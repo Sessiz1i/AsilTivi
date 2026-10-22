@@ -1,0 +1,41 @@
+[
+  {
+    "rawProviderHint": "",
+    "candidateId": "R20-C013",
+    "name": "TRT Türk",
+    "sourceId": "17470542403,1",
+    "rawIndex": 38,
+    "metadataId": "TRTTurk.tr",
+    "oldChannelId": null,
+    "publisherStatus": "CURRENT_EXACT",
+    "publisherEvidenceSha256": "6c7a4b55d6f88b78e25a6542fd76cf284ac733f165738eb69a6dcb266dd66a9d",
+    "old": {
+      "address": "https://streams.uzunmuhalefet.com/stream/d8fcd134-0f23-4883-ae8f-4c04cc3cc49a.m3u8",
+      "headers": [],
+      "mimeType": null,
+      "protocol": null,
+      "drm": null,
+      "authorityScope": null,
+      "options": [],
+      "unknownRequiredDirectives": [],
+      "isLossless": true
+    },
+    "new": {
+      "address": "https://tv-trtturk.medya.trt.com.tr/master.m3u8",
+      "headers": [],
+      "mimeType": null,
+      "protocol": null,
+      "drm": null,
+      "authorityScope": null,
+      "options": [],
+      "unknownRequiredDirectives": [],
+      "isLossless": true
+    },
+    "oldLibraryCodecSha256": "6b40fe03c25200071898113a0186e6f05658288bc0f84f4fce1d4c8becebfaef",
+    "newLibraryCodecSha256": "41ce4b9bbfc6de1d17b60d12ec3fe7697cf5e030c2f0fa46c0a25efaded7d0d2",
+    "oldFullDefinitionSha256": "9d3a7e125ffebcd5aad860001ffa8d69b587bd74ce2d640e49460f9b8e531ec9",
+    "newFullDefinitionSha256": "8ef3f1857850e18e92a5a3b9379b06fad73078a7fd7df7c851e69667e2edf366",
+    "oldUriSha256": "318e9832b751b46a54b8f95d845edc3c35068dbcd6a0a82d71a640abcdb8b9b1",
+    "newUriSha256": "08616fb707a3adc91b4e4753d0c5dbeebdf324f6ddcd410f491ddf2339f42b9f"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "version": "R33-TRT-AVAZ-1",
+  "approval": "R33-TRT-AVAZ-T02-VE-GERCEK-PROFIL-ONAYI-2026-10-15",
+  "candidateId": "R20-C014",
+  "sourceId": "17470542403,1",
+  "rawIndex": 39,
+  "old": {
+    "uri": "https://streams.uzunmuhalefet.com/stream/3dd49c7a-001c-4be0-9a16-0f8957e3977c.m3u8",
+    "headers": {},
+    "expectedMedia": "video",
+    "unsupportedDirectives": []
+  },
+  "new": {
+    "uri": "https://tv-trtavaz.medya.trt.com.tr/master.m3u8",
+    "headers": {},
+    "expectedMedia": "video",
+    "unsupportedDirectives": []
+  },
+  "seedSha256": "ff4490b2563117b522e12f751ecf4dca936b180dd01837487fdd3ea8dd170a2c"
+}

@@ -1,0 +1,49 @@
+{
+  "status": "APPROVED_EXPLICIT_USER_DECISION",
+  "humanApprovalRecorded": true,
+  "t02": "APPROVED_C013_EXACT_FROZEN_DEFINITION_ONLY",
+  "normalApply": "APPROVED_C013_ONLY_WITH_PREFLIGHT_TESTS_AND_PRODUCT_VALIDATION",
+  "scope": {
+    "candidate": "R20-C013",
+    "name": "TRT Türk",
+    "realChannelId": "4093774985743516282,-6857945044662352196",
+    "sourceId": "17470542403,1",
+    "rawIndex": 38,
+    "frozenInput": {
+      "path": "outputs/R38A-TRT-Turk-Preflight-Kanit-Eki-2026-10-16/c013-definitions.private.json",
+      "bytes": 1568,
+      "sha256": "30066f3b50c103f30b3aa9421bcf0f6cf8fb57b1f72dbf7ab6ae43981beaf6af"
+    },
+    "hashes": {
+      "seedSha256": "ff4490b2563117b522e12f751ecf4dca936b180dd01837487fdd3ea8dd170a2c",
+      "oldUriSha256": "318e9832b751b46a54b8f95d845edc3c35068dbcd6a0a82d71a640abcdb8b9b1",
+      "newUriSha256": "08616fb707a3adc91b4e4753d0c5dbeebdf324f6ddcd410f491ddf2339f42b9f",
+      "oldLibraryCodecSha256": "6b40fe03c25200071898113a0186e6f05658288bc0f84f4fce1d4c8becebfaef",
+      "newLibraryCodecSha256": "41ce4b9bbfc6de1d17b60d12ec3fe7697cf5e030c2f0fa46c0a25efaded7d0d2",
+      "oldFullDefinitionSha256": "9d3a7e125ffebcd5aad860001ffa8d69b587bd74ce2d640e49460f9b8e531ec9",
+      "newFullDefinitionSha256": "8ef3f1857850e18e92a5a3b9379b06fad73078a7fd7df7c851e69667e2edf366"
+    },
+    "implementation": "Narrow normal binding after code54 synthetic closure, targeted tests/new same-signature higher-code APK, fresh preflight",
+    "normalWrite": "One atomic sources-only apply for this exact target; no allocator/general rebind",
+    "productValidation": "Only normal C013 select, short playback and one product EXIT/normal MAIN-LAUNCHER reopen; expected product history/lastChannel effects recorded separately",
+    "normalRollback": "NOT_INCLUDED_REQUIRES_SEPARATE_DECISION",
+    "excluded": [
+      "other channels",
+      "Avaz hide",
+      "EPG",
+      "R39",
+      "DB reset/restore/downgrade"
+    ]
+  },
+  "reason": "Direct human acceptance of the concrete C013 question; no inference from worker result.",
+  "directUserMessage": "onayloyorum sen herşeyi sırayla devam ettir onay bekleme on sonda kontrol edicem herşeyi sen bitti diyince",
+  "approvalDate": "2026-10-16",
+  "approvalRecord": "kayitlar/R38C-C013-NORMAL-GECIS-ONAYI-VE-SIRALI-DEVAM-YETKISI-2026-10-16.md",
+  "sequentialProgressAuthorization": {
+    "withinExistingPlan": true,
+    "routineReconfirmationRequired": false,
+    "finalHumanReview": "AT_END_NOT_YET_GIVEN",
+    "plannerRoleUnchanged": true,
+    "otherThreadMessagingAuthorized": false
+  }
+}

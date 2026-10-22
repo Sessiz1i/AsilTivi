@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- Exact public-list HTTP hosts plus the observed Star redirect; no trust overrides. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">104.238.23.221</domain>
+        <domain includeSubdomains="false">161.118.166.5</domain>
+        <domain includeSubdomains="false">208.79.153.167</domain>
+        <domain includeSubdomains="false">37.247.98.7</domain>
+        <domain includeSubdomains="false">46.20.3.201</domain>
+        <domain includeSubdomains="false">46.20.3.220</domain>
+        <domain includeSubdomains="false">46.20.3.230</domain>
+        <domain includeSubdomains="false">46.20.7.125</domain>
+        <domain includeSubdomains="false">87.121.104.29</domain>
+        <domain includeSubdomains="false">dogusdyg-star.lg.mncdn.com</domain>
+        <domain includeSubdomains="false">dygvideo.dygdigital.com</domain>
+        <domain includeSubdomains="false">icecast.netmedya.net</domain>
+        <domain includeSubdomains="false">live.cdn-vizi.workers.dev</domain>
+        <domain includeSubdomains="false">live.yt-hls.workers.dev</domain>
+        <domain includeSubdomains="false">live4.radyotvonline.com</domain>
+        <domain includeSubdomains="false">m.live.net.sa</domain>
+        <domain includeSubdomains="false">ntvrdwmp.radyotvonline.com</domain>
+        <domain includeSubdomains="false">radyopause.ozelip.com.tr</domain>
+        <domain includeSubdomains="false">radyotrio.radyotvonline.net</domain>
+        <domain includeSubdomains="false">schwarzer-1903.com</domain>
+        <domain includeSubdomains="false">shoutcast.radyogrup.com</domain>
+        <domain includeSubdomains="false">stream.radyoodtu.com.tr</domain>
+        <domain includeSubdomains="false">turkmedya.radyotvonline.com</domain>
+        <domain includeSubdomains="false">tv.smartglwiz.workers.dev</domain>
+    </domain-config>
+</network-security-config>
