@@ -64,7 +64,8 @@ class MainActivity : ComponentActivity() {
     private val navigationKeys = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
-        KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN)
+        KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
+        KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_ZOOM_MODE)
 
     private fun immersive() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -84,6 +85,16 @@ class MainActivity : ComponentActivity() {
     private fun handleNavigationKey(event: KeyEvent): Boolean {
         observeKey(event, "window")
         val s = previewState
+        if (s != null && s.loaded && s.page == "live" && event.action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            if (event.keyCode in listOf(KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE)) {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) s.toggleInfo()
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_TV_ZOOM_MODE) {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) s.openFormatMenu()
+                return true
+            }
+        }
         val command = tvNavigationCommand(event.keyCode)
         if (s != null && command != null && event.action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
             val ime = ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
@@ -138,7 +149,8 @@ class MainActivity : ComponentActivity() {
                 PreviewImage(name, modifier)
             }, video = { channel, paused, muted, retry, format, preferences, onQuality, modifier ->
                 SampleVideo(channel, paused, muted, retry, format, modifier, state::played, preferences, onQuality,
-                    captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0)
+                    captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0,
+                    onTechnicalInfo = { state.technicalInfo = it })
             })
         }
     }
@@ -287,9 +299,45 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
     private var requestedPause = false
     private var playbackPreferences by mutableStateOf(PlaybackPreferences())
     private var qualityObservation by mutableStateOf(VideoQualityObservation())
+    var technicalInfo by mutableStateOf(StreamTechnicalInfo()); private set
     val qualityDescription get() = qualityObservation.description(playbackPreferences) + "\nSes: " +
         languageStatus(playbackPreferences.audio,TrackLanguage.audio(playbackPreferences.audio),audioTracks) + "\nAltyazı: " +
         languageStatus(playbackPreferences.subtitle,TrackLanguage.subtitle(playbackPreferences.subtitle),textTracks,text=true)
+    private fun updateTechnicalVideoFormat(format: androidx.media3.common.Format) {
+        val w = if (format.width > 0) format.width else technicalInfo.width
+        val h = if (format.height > 0) format.height else technicalInfo.height
+        val fps = if (format.frameRate > 0f) format.frameRate else technicalInfo.frameRate
+        val br = when {
+            format.bitrate > 0 -> format.bitrate
+            format.peakBitrate > 0 -> format.peakBitrate
+            format.averageBitrate > 0 -> format.averageBitrate
+            else -> technicalInfo.videoBitrate
+        }
+        technicalInfo = technicalInfo.copy(
+            width = w,
+            height = h,
+            frameRate = fps,
+            videoCodec = format.codecs ?: technicalInfo.videoCodec,
+            videoMimeType = format.sampleMimeType ?: technicalInfo.videoMimeType,
+            videoBitrate = br,
+        )
+    }
+    private fun updateTechnicalAudioFormat(format: androidx.media3.common.Format) {
+        val ch = if (format.channelCount > 0) format.channelCount else technicalInfo.audioChannels
+        val sr = if (format.sampleRate > 0) format.sampleRate else technicalInfo.audioSampleRate
+        val br = when {
+            format.bitrate > 0 -> format.bitrate
+            format.averageBitrate > 0 -> format.averageBitrate
+            else -> technicalInfo.audioBitrate
+        }
+        technicalInfo = technicalInfo.copy(
+            audioCodec = format.codecs ?: technicalInfo.audioCodec,
+            audioMimeType = format.sampleMimeType ?: technicalInfo.audioMimeType,
+            audioChannels = ch,
+            audioSampleRate = sr,
+            audioBitrate = br,
+        )
+    }
     private var audioTracks by mutableStateOf(emptyList<LanguageTrack>())
     private var textTracks by mutableStateOf(emptyList<LanguageTrack>())
     var captions by mutableStateOf(emptyList<androidx.media3.common.text.Cue>()); private set
@@ -372,6 +420,33 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             override fun onVideoInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: androidx.media3.common.Format, decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
                 observedAttempt(eventTime) ?: return
                 qualityObservation = qualityObservation.copy(input = VideoTrackFormat(format.width, format.height, format.bitrate, format.codecs ?: format.sampleMimeType))
+                updateTechnicalVideoFormat(format)
+            }
+            override fun onAudioInputFormatChanged(eventTime: AnalyticsListener.EventTime, format: androidx.media3.common.Format, decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?) {
+                observedAttempt(eventTime) ?: return
+                updateTechnicalAudioFormat(format)
+            }
+            override fun onVideoSizeChanged(eventTime: AnalyticsListener.EventTime, videoSize: VideoSize) {
+                observedAttempt(eventTime) ?: return
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    technicalInfo = technicalInfo.copy(width = videoSize.width, height = videoSize.height)
+                }
+            }
+            override fun onMediaMetadataChanged(eventTime: AnalyticsListener.EventTime, mediaMetadata: androidx.media3.common.MediaMetadata) {
+                observedAttempt(eventTime) ?: return
+                val title = mediaMetadata.title?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: mediaMetadata.displayTitle?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                if (title != null) technicalInfo = technicalInfo.copy(streamTitle = title)
+            }
+            override fun onLoadCompleted(eventTime: AnalyticsListener.EventTime, loadEventInfo: LoadEventInfo, mediaLoadData: MediaLoadData) {
+                observedAttempt(eventTime) ?: return
+                if (mediaLoadData.trackType == C.TRACK_TYPE_VIDEO) mediaLoadData.trackFormat?.let(::updateTechnicalVideoFormat)
+                if (mediaLoadData.trackType == C.TRACK_TYPE_AUDIO) mediaLoadData.trackFormat?.let(::updateTechnicalAudioFormat)
+                val segmentDurationMs = mediaLoadData.mediaEndTimeMs - mediaLoadData.mediaStartTimeMs
+                if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA && loadEventInfo.bytesLoaded > 0 && segmentDurationMs > 0) {
+                    val bps = ((loadEventInfo.bytesLoaded * 8_000L) / segmentDurationMs).coerceIn(1L, 100_000_000L).toInt()
+                    technicalInfo = technicalInfo.copy(measuredBitrate = bps)
+                }
             }
             override fun onTracksChanged(eventTime: AnalyticsListener.EventTime, tracks: androidx.media3.common.Tracks) {
                 observedAttempt(eventTime) ?: return
@@ -382,8 +457,16 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                         val f = group.getTrackFormat(index)
                         videoTracks++
                         if (group.isTrackSupported(index)) formats += VideoTrackFormat(f.width, f.height, f.bitrate, f.codecs ?: f.sampleMimeType)
+                        if (group.isTrackSelected(index)) updateTechnicalVideoFormat(f)
                     }
                 }
+                tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }.forEach { group ->
+                    for (index in 0 until group.length) {
+                        if (group.isTrackSelected(index)) updateTechnicalAudioFormat(group.getTrackFormat(index))
+                    }
+                }
+                exo.videoFormat?.let(::updateTechnicalVideoFormat)
+                exo.audioFormat?.let(::updateTechnicalAudioFormat)
                 qualityObservation = qualityObservation.copy(tracks = formats, unsupported = videoTracks > 0 && formats.isEmpty())
                 audioTracks=LanguageTrackSelection.tracks(tracks,C.TRACK_TYPE_AUDIO)
                 textTracks=LanguageTrackSelection.tracks(tracks,C.TRACK_TYPE_TEXT)
@@ -425,6 +508,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         resetCueObserver();audioTracks=emptyList();textTracks=emptyList()
         this.channel = channel; error = null
         qualityObservation = VideoQualityObservation()
+        technicalInfo = StreamTechnicalInfo()
         exo.stop(); exo.clearMediaItems()
         status = PlaybackStatus.IDLE
         val uri = playbackUri(channel)
@@ -486,13 +570,13 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         if (released) return
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
         cueListener?.let(exo::removeAnalyticsListener); cueListener = null
-        audioTracks = emptyList(); textTracks = emptyList()
+        audioTracks = emptyList(); textTracks = emptyList(); technicalInfo = StreamTechnicalInfo()
         sourceScope.cancel(); exo.release()
     }
 }
 
 @Composable
-internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0) {
+internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val played by rememberUpdatedState(onPlayed)
@@ -500,7 +584,7 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
     val currentPaused by rememberUpdatedState(paused)
     LaunchedEffect(channel, retry) { player.preferences(preferences); player.mute(muted); player.select(channel); player.pause(paused) }
     LaunchedEffect(preferences) { player.preferences(preferences) }
-    SideEffect { onQuality(player.qualityDescription) }
+    SideEffect { onQuality(player.qualityDescription); onTechnicalInfo(player.technicalInfo) }
     LaunchedEffect(paused, muted) { player.pause(paused); player.mute(muted) }
     DisposableEffect(player, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -540,6 +624,7 @@ private fun VideoTexture(player: AndroidPreviewPlayer, format: String, modifier:
         matrix.setScale(rect.width / view.width, rect.height / view.height, view.width / 2f, view.height / 2f)
         view.setTransform(matrix)
     }
+    LaunchedEffect(format, size) { resize(texture) }
     DisposableEffect(exo, texture) {
         val listener = object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) { size = videoSize }

@@ -254,8 +254,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconAction("Radyo", "ikon_audio", image) { s.notice = s.message("Radyo modu yakında eklenecektir.", "Radio mode coming soon.", "Radiomodus demnächst verfügbar.") }
                 IconAction("Çoklu Ekran", "ikon_coklu", image) { s.dialog = "warning" }
-                IconAction("Görüntü", "ikon_format", image, click = s::cycleLiveFormat)
-                IconAction("Bilgi", "ikon_saat", image) { s.info = !s.info }
+                IconAction("Görüntü", "ikon_format", image, click = s::openFormatMenu)
+                IconAction("Bilgi", "ikon_saat", image, click = s::toggleInfo)
                 IconAction("Ayarlar", "ikon_ayar", image, click = s::settings)
                 IconAction("Çıkış", "ikon_cikis", image) { s.dialog = "exit" }
             }
@@ -293,18 +293,132 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             }
         }
         if (s.info) {
+            LaunchedEffect(s.info, s.selected) {
+                kotlinx.coroutines.delay(10_000)
+                s.info = false
+            }
             val align = when (s.data.pref("position")) { "Sol" -> Alignment.BottomStart; "Sağ" -> Alignment.BottomEnd; else -> Alignment.BottomCenter }
             val factor = when (s.data.pref("size")) { "Küçük" -> .75f; "Büyük" -> 1.25f; else -> 1f }
-            Row(Modifier.align(align).onGloballyPositioned { boundsObserver("channel-info",it.boundsInWindow()) }.padding(bottom = if (s.panel && !vertical) panelHeight + 18.dp else 20.dp, start = 16.dp, end = 16.dp).width(385.57.dp * factor).heightIn(min = 94.47.dp * factor).background(Color(0xCF000000), RoundedCornerShape(12.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                image(s.channel?.logo ?: "ikon_tv", Modifier.size(58.dp * factor))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) { Label(s.channel?.name ?: "", (18 * factor).toInt(), Color.White, bold = true); Label("Program bilgisi yok", (11 * factor).toInt(), Color(0xFFFFD735)); Label(s.channel?.category.orEmpty(), (10 * factor).toInt(), Color(0xFF86C9EF)); Label(qualityInfo, (9 * factor).toInt(), Color.White) }
-            }
+            ChannelInfoPanel(
+                s = s,
+                qualityInfo = qualityInfo,
+                factor = factor,
+                image = image,
+                modifier = Modifier
+                    .align(align)
+                    .onGloballyPositioned { boundsObserver("channel-info", it.boundsInWindow()) }
+                    .padding(bottom = if (s.panel && !vertical) panelHeight + 18.dp else 20.dp, start = 16.dp, end = 16.dp)
+                    .width((435.dp * factor).coerceAtMost(maxWidth - 32.dp))
+            )
         }
         if (s.moving != null) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 25.dp).background(Color(0xFF243F66), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp)); Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
         }
     }
 }
+@Composable
+private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, factor: Float, image: @Composable (String, Modifier) -> Unit, modifier: Modifier) {
+    val t = s.technicalInfo
+    val programTitle = t.streamTitle ?: "Program Bilgisi Bulunamadı"
+    Column(
+        modifier
+            .background(Color(0xE608111E), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFF2B3E58), RoundedCornerShape(12.dp))
+            .pointerInput(Unit) { detectTapGestures { s.info = false } }
+            .padding((12 * factor).dp),
+        verticalArrangement = Arrangement.spacedBy((8 * factor).dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy((12 * factor).dp)
+        ) {
+            Box(
+                Modifier
+                    .size((56 * factor).dp)
+                    .background(Color(0xFF13233D), RoundedCornerShape(10.dp))
+                    .padding((6 * factor).dp),
+                contentAlignment = Alignment.Center
+            ) {
+                image(s.channel?.logo ?: "ikon_tv", Modifier.fillMaxSize())
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy((4 * factor).dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy((6 * factor).dp)
+                ) {
+                    Box(
+                        Modifier
+                            .background(Color(0xFF1E3557), RoundedCornerShape(5.dp))
+                            .padding(horizontal = (6 * factor).dp, vertical = (2 * factor).dp)
+                    ) {
+                        Label("#${s.channelNumber}", (10 * factor).toInt(), Color(0xFFFFD735), bold = true)
+                    }
+                    Label(s.channel?.name ?: "", (16 * factor).toInt(), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+                    if (!s.channel?.category.isNullOrEmpty()) {
+                        Label(s.channel?.category.orEmpty(), (9 * factor).toInt(), Color(0xFF86C9EF), bold = true, maxLines = 1)
+                    }
+                    Box(
+                        Modifier
+                            .background(amber, RoundedCornerShape(5.dp))
+                            .padding(horizontal = (6 * factor).dp, vertical = (2 * factor).dp)
+                    ) {
+                        Label(t.resolutionBadge, (9 * factor).toInt(), Color.White, bold = true)
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Label("Şimdi: $programTitle", (11 * factor).toInt(), Color(0xFFFFD735), Modifier.weight(1f), bold = true, maxLines = 1)
+                    Label("--:-- - --:--", (9 * factor).toInt(), Color(0xFFB0BEC5))
+                }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height((3 * factor).dp)
+                        .background(Color(0xFF223651), RoundedCornerShape(2.dp))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(if (t.streamTitle != null) 0.5f else 0.25f)
+                            .fillMaxHeight()
+                            .background(Color(0xFFFFD735), RoundedCornerShape(2.dp))
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Label("Sonra: Program Bilgisi Bulunamadı", (10 * factor).toInt(), Color(0xFF86C9EF), Modifier.weight(1f), maxLines = 1)
+                    Label("Oran: ${s.data.pref("format").substringBefore(" (")}", (9 * factor).toInt(), Color(0xFF94A2B7))
+                }
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x33FFFFFF)))
+        Column(verticalArrangement = Arrangement.spacedBy((3 * factor).dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Label("Çözünürlük: ${t.resolutionLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
+                Label("Kare Hızı: ${t.fpsLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
+                Label("Video Codec: ${t.videoCodecLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Label("Ses Formatı: ${t.audioFormatLabel}", (9 * factor).toInt(), Color(0xFFB8C7DC))
+                Label("Bitrate: ${t.bitrateLabel}", (9 * factor).toInt(), Color(0xFFFFD735), bold = true)
+            }
+            if (qualityInfo.isNotBlank()) {
+                val extraLine = qualityInfo.lineSequence().drop(2).joinToString(" · ")
+                if (extraLine.isNotBlank()) {
+                    Label(extraLine, (8 * factor).toInt(), Color(0xFF8A9AB0), maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
 @Composable private fun IconAction(label: String, icon: String, image: @Composable (String, Modifier) -> Unit, width: Dp? = null, visibleLabel: String = label, click: () -> Unit) {
     Action(label, Modifier.height(29.dp).then(if (width != null) Modifier.width(width) else Modifier), tint = Color(0xB8000000), radius = 11.dp, stroke = Color(0xFF344454), content = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { image(icon, Modifier.size(13.dp, 14.dp)); Label(visibleLabel, 11, bold = true) } }, click = click)
 }
@@ -425,7 +539,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
 
 private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Yardım Ve Hakkında")
 private val sectionsEn = listOf("Channels And Lists", "Appearance", "Playback", "Application", "Backup And Transfer", "Help And About")
-private val choices = mapOf("list" to listOf("Yatay (Alt)", "Dikey (Sidebar)"), "position" to listOf("Sol", "Orta", "Sağ"), "size" to listOf("Küçük", "Normal", "Büyük"), "language" to listOf("Türkçe", "English", "Deutsch"), "quality" to listOf("360p", "480p", "720p HD", "1080p FHD", "4K UHD"), "format" to listOf("Orijinal", "Sığdır (Fit)", "Tam Ekran (Kes)"), "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"), "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"))
+private val choices = mapOf("list" to listOf("Yatay (Alt)", "Dikey (Sidebar)"), "position" to listOf("Sol", "Orta", "Sağ"), "size" to listOf("Küçük", "Normal", "Büyük"), "language" to listOf("Türkçe", "English", "Deutsch"), "quality" to listOf("360p", "480p", "720p HD", "1080p FHD", "4K UHD"), "format" to LiveFormatOptions, "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"), "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"))
 private val titles = mapOf("list" to "Liste Konumu", "opacity" to "Liste Şeffaflığı", "position" to "Kanal Bilgisi Konum", "size" to "Kanal Bilgisi Boyut", "language" to "Uygulama Dili", "quality" to "Görüntü Kalitesi", "format" to "Varsayılan Görüntü Formatı", "audio" to "Tercih Edilen Ses Dili", "subtitle" to "Altyazı Varsayılanı")
 private val sectionIcons = listOf("ikon_kaynak", "ikon_gorunum", "ikon_oynatma", "ikon_app", "ikon_export", "ikon_hakkinda")
 private val settingIcons = mapOf("list" to "ikon_list", "opacity" to "ikon_opacity", "position" to "ikon_position", "size" to "ikon_size", "language" to "ikon_language", "quality" to "ikon_quality", "format" to "ikon_format", "audio" to "ikon_ses", "subtitle" to "ikon_subtitle")
@@ -625,7 +739,7 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
     val kind = s.dialog ?: return
     if (kind == "exit") { ExitDialog(s, image); return }
     if (kind in sourceFormKinds || kind == "categories") return
-    if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), optionHeading(kind)); return }
+    if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), if (kind == "format" && s.page == "live") "GÖRÜNTÜ ORANI" else optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }
     if (kind == "layout") { LayoutChooser(s, image); return }
     if (kind == "favorite" || kind == "channel") { ChannelMenu(s, image); return }

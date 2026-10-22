@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.omer.belestiviclone.shared.preview.isVideoFormatSelected
 
 internal val LocalModalLayer = staticCompositionLocalOf { false }
 private val referenceCard = Color(0xFF13233D)
@@ -40,28 +41,29 @@ internal fun ReferenceOverlay(s: PreviewState, title: String, quality: Boolean =
 @Composable
 internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, title: String) {
     val quality = kind == "quality"
+    val format = kind == "format"
     val selected = remember(kind) { FocusRequester() }
     ReferenceOverlay(s, title, quality) {
         val width = if (quality) maxWidth * (256f / 855f) else 470.dp.coerceAtMost(maxWidth - 32.dp)
-        val height = when (kind) { "list" -> 144.dp; "audio", "subtitle" -> 413.dp; "quality" -> 211.dp; else -> 188.dp }
+        val height = when (kind) { "list" -> 144.dp; "format" -> 368.dp; "audio", "subtitle" -> 413.dp; "quality" -> 211.dp; else -> 188.dp }
         val placement = if (quality) Modifier.offset(x = maxWidth * (560f / 855f), y = maxHeight * (135f / 481f))
             else Modifier.align(Alignment.Center)
         Column(placement.width(width).heightIn(max = maxHeight - 12.dp).height(height)
-            .background(referenceCard, RoundedCornerShape(if (quality) 10.dp else 0.dp))
+            .background(referenceCard, RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
             .pointerInput(Unit) { detectTapGestures { } }
             .padding(horizontal = 20.dp, vertical = if (quality) 17.dp else 19.dp).focusGroup()) {
             Label(title, 9, Color(0xFF94A2B7), bold = true, lineHeight = 16f, letterSpacing = if (quality) 0f else 1f)
             Spacer(Modifier.height(if (quality) 5.dp else 7.dp))
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 values.forEachIndexed { index, value ->
-                    val chosen = s.data.pref(kind) == value
+                    val chosen = if (format) isVideoFormatSelected(s.data.pref(kind), value) else s.data.pref(kind) == value
                     Action(value, Modifier.fillMaxWidth().height(if (quality) 41.5.dp else 44.5.dp)
-                        .then(if (chosen || (s.data.pref(kind) !in values && index == 0)) Modifier.focusRequester(selected) else Modifier),
+                        .then(if (chosen || (!format && s.data.pref(kind) !in values && index == 0)) Modifier.focusRequester(selected) else Modifier),
                         tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, focusColor = Color(0xFFE67E22), enabled = !s.busy,
                         padding = PaddingValues(horizontal = 2.dp), content = {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 Label(value, 12, Color(0xFFE9EEF5), bold = true)
-                                if (chosen) Label("✓", 20, Color(0xFFE67E22), if (quality) Modifier.align(Alignment.CenterEnd).padding(end = 5.dp) else Modifier.offset(x = 184.dp))
+                                if (chosen) Label("✓", 20, Color(0xFFE67E22), if (quality || format) Modifier.align(Alignment.CenterEnd).padding(end = 5.dp) else Modifier.offset(x = 184.dp))
                             }
                         }) { s.pref(kind, value) }
                 }

@@ -38,6 +38,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var panel by mutableStateOf(true)
     var categoryMenu by mutableStateOf(false)
     var info by mutableStateOf(false)
+    var technicalInfo by mutableStateOf(StreamTechnicalInfo())
     var selected by mutableStateOf(PreviewFixture.channels.first().id)
     var dialog by mutableStateOf<String?>(null)
     var target by mutableStateOf<OpaqueId?>(null)
@@ -67,18 +68,30 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var sessionOnly by mutableStateOf(false); private set
     val visibleData get() = draft ?: data
     val channel get() = data.channels.find { it.id == selected }
+    val channelNumber: Int get() {
+        val list = visibleData.filtered(category, query)
+        val inFiltered = list.indexOfFirst { it.id == selected }
+        if (inFiltered >= 0) return inFiltered + 1
+        val inAll = data.channels.indexOfFirst { it.id == selected }
+        return if (inAll >= 0) inAll + 1 else 1
+    }
     val normalLiveControls get() = loaded && page == "live" && dialog == null && !searching &&
         query.isEmpty() && moving == null && draft == null && multi == null && !busy
     val canRevealLiveControls get() = normalLiveControls && !panel
     val liveHeadingVisible get() = page == "live" && panel
     fun revealLiveControls() { if (canRevealLiveControls) panel = true }
+    fun openFormatMenu() {
+        if (busy) return
+        dialog = if (dialog == "format") null else "format"
+    }
+    fun toggleInfo() {
+        if (page == "live") info = !info
+    }
     fun cycleLiveFormat() {
         if (!normalLiveControls) return
-        val next = when (data.pref("format")) {
-            "Orijinal" -> "Sığdır (Fit)"
-            "Sığdır (Fit)" -> "Tam Ekran (Kes)"
-            else -> "Orijinal"
-        }
+        val current = data.pref("format")
+        val index = LiveFormatOptions.indexOfFirst { isVideoFormatSelected(current, it) }
+        val next = LiveFormatOptions[(index + 1) % LiveFormatOptions.size]
         pref("format", next)
     }
     fun stepChannel(delta: Int) {
@@ -157,7 +170,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val order = data.categories.toMutableList(); order.removeAt(from); order.add(to, category)
         commit(data.copy(categories = order))
     }
-    fun select(id: OpaqueId) { selected = id; paused = false; if (playbackUri(channel) == null) notice = if (channel?.available == false)
+    fun select(id: OpaqueId) { if (selected != id) technicalInfo = StreamTechnicalInfo(); selected = id; paused = false; if (playbackUri(channel) == null) notice = if (channel?.available == false)
         message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
         else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı." }
     /** Called by a real first-frame/audio-advancing event, never by focus or channel selection. */
@@ -209,7 +222,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             searching -> { searching = false; query = "" }
             categoryMenu -> categoryMenu = false
             page == "settings" -> { page = origin; panel = false; if (returnAfterClear) clearReturn() }
-            page == "multi" -> { selected = multi?.returnChannel() ?: selected; multi = null; page = "live"; pref("format", "Orijinal") }
+            page == "multi" -> { selected = multi?.returnChannel() ?: selected; multi = null; page = "live" }
+            page == "live" && info -> info = false
             page == "live" && panel -> panel = false
             page == "live" -> dialog = "exit"
         }

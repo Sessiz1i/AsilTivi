@@ -21,4 +21,42 @@ class VideoQualityTest {
         assertTrue(VideoQualityObservation().description(PlaybackPreferences("old")).contains("bilinmeyen tercih"))
         assertTrue(VideoQualityObservation(unsupported=true).description(PlaybackPreferences()).contains("bu cihazda desteklenmiyor"))
     }
+    @Test fun streamTechnicalInfoFormatsResolutionFpsCodecsAudioAndBitrate() {
+        val info = StreamTechnicalInfo(
+            width = 1920,
+            height = 1080,
+            frameRate = 50f,
+            videoCodec = "avc1.640028",
+            videoMimeType = "video/avc",
+            videoBitrate = 2_400_000,
+            audioCodec = "mp4a.40.2",
+            audioMimeType = "audio/mp4a-latm",
+            audioChannels = 2,
+            audioSampleRate = 48_000,
+            audioBitrate = 128_000,
+        )
+        assertEquals("1080p FHD", info.resolutionBadge)
+        assertEquals("1920x1080 (1080p)", info.resolutionLabel)
+        assertEquals("50 fps", info.fpsLabel)
+        assertEquals("H.264 / AVC", info.videoCodecLabel)
+        assertEquals("AAC, 2 kanal, 48 kHz", info.audioFormatLabel)
+        assertEquals("2.5 Mbps (2528 kbps)", info.bitrateLabel)
+
+        val hevcFallback = StreamTechnicalInfo(
+            width = 1280,
+            height = 720,
+            frameRate = 25f,
+            videoMimeType = "video/hevc",
+            measuredBitrate = 1_500_000,
+        )
+        assertEquals("720p HD", hevcFallback.resolutionBadge)
+        assertEquals("1280x720 (720p)", hevcFallback.resolutionLabel)
+        assertEquals("25 fps", hevcFallback.fpsLabel)
+        assertEquals("H.265 / HEVC", hevcFallback.videoCodecLabel)
+        assertEquals("1.5 Mbps (1500 kbps)", hevcFallback.bitrateLabel)
+
+        assertEquals(7, LiveFormatOptions.size)
+        assertTrue(isVideoFormatSelected("Orijinal", "Otomatik (Orijinal yayın oranı)"))
+        assertTrue(isVideoFormatSelected("2.39:1 (Anamorfik sinema)", "2.39:1 (Anamorfik sinema)"))
+    }
 }
