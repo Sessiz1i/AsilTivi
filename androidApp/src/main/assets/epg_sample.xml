@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv generator-info-name="BelesTiviClone-F4" generator-info-url="https://belestivi.local">
+  <channel id="trt1.tr">
+    <display-name lang="tr">TRT 1</display-name>
+    <display-name lang="tr">TRT1</display-name>
+    <display-name lang="tr">TRT 1 HD</display-name>
+  </channel>
+  <channel id="atv.tr">
+    <display-name lang="tr">ATV</display-name>
+    <display-name lang="tr">ATV HD</display-name>
+  </channel>
+  <channel id="kanald.tr">
+    <display-name lang="tr">Kanal D</display-name>
+    <display-name lang="tr">Kanal D HD</display-name>
+  </channel>
+  <channel id="nowtv.tr">
+    <display-name lang="tr">NOW TV</display-name>
+    <display-name lang="tr">NOW</display-name>
+    <display-name lang="tr">NOW HD</display-name>
+  </channel>
+  <channel id="showtv.tr">
+    <display-name lang="tr">Show TV</display-name>
+    <display-name lang="tr">Show</display-name>
+    <display-name lang="tr">Show TV HD</display-name>
+  </channel>
+  <channel id="startv.tr">
+    <display-name lang="tr">Star TV</display-name>
+    <display-name lang="tr">Star</display-name>
+    <display-name lang="tr">Star TV HD</display-name>
+  </channel>
+  <channel id="tv8.tr">
+    <display-name lang="tr">TV8</display-name>
+    <display-name lang="tr">TV 8</display-name>
+    <display-name lang="tr">TV8 HD</display-name>
+  </channel>
+  <channel id="kanal7.tr">
+    <display-name lang="tr">Kanal 7</display-name>
+    <display-name lang="tr">Kanal 7 HD</display-name>
+  </channel>
+  <channel id="beyaztv.tr">
+    <display-name lang="tr">Beyaz TV</display-name>
+    <display-name lang="tr">Beyaz TV HD</display-name>
+  </channel>
+  <channel id="360tv.tr">
+    <display-name lang="tr">360 TV</display-name>
+    <display-name lang="tr">360</display-name>
+  </channel>
+  <channel id="trthaber.tr">
+    <display-name lang="tr">TRT Haber</display-name>
+    <display-name lang="tr">TRT Haber HD</display-name>
+  </channel>
+  <channel id="ahaber.tr">
+    <display-name lang="tr">A Haber</display-name>
+    <display-name lang="tr">A Haber HD</display-name>
+  </channel>
+  <channel id="ntv.tr">
+    <display-name lang="tr">NTV</display-name>
+    <display-name lang="tr">NTV HD</display-name>
+  </channel>
+  <channel id="cnnturk.tr">
+    <display-name lang="tr">CNN Türk</display-name>
+    <display-name lang="tr">CNN Turk</display-name>
+  </channel>
+  <channel id="haberturk.tr">
+    <display-name lang="tr">Habertürk</display-name>
+    <display-name lang="tr">Haberturk</display-name>
+  </channel>
+  <channel id="halktv.tr">
+    <display-name lang="tr">Halk TV</display-name>
+  </channel>
+  <channel id="sozcutv.tr">
+    <display-name lang="tr">Sözcü TV</display-name>
+    <display-name lang="tr">Sozcu TV</display-name>
+  </channel>
+  <channel id="trtspor.tr">
+    <display-name lang="tr">TRT Spor</display-name>
+  </channel>
+  <channel id="aspor.tr">
+    <display-name lang="tr">A Spor</display-name>
+  </channel>
+  <channel id="trtcocuk.tr">
+    <display-name lang="tr">TRT Çocuk</display-name>
+    <display-name lang="tr">TRT Cocuk</display-name>
+  </channel>
+  <channel id="trtgenc.tr">
+    <display-name lang="tr">TRT GENÇ</display-name>
+    <display-name lang="tr">TRT Genç</display-name>
+  </channel>
+  <channel id="trtbelgesel.tr">
+    <display-name lang="tr">TRT Belgesel</display-name>
+  </channel>
+  <channel id="trt4k.tr">
+    <display-name lang="tr">TRT 4K</display-name>
+  </channel>
+  <channel id="tlc.tr">
+    <display-name lang="tr">TLC</display-name>
+  </channel>
+  <channel id="dmax.tr">
+    <display-name lang="tr">DMAX</display-name>
+  </channel>
+
+  <!-- TRT 1 -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="trt1.tr">
+    <title lang="tr">Gece Sineması: Anadolu Hikayeleri</title>
+    <desc lang="tr">Türk sinemasının seçkin örnekleri.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023060000 +0300" channel="trt1.tr">
+    <title lang="tr">Sabah Haberleri</title>
+    <desc lang="tr">Günün ilk gelişmeleri ve hava durumu.</desc>
+  </programme>
+  <programme start="20261023060000 +0300" stop="20261023090000 +0300" channel="trt1.tr">
+    <title lang="tr">Hayatımın Neşesi</title>
+    <desc lang="tr">Aile komedisi sabah kuşağı.</desc>
+  </programme>
+  <programme start="20261023090000 +0300" stop="20261023120000 +0300" channel="trt1.tr">
+    <title lang="tr">Gündem Ötesi</title>
+    <desc lang="tr">Tarih, kültür ve bilim sohbetleri.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023150000 +0300" channel="trt1.tr">
+    <title lang="tr">Öğle Ana Haber</title>
+    <desc lang="tr">Türkiye ve dünyadan sıcak gelişmeler.</desc>
+  </programme>
+  <programme start="20261023150000 +0300" stop="20261023180000 +0300" channel="trt1.tr">
+    <title lang="tr">Turp Gibi</title>
+    <desc lang="tr">Sağlıklı yaşam ve beslenme rehberi.</desc>
+  </programme>
+  <programme start="20261023180000 +0300" stop="20261023200000 +0300" channel="trt1.tr">
+    <title lang="tr">Ana Haber Bülteni</title>
+    <desc lang="tr">Günün öne çıkan başlıkları ve canlı bağlantılar.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trt1.tr">
+    <title lang="tr">Gönül Dağı</title>
+    <desc lang="tr">Bozkırda bir Anadolu masalı, yeni bölüm.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024003000 +0300" channel="trt1.tr">
+    <title lang="tr">Pelin Çift ile Gündem Ötesi</title>
+    <desc lang="tr">Derinlemesine tarih ve kültür tartışmaları.</desc>
+  </programme>
+  <programme start="20261024003000 +0300" stop="20261024060000 +0300" channel="trt1.tr">
+    <title lang="tr">Gece Kuşağı: Seksenler</title>
+    <desc lang="tr">Nostaljik aile komedisi tekrarı.</desc>
+  </programme>
+
+  <!-- ATV -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="atv.tr">
+    <title lang="tr">Gece Kuşağı: Kuruluş Osman</title>
+    <desc lang="tr">Tekrar bölümüyle ekranlarda.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023060000 +0300" channel="atv.tr">
+    <title lang="tr">Kahvaltı Haberleri</title>
+    <desc lang="tr">Yeni güne başlarken sıcak başlıklar.</desc>
+  </programme>
+  <programme start="20261023060000 +0300" stop="20261023100000 +0300" channel="atv.tr">
+    <title lang="tr">Sabah Kuşağı</title>
+    <desc lang="tr">Gündem ve yaşam haberleri.</desc>
+  </programme>
+  <programme start="20261023100000 +0300" stop="20261023130000 +0300" channel="atv.tr">
+    <title lang="tr">Müge Anlı ile Tatlı Sert</title>
+    <desc lang="tr">Faili meçhul olaylar ve kayıplar aranıyor.</desc>
+  </programme>
+  <programme start="20261023130000 +0300" stop="20261023160000 +0300" channel="atv.tr">
+    <title lang="tr">ATV Gün Ortası &amp; Mutfak Bahane</title>
+    <desc lang="tr">Öğle haberleri ve yemek yarışması.</desc>
+  </programme>
+  <programme start="20261023160000 +0300" stop="20261023190000 +0300" channel="atv.tr">
+    <title lang="tr">Esra Erol'da</title>
+    <desc lang="tr">Hayatın içinden gerçek hikayeler.</desc>
+  </programme>
+  <programme start="20261023190000 +0300" stop="20261023200000 +0300" channel="atv.tr">
+    <title lang="tr">ATV Ana Haber</title>
+    <desc lang="tr">Cem Öğretir ile günün özeti.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="atv.tr">
+    <title lang="tr">Kim Milyoner Olmak İster?</title>
+    <desc lang="tr">Bilgi ve heyecan dolu yarışma programı.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="atv.tr">
+    <title lang="tr">Aldatmak</title>
+    <desc lang="tr">Dram dizisi özel bölümü.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="atv.tr">
+    <title lang="tr">Gece Bülteni</title>
+    <desc lang="tr">Gece saatlerinde son gelişmeler.</desc>
+  </programme>
+
+  <!-- Kanal D -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="kanald.tr">
+    <title lang="tr">Yabancı Sinema</title>
+    <desc lang="tr">Aksiyon ve macera kuşağı.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023090000 +0300" channel="kanald.tr">
+    <title lang="tr">Neler Oluyor Hayatta?</title>
+    <desc lang="tr">Gündemin nabzı ve yorumlar.</desc>
+  </programme>
+  <programme start="20261023090000 +0300" stop="20261023130000 +0300" channel="kanald.tr">
+    <title lang="tr">Yaprak Dökümü</title>
+    <desc lang="tr">Unutulmaz klasik dizi.</desc>
+  </programme>
+  <programme start="20261023130000 +0300" stop="20261023160000 +0300" channel="kanald.tr">
+    <title lang="tr">Gelinim Mutfakta</title>
+    <desc lang="tr">En iyi tabağı hazırlama mücadelesi.</desc>
+  </programme>
+  <programme start="20261023160000 +0300" stop="20261023190000 +0300" channel="kanald.tr">
+    <title lang="tr">Arka Sokaklar (Özel)</title>
+    <desc lang="tr">Ekibin heyecan dolu operasyonları.</desc>
+  </programme>
+  <programme start="20261023190000 +0300" stop="20261023200000 +0300" channel="kanald.tr">
+    <title lang="tr">Kanal D Ana Haber</title>
+    <desc lang="tr">Deniz Bayramoğlu ile Ana Haber.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="kanald.tr">
+    <title lang="tr">İnci Taneleri</title>
+    <desc lang="tr">Yılmaz Erdoğan'dan etkileyici bir hikaye.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="kanald.tr">
+    <title lang="tr">Arka Sokaklar</title>
+    <desc lang="tr">Polisiye ve aksiyon dolu yeni bölüm.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="kanald.tr">
+    <title lang="tr">Gece Sineması</title>
+    <desc lang="tr">Sinema kuşağı.</desc>
+  </programme>
+
+  <!-- NOW TV -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="nowtv.tr">
+    <title lang="tr">Gece Tekrarı: Kızıl Goncalar</title>
+    <desc lang="tr">Dram kuşağı tekrar bölümü.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023080000 +0300" channel="nowtv.tr">
+    <title lang="tr">İlker Karagöz ile Çalar Saat</title>
+    <desc lang="tr">Sabah haberleri ve gazete manşetleri.</desc>
+  </programme>
+  <programme start="20261023080000 +0300" stop="20261023130000 +0300" channel="nowtv.tr">
+    <title lang="tr">Çağla ile Yeni Bir Gün</title>
+    <desc lang="tr">Sağlık, güzellik ve yaşam ipuçları.</desc>
+  </programme>
+  <programme start="20261023130000 +0300" stop="20261023190000 +0300" channel="nowtv.tr">
+    <title lang="tr">En Hamarat Benim</title>
+    <desc lang="tr">Temizlik ve yemek yarışması.</desc>
+  </programme>
+  <programme start="20261023190000 +0300" stop="20261023200000 +0300" channel="nowtv.tr">
+    <title lang="tr">Selçuk Tepeli ile NOW Ana Haber</title>
+    <desc lang="tr">Gündemin çarpıcı dosyaları.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="nowtv.tr">
+    <title lang="tr">Hudutsuz Sevda</title>
+    <desc lang="tr">Heyecan dolu yeni bölüm.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="nowtv.tr">
+    <title lang="tr">Orta Sayfa</title>
+    <desc lang="tr">Ankara kulisleri ve siyaset gündemi.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="nowtv.tr">
+    <title lang="tr">Gece Hattı</title>
+    <desc lang="tr">Günün son haberleri.</desc>
+  </programme>
+
+  <!-- Show TV -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="showtv.tr">
+    <title lang="tr">Türk Sineması: Hababam Sınıfı</title>
+    <desc lang="tr">Yeşilçam klasikleri kuşağı.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023090000 +0300" channel="showtv.tr">
+    <title lang="tr">Bu Sabah</title>
+    <desc lang="tr">Günün sıcak başlıkları.</desc>
+  </programme>
+  <programme start="20261023090000 +0300" stop="20261023150000 +0300" channel="showtv.tr">
+    <title lang="tr">Gelin Evi</title>
+    <desc lang="tr">Çeyiz ve ev dekorasyonu yarışması.</desc>
+  </programme>
+  <programme start="20261023150000 +0300" stop="20261023184500 +0300" channel="showtv.tr">
+    <title lang="tr">Didem Arslan Yılmaz'la Vazgeçme</title>
+    <desc lang="tr">Gerçek olayların izinde.</desc>
+  </programme>
+  <programme start="20261023184500 +0300" stop="20261023200000 +0300" channel="showtv.tr">
+    <title lang="tr">Show Ana Haber</title>
+    <desc lang="tr">Pınar Erbaş ile günün haberleri.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="showtv.tr">
+    <title lang="tr">Kızılcık Şerbeti</title>
+    <desc lang="tr">İki farklı ailenin çarpıcı hikayesi.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="showtv.tr">
+    <title lang="tr">Bahar</title>
+    <desc lang="tr">Umudun ve yeniden başlamanın öyküsü.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="showtv.tr">
+    <title lang="tr">Show Gece</title>
+    <desc lang="tr">Gece sinema kuşağı.</desc>
+  </programme>
+
+  <!-- Star TV -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="startv.tr">
+    <title lang="tr">Gece Sineması</title>
+    <desc lang="tr">Dünya sinemasından seçmeler.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023100000 +0300" channel="startv.tr">
+    <title lang="tr">Sabahların Sultanı Seda Sayan</title>
+    <desc lang="tr">Müzik ve eğlence kuşağı.</desc>
+  </programme>
+  <programme start="20261023100000 +0300" stop="20261023160000 +0300" channel="startv.tr">
+    <title lang="tr">Kiralık Aşk</title>
+    <desc lang="tr">Romantik komedi dizisi.</desc>
+  </programme>
+  <programme start="20261023160000 +0300" stop="20261023190000 +0300" channel="startv.tr">
+    <title lang="tr">Çok Güzel Hareketler 2</title>
+    <desc lang="tr">Komedi skeçleri.</desc>
+  </programme>
+  <programme start="20261023190000 +0300" stop="20261023200000 +0300" channel="startv.tr">
+    <title lang="tr">Star Ana Haber</title>
+    <desc lang="tr">Nazlı Çelik ile Ana Haber.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="startv.tr">
+    <title lang="tr">Yalı Çapkını</title>
+    <desc lang="tr">Antep'ten İstanbul'a uzanan hikaye.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="startv.tr">
+    <title lang="tr">Ömer</title>
+    <desc lang="tr">Dram dizisi özel bölümü.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="startv.tr">
+    <title lang="tr">Gece Kuşağı</title>
+    <desc lang="tr">Dizi tekrarları.</desc>
+  </programme>
+
+  <!-- TV8 -->
+  <programme start="20261023000000 +0300" stop="20261023030000 +0300" channel="tv8.tr">
+    <title lang="tr">Survivor Ekstra (Tekrar)</title>
+    <desc lang="tr">Ada konseyi değerlendirmeleri.</desc>
+  </programme>
+  <programme start="20261023030000 +0300" stop="20261023120000 +0300" channel="tv8.tr">
+    <title lang="tr">8'de Sağlık &amp; Magazin</title>
+    <desc lang="tr">Uzman doktorlarla sağlık ve magazin rehberi.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023160000 +0300" channel="tv8.tr">
+    <title lang="tr">MasterChef Türkiye (Özet)</title>
+    <desc lang="tr">Önceki bölümün en heyecanlı anları.</desc>
+  </programme>
+  <programme start="20261023160000 +0300" stop="20261023200000 +0300" channel="tv8.tr">
+    <title lang="tr">Zuhal Topal'la Yemekteyiz</title>
+    <desc lang="tr">Haftanın en iyi ev sahibi yarışması.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="tv8.tr">
+    <title lang="tr">MasterChef Türkiye</title>
+    <desc lang="tr">Büyük ödül için mutfakta kıyasıya rekabet.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024010000 +0300" channel="tv8.tr">
+    <title lang="tr">O Ses Türkiye</title>
+    <desc lang="tr">Müzik ve eğlence yarışması.</desc>
+  </programme>
+  <programme start="20261024010000 +0300" stop="20261024060000 +0300" channel="tv8.tr">
+    <title lang="tr">Survivor Ekstra</title>
+    <desc lang="tr">Canlı stüdyo tartışmaları.</desc>
+  </programme>
+
+  <!-- Haber ve Diğer Temel Kanallar -->
+  <programme start="20261023000000 +0300" stop="20261023120000 +0300" channel="trthaber.tr">
+    <title lang="tr">TRT Haber Sabah Kuşağı</title>
+    <desc lang="tr">Yurt ve dünyadan sabah gelişmeleri.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023200000 +0300" channel="trthaber.tr">
+    <title lang="tr">Öğle ve Akşam Bülteni</title>
+    <desc lang="tr">Canlı bağlantılar ve sıcak başlıklar.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trthaber.tr">
+    <title lang="tr">Birinci Sayfa</title>
+    <desc lang="tr">Uzman konuklarla dış politika ve gündem analizi.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trthaber.tr">
+    <title lang="tr">Gece Bakışı</title>
+    <desc lang="tr">Günün kapanış bülteni.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023120000 +0300" channel="ahaber.tr">
+    <title lang="tr">Sabah Ajansı</title>
+    <desc lang="tr">Erkan Tan ile sabah gündemi.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023200000 +0300" channel="ahaber.tr">
+    <title lang="tr">Ajans Gün Ortası &amp; Ana Haber</title>
+    <desc lang="tr">Günün kapsamlı haber özeti.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="ahaber.tr">
+    <title lang="tr">Arka Plan</title>
+    <desc lang="tr">Siyaset ve dış politika masası.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="ahaber.tr">
+    <title lang="tr">Gece Ajansı</title>
+    <desc lang="tr">Son dakika gelişmeleri.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023120000 +0300" channel="ntv.tr">
+    <title lang="tr">Güne Başlarken &amp; Piyasa Ekranı</title>
+    <desc lang="tr">Sabah haberleri ve ekonomi açılışı.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023200000 +0300" channel="ntv.tr">
+    <title lang="tr">Günün İçinden &amp; NTV Ana Haber</title>
+    <desc lang="tr">Sıcak gelişmeler ve akşam ana haber bülteni.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="ntv.tr">
+    <title lang="tr">Siyasi İşler</title>
+    <desc lang="tr">Ankara gündemi ve kulisler.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="ntv.tr">
+    <title lang="tr">Yüzde Yüz Futbol</title>
+    <desc lang="tr">Spor gündemi ve maç analizleri.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="trtgenc.tr">
+    <title lang="tr">Bilim, Teknoloji ve Kampüs</title>
+    <desc lang="tr">Gençlik, yazılım ve inovasyon kuşağı.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trtgenc.tr">
+    <title lang="tr">E-Spor Arenası</title>
+    <desc lang="tr">Turnuva özetleri ve röportajlar.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trtgenc.tr">
+    <title lang="tr">Genç Sahne</title>
+    <desc lang="tr">Müzik ve performans kuşağı.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="trtbelgesel.tr">
+    <title lang="tr">Yabani Hayat &amp; Anadolu'nun Ustaları</title>
+    <desc lang="tr">Doğa ve kültür belgeselleri kuşağı.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trtbelgesel.tr">
+    <title lang="tr">Doğadaki İnsan</title>
+    <desc lang="tr">Serdar Kılıç ile doğada hayatta kalma.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trtbelgesel.tr">
+    <title lang="tr">Savaşın Efsaneleri</title>
+    <desc lang="tr">Tarihin dönüm noktası savaşlar.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="trt4k.tr">
+    <title lang="tr">Anadolu Mirası 4K</title>
+    <desc lang="tr">Ultra HD doğa ve tarih belgeseli.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trt4k.tr">
+    <title lang="tr">UEFA Maç Kuşağı 4K</title>
+    <desc lang="tr">Ultra HD stadyum heyecanı.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trt4k.tr">
+    <title lang="tr">Gece Senfonisi 4K</title>
+    <desc lang="tr">Cumhurbaşkanlığı Senfoni Orkestrası özel kaydı.</desc>
+  </programme>
+
+  <!-- Kanal 7, Beyaz TV, 360 TV, CNN Türk, Habertürk, Halk TV, Sözcü TV, TRT Spor, A Spor, TRT Çocuk, TLC, DMAX -->
+  <programme start="20261023000000 +0300" stop="20261023120000 +0300" channel="kanal7.tr">
+    <title lang="tr">Kanal 7 Sabah &amp; Dr. Feridun Kunak</title>
+    <desc lang="tr">Sabah haberleri ve sağlıklı yaşam rehberi.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023200000 +0300" channel="kanal7.tr">
+    <title lang="tr">Bahar Kapıda &amp; Ana Haber</title>
+    <desc lang="tr">Anadolu'dan insan hikayeleri ve akşam haberleri.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="kanal7.tr">
+    <title lang="tr">Esaret</title>
+    <desc lang="tr">Heyecan dolu günlük dizi.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="kanal7.tr">
+    <title lang="tr">Gündüz Gece</title>
+    <desc lang="tr">Türkü ve kültür yolculuğu.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023120000 +0300" channel="beyaztv.tr">
+    <title lang="tr">Uyan Türkiyem &amp; Söylemezsem Olmaz</title>
+    <desc lang="tr">Sabah gündemi ve magazin dünyası.</desc>
+  </programme>
+  <programme start="20261023120000 +0300" stop="20261023200000 +0300" channel="beyaztv.tr">
+    <title lang="tr">Hayatta Her Şey Var &amp; Ana Haber</title>
+    <desc lang="tr">Yaşam rehberi ve akşam bülteni.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="beyaztv.tr">
+    <title lang="tr">Sinema Kuşağı</title>
+    <desc lang="tr">Aksiyon ve macera filmi.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="beyaztv.tr">
+    <title lang="tr">Beyaz Futbol</title>
+    <desc lang="tr">Süper Lig değerlendirmeleri ve tartışmalar.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="360tv.tr">
+    <title lang="tr">Seksenler &amp; Gökyüzünden Türkiye</title>
+    <desc lang="tr">Aile komedisi ve Anadolu manzaraları.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="360tv.tr">
+    <title lang="tr">Ben Bilirim</title>
+    <desc lang="tr">Alper Ateş ile genel kültür yarışması.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="360tv.tr">
+    <title lang="tr">Aileler Yarışıyor</title>
+    <desc lang="tr">Eğlenceli yarışma programı.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="cnnturk.tr">
+    <title lang="tr">Yeni Gün &amp; CNN Türk Masası</title>
+    <desc lang="tr">Gündemdeki sıcak gelişmeler ve ekonomi.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="cnnturk.tr">
+    <title lang="tr">Tarafsız Bölge</title>
+    <desc lang="tr">Ahmet Hakan ile gündem tartışması.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="cnnturk.tr">
+    <title lang="tr">Gece Görüşü</title>
+    <desc lang="tr">Hande Fırat ile Ankara gündemi.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="haberturk.tr">
+    <title lang="tr">Para Gündem &amp; Ana Haber</title>
+    <desc lang="tr">Ekonomi, siyaset ve akşam haber bülteni.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="haberturk.tr">
+    <title lang="tr">Açık ve Net</title>
+    <desc lang="tr">Canlı tartışma programı.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="haberturk.tr">
+    <title lang="tr">Teke Tek Bilim</title>
+    <desc lang="tr">Bilim ve tarih sohbetleri.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="halktv.tr">
+    <title lang="tr">Yeni Bir Sabah &amp; Halk Ana Haber</title>
+    <desc lang="tr">Sabah gündemi ve akşam haberleri.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="halktv.tr">
+    <title lang="tr">Kırmızı Çizgi</title>
+    <desc lang="tr">Gündem tartışmaları.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="halktv.tr">
+    <title lang="tr">Sansürsüz</title>
+    <desc lang="tr">Canlı stüdyo konuklarıyla analiz.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="sozcutv.tr">
+    <title lang="tr">Para Politika &amp; Sözcü Ana Haber</title>
+    <desc lang="tr">Ekonomi yorumları ve akşam ana haber bülteni.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="sozcutv.tr">
+    <title lang="tr">Arena</title>
+    <desc lang="tr">Araştırma dosyaları ve tartışma.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="sozcutv.tr">
+    <title lang="tr">Sözcü Gece</title>
+    <desc lang="tr">Kapanış bülteni.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="trtspor.tr">
+    <title lang="tr">Gündem Futbol &amp; Spor Stüdyosu</title>
+    <desc lang="tr">Antrenman notları ve branş gelişmeleri.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trtspor.tr">
+    <title lang="tr">Stadyum</title>
+    <desc lang="tr">Maç önü ve maç sonu canlı analizler.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trtspor.tr">
+    <title lang="tr">Teknik Analiz</title>
+    <desc lang="tr">Taktik tahtasında haftanın maçları.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="aspor.tr">
+    <title lang="tr">Sabah Sporu &amp; Transfer Raporu</title>
+    <desc lang="tr">Takımlardan canlı bağlantılar ve transfer gündemi.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="aspor.tr">
+    <title lang="tr">Takım Oyunu</title>
+    <desc lang="tr">Süper Lig ve Avrupa kupası tartışmaları.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="aspor.tr">
+    <title lang="tr">Son Sayfa</title>
+    <desc lang="tr">Gece spor gündemi.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="trtcocuk.tr">
+    <title lang="tr">Niloya &amp; Rafadan Tayfa</title>
+    <desc lang="tr">Eğitici ve neşeli çizgi film kuşağı.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="trtcocuk.tr">
+    <title lang="tr">Akıllı Tavşan Momo</title>
+    <desc lang="tr">Ormanda yardımlaşma hikayeleri.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="trtcocuk.tr">
+    <title lang="tr">Masal Kuşağı</title>
+    <desc lang="tr">Uykudan önce masallar.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="tlc.tr">
+    <title lang="tr">Emlak Avcıları &amp; Ağır Yaşamlar</title>
+    <desc lang="tr">Ev yenileme ve yaşam hikayeleri.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="tlc.tr">
+    <title lang="tr">Temizlik Avcıları</title>
+    <desc lang="tr">Zorlu evlerin dönüşümü.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="tlc.tr">
+    <title lang="tr">Suç Dosyası</title>
+    <desc lang="tr">Gerçek polisiye hikayeler.</desc>
+  </programme>
+
+  <programme start="20261023000000 +0300" stop="20261023200000 +0300" channel="dmax.tr">
+    <title lang="tr">Tamirat Tadilat &amp; Depo Savaşları</title>
+    <desc lang="tr">Klasik otomobiller ve açık artırma heyecanı.</desc>
+  </programme>
+  <programme start="20261023200000 +0300" stop="20261023223000 +0300" channel="dmax.tr">
+    <title lang="tr">Altın Peşinde</title>
+    <desc lang="tr">Klondike altın madencileri.</desc>
+  </programme>
+  <programme start="20261023223000 +0300" stop="20261024060000 +0300" channel="dmax.tr">
+    <title lang="tr">Ed Stafford ile Kurtuluş</title>
+    <desc lang="tr">Issız coğrafyalarda hayatta kalma.</desc>
+  </programme>
+</tv>

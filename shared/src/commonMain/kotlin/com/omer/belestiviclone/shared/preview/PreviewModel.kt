@@ -6,7 +6,7 @@ import com.omer.belestiviclone.shared.catalog.ComparisonV1
 
 data class PreviewChannel(val id: OpaqueId, val name: String, val category: String, val logo: String, val video: Boolean = false,
     val definition: PlaybackDefinition? = null, val groups: List<String> = listOf(category), val providerId: String = "", val available: Boolean = true,
-    val sourceReferences: List<OpaqueId> = emptyList())
+    val sourceReferences: List<OpaqueId> = emptyList(), val tvgName: String = "")
 object PreviewFixture {
     val channels = listOf(
         PreviewChannel(OpaqueId(0x50524556, 1), "Örnek video", "Örnek", "ikon_tv", true),
@@ -67,7 +67,8 @@ data class PreviewData(
         "subtitleBgOpacity" to "%75",
         "startupFavorites" to "Kapalı",
         "backgroundAudio" to "Kapalı",
-        "autoPip" to "Açık"
+        "autoPip" to "Açık",
+        "epgUrl" to ""
     ),
     val sources: List<String> = listOf("Örnek kayıt"),
     val channels: List<PreviewChannel> = PreviewFixture.channels,

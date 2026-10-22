@@ -30,7 +30,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         val channels = data.channels.filter { it.definition != null }
         val categories = channels.flatMap { it.groups }.distinct().mapIndexed { index, label -> CategoryRecord(CategoryId(allocate()), CategoryLabel.fromRaw(label), index.toLong()) }
         val rows = channels.flatMapIndexed { index, ch -> ch.groups.mapIndexed { group, label ->
-            ChannelContribution(default, index.toLong() * 1000 + group, ch.definition!!, CategoryLabel.fromRaw(label), ch.name, ch.logo, ch.providerId)
+            ChannelContribution(default, index.toLong() * 1000 + group, ch.definition!!, CategoryLabel.fromRaw(label), ch.name, ch.logo, ch.providerId, ch.tvgName)
         } }
         val memberships = rows.map { row -> MembershipRecord(MembershipId(allocate()), ChannelId(channels.first { it.definition == row.definition }.id), default, categories.first { it.label == row.category }.id) }
         val snapshot = CatalogSnapshot(listOf(SourceRecord(default, SourceRole.MAIN, true)), channels.mapIndexed { i, ch -> ChannelRecord(ChannelId(ch.id), ch.definition!!, i.toLong()) }, memberships, categories)
@@ -99,7 +99,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         val active = plan.catalog.filter { it.hasUsableActiveMembership }.map { ch ->
             val row = ch.contributions.first { contribution -> sources.first { it.id == contribution.input.sourceId }.inActiveSet }.input
             val groups = ch.categoryIds.map { labels.getValue(it) }
-            PreviewChannel(ch.id.value, ch.name ?: "Adsız kanal", groups.first(), ch.logo.orEmpty(), definition = row.definition, groups = groups, providerId = row.providerHint.orEmpty())
+            PreviewChannel(ch.id.value, ch.name ?: "Adsız kanal", groups.first(), ch.logo.orEmpty(), definition = row.definition, groups = groups, providerId = row.providerHint.orEmpty(), tvgName = row.tvgName)
         }
         val activeIds = active.map { it.id }.toSet()
         val archived = data.channels.filter { it.id !in activeIds }.map { it.copy(available = false) }
@@ -124,17 +124,17 @@ object LibraryCodec {
         return PlaybackDefinition(Address.fromForm(f[0]), headers.chunked(2).map { Header(it[0], it[1]) }, mimeType = f[2].ifEmpty { null }, unknownRequiredDirectives = PreviewCodec.unpack(f[3]))
     }
     private fun label(value: CategoryLabel) = (value as? CategoryLabel.Exact)?.text.orEmpty()
-    fun channels(values: List<PreviewChannel>) = PreviewCodec.pack(values.map { ch -> pack(PreviewCodec.id(ch.id), ch.name, ch.logo, PreviewCodec.pack(ch.groups), ch.providerId, ch.definition?.let(::definition).orEmpty(), ch.available.toString(), ch.video.toString(), PreviewCodec.pack(ch.sourceReferences.map(PreviewCodec::id))) })
+    fun channels(values: List<PreviewChannel>) = PreviewCodec.pack(values.map { ch -> pack(PreviewCodec.id(ch.id), ch.name, ch.logo, PreviewCodec.pack(ch.groups), ch.providerId, ch.definition?.let(::definition).orEmpty(), ch.available.toString(), ch.video.toString(), PreviewCodec.pack(ch.sourceReferences.map(PreviewCodec::id)), ch.tvgName) })
     fun channels(value: String) = PreviewCodec.unpack(value).map { row ->
-        val f = PreviewCodec.unpack(row); require(f.size == 9)
+        val f = PreviewCodec.unpack(row); require(f.size in 9..10)
         val groups = PreviewCodec.unpack(f[3]); require(groups.isNotEmpty())
-        PreviewChannel(PreviewCodec.id(f[0]), f[1], groups.first(), f[2], f[7].toBooleanStrict(), f[5].ifEmpty { null }?.let(::definition), groups, f[4], f[6].toBooleanStrict(), PreviewCodec.unpack(f[8]).map(PreviewCodec::id))
+        PreviewChannel(PreviewCodec.id(f[0]), f[1], groups.first(), f[2], f[7].toBooleanStrict(), f[5].ifEmpty { null }?.let(::definition), groups, f[4], f[6].toBooleanStrict(), PreviewCodec.unpack(f[8]).map(PreviewCodec::id), f.getOrElse(9) { "" })
     }
     fun encode(data: PreviewData): String {
         val library = data.library ?: return pack("BT-PROFILE-1", PreviewCodec.pack(data.sources), channels(data.channels))
         val snapshot = library.snapshot
         val records = PreviewCodec.pack(library.records.map { source -> pack(id(source.id), source.name, source.kind.name, source.address, source.parent?.let(::id).orEmpty(), source.deleted.toString(), source.rawCount.toString(), source.skippedCount.toString(),
-            PreviewCodec.pack(source.rows.map { row -> pack(row.rowOrder.toString(), definition(row.definition), label(row.category), row.name.orEmpty(), row.logo.orEmpty(), row.providerHint.orEmpty()) })) })
+            PreviewCodec.pack(source.rows.map { row -> pack(row.rowOrder.toString(), definition(row.definition), label(row.category), row.name.orEmpty(), row.logo.orEmpty(), row.providerHint.orEmpty(), row.tvgName) })) })
         val ch = PreviewCodec.pack(snapshot.channels.map { pack(PreviewCodec.id(it.id.value), definition(it.definition), it.firstSeen.toString()) })
         val cat = PreviewCodec.pack(snapshot.categories.map { pack(PreviewCodec.id(it.id.value), label(it.label), it.firstSeen.toString()) })
         val member = PreviewCodec.pack(snapshot.memberships.map { pack(PreviewCodec.id(it.id.value), PreviewCodec.id(it.channelId.value), id(it.sourceId), PreviewCodec.id(it.categoryId.value), it.isCurrent.toString()) })
@@ -159,8 +159,8 @@ object LibraryCodec {
             val r = PreviewCodec.unpack(row); require(r.size == 9)
             val source = sid(r[0])
             SavedSource(source, r[1], SourceKind.valueOf(r[2]), r[3], PreviewCodec.unpack(r[8]).map { raw ->
-                val v = PreviewCodec.unpack(raw); require(v.size == 6)
-                ChannelContribution(source, v[0].toLong(), definition(v[1]), CategoryLabel.fromRaw(v[2]), v[3], v[4], v[5])
+                val v = PreviewCodec.unpack(raw); require(v.size in 6..7)
+                ChannelContribution(source, v[0].toLong(), definition(v[1]), CategoryLabel.fromRaw(v[2]), v[3], v[4], v[5], v.getOrElse(6) { "" })
             }, r[4].ifEmpty { null }?.let(::sid), r[5].toBooleanStrict(), r[6].toInt(), r[7].toInt())
         }
         val active = sid(f[3])

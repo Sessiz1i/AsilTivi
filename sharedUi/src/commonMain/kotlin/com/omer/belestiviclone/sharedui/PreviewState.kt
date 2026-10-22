@@ -3,6 +3,9 @@ package com.omer.belestiviclone.sharedui
 import androidx.compose.runtime.*
 import com.omer.belestiviclone.shared.preview.*
 import com.omer.belestiviclone.shared.catalog.OpaqueId
+import com.omer.belestiviclone.shared.catalog.Address
+import com.omer.belestiviclone.shared.catalog.ComparisonV1
+import com.omer.belestiviclone.shared.catalog.SourceAddressKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -11,8 +14,15 @@ import com.omer.belestiviclone.shared.catalog.SourceId
 import kotlin.random.Random
 
 class PreviewState(private val store: PreviewStore, private val scope: CoroutineScope, private val publicStore: PreviewStore? = null,
-    private val sourceLoader: SourceLoader? = null, allocate: () -> OpaqueId = { OpaqueId(Random.nextLong(), Random.nextLong()) }) {
+    private val sourceLoader: SourceLoader? = null, allocate: () -> OpaqueId = { OpaqueId(Random.nextLong(), Random.nextLong()) },
+    private val epgLoader: EpgLoader? = null) {
     private val sources = SourceOperations(allocate)
+    val epgCache = EpgCacheManager().also { it.loadSampleDefault(System.currentTimeMillis()) }
+    var epgRevision by mutableStateOf(0); private set
+    fun epgNowNext(channel: PreviewChannel? = this.channel, nowEpochMs: Long = System.currentTimeMillis()): EpgNowNext {
+        epgRevision // Compose state observation
+        return epgCache.nowNext(channel, nowEpochMs)
+    }
     private var sourceJob: Job? = null
     private var generation = 0
     var committingSource by mutableStateOf(false); private set
@@ -138,6 +148,24 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             try { publicData = publicStore.load(); switchProfile(true) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { notice = "Kamu listesi açılamadı. Mevcut liste korunuyor." }
+        }
+        if (epgLoader != null) {
+            try {
+                val sampleXml = epgLoader.loadSampleXml()
+                if (sampleXml.isNotBlank()) {
+                    epgCache.loadXml(sampleXml, nowEpochMs = System.currentTimeMillis(), rebaseSampleIfOutdated = true)
+                    epgRevision++
+                }
+                val customEpgUrl = data.pref("epgUrl").trim()
+                if (customEpgUrl.isNotBlank()) {
+                    val remoteXml = epgLoader.fetchXml(customEpgUrl)
+                    if (remoteXml.isNotBlank()) {
+                        epgCache.loadXml(remoteXml, nowEpochMs = System.currentTimeMillis(), rebaseSampleIfOutdated = false)
+                        epgRevision++
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { }
         }
         page = "live"
         loaded = true
@@ -268,9 +296,60 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun sourceForm(type: String, index: Int? = null) {
         if (busy) return
+        if (type == "epg") {
+            editing = null; formName = ""; formAddress = data.pref("epgUrl")
+            formUser = ""; formPassword = ""; dialog = "epg"
+            return
+        }
         val source = if (type == "supplement") data.library?.extra else index?.let { savedSources.getOrNull(it) }
         editing = index; formName = source?.name.orEmpty(); formAddress = source?.address.orEmpty()
         formUser = ""; formPassword = ""; dialog = type
+    }
+    fun saveEpgUrl() {
+        if (busy) return
+        val address = formAddress.trim()
+        if (address.isNotEmpty() && !address.startsWith("http://", ignoreCase = true) && !address.startsWith("https://", ignoreCase = true)) {
+            notice = message("Geçerli bir HTTP/HTTPS adresi girin.", "Enter a valid HTTP/HTTPS address.", "Gültige HTTP/HTTPS-Adresse eingeben.")
+            return
+        }
+        val next = data.withPref("epgUrl", address)
+        if (epgLoader != null && address.isNotEmpty()) {
+            busy = true
+            scope.launch {
+                try {
+                    val xml = epgLoader.fetchXml(address)
+                    withContext(NonCancellable) {
+                        epgCache.loadXml(xml, nowEpochMs = System.currentTimeMillis(), rebaseSampleIfOutdated = false)
+                        epgRevision++
+                        if (isPublic) publicStore?.save(next) else if (!sessionOnly) store.save(next)
+                        data = next
+                        dismiss()
+                        notice = message("EPG kaynağı güncellendi.", "EPG source updated.", "EPG-Quelle aktualisiert.")
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    notice = message("EPG kaynağı yüklenemedi. Önceki rehber korundu.", "Failed to load EPG source. Previous guide preserved.", "EPG-Quelle konnte nicht geladen werden.")
+                } finally { busy = false }
+            }
+        } else {
+            if (address.isEmpty()) {
+                epgCache.loadSampleDefault(nowEpochMs = System.currentTimeMillis())
+                epgRevision++
+            }
+            commit(next) {
+                dismiss()
+                notice = if (address.isEmpty()) {
+                    message("Varsayılan örnek EPG kaynağı etkinleştirildi.", "Default sample EPG source enabled.", "Standard-EPG-Quelle aktiviert.")
+                } else {
+                    message("EPG kaynağı kaydedildi.", "EPG source saved.", "EPG-Quelle gespeichert.")
+                }
+            }
+        }
+    }
+    fun clearEpgUrl() {
+        if (busy) return
+        formAddress = ""
+        saveEpgUrl()
     }
     fun saveSource() {
         if (editingFile) {

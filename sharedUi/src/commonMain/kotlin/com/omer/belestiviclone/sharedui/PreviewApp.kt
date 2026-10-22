@@ -242,6 +242,16 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         val panelHeight = if (s.searching) 160.dp else 120.dp
         val opacity = s.data.pref("opacity").toFloat() / 100f
         var qualityInfo by remember(s.selected, s.retry) { mutableStateOf("") }
+        var nowEpochMs by remember { mutableStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(s.selected, s.info, s.panel, s.epgRevision) {
+            nowEpochMs = System.currentTimeMillis()
+            s.epgCache.evictExpired(nowEpochMs)
+            while (s.info || s.panel) {
+                kotlinx.coroutines.delay(15_000)
+                nowEpochMs = System.currentTimeMillis()
+                s.epgCache.evictExpired(nowEpochMs)
+            }
+        }
         val playbackPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
         video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), playbackPrefs, { qualityInfo = it }, Modifier.fillMaxSize())
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -249,7 +259,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         }
         Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { s.panel = true } })
         val boundsObserver = LocalBoundsObserver.current
-        if (s.liveHeadingVisible) LiveHeading(s.channel?.name ?: "", s.channel?.logo ?: "ikon_tv", "${s.profileName} · EPG bilgisi yok", image,
+        val currentEpg = remember(s.channel, nowEpochMs, s.epgRevision) { s.epgNowNext(s.channel, nowEpochMs) }
+        val headingSub = currentEpg.now?.let { "${s.profileName} · ${it.title} (${it.timeRangeLabel()})" } ?: "${s.profileName} · EPG bilgisi yok"
+        if (s.liveHeadingVisible) LiveHeading(s.channel?.name ?: "", s.channel?.logo ?: "ikon_tv", headingSub, image,
             Modifier.liveHeadingPlacement(s.data.pref("format"), maxWidth.value, maxHeight.value).widthIn(max = maxWidth * .43f), includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
         if (s.panel) {
             Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -303,6 +315,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             ChannelInfoPanel(
                 s = s,
                 qualityInfo = qualityInfo,
+                nowEpochMs = nowEpochMs,
                 factor = factor,
                 image = image,
                 modifier = Modifier
@@ -318,9 +331,16 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
     }
 }
 @Composable
-private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, factor: Float, image: @Composable (String, Modifier) -> Unit, modifier: Modifier) {
+private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: Long, factor: Float, image: @Composable (String, Modifier) -> Unit, modifier: Modifier) {
     val t = s.technicalInfo
-    val programTitle = t.streamTitle ?: "Program Bilgisi Bulunamadı"
+    val epg = remember(s.channel, nowEpochMs, s.epgRevision) { s.epgNowNext(s.channel, nowEpochMs) }
+    val nowProg = epg.now
+    val nextProg = epg.next
+    val programTitle = nowProg?.title ?: t.streamTitle ?: "Program Bilgisi Bulunamadı"
+    val timeRangeText = nowProg?.timeRangeLabel() ?: "--:-- - --:--"
+    val progressFraction = nowProg?.progressAt(nowEpochMs) ?: if (t.streamTitle != null) 0.5f else 0.0f
+    val progressPercentText = nowProg?.let { "%${it.progressPercentAt(nowEpochMs)}" }
+    val nextText = nextProg?.let { "${it.title} (${it.timeRangeLabel()})" } ?: "Program Bilgisi Bulunamadı"
     Column(
         modifier
             .background(Color(0xE608111E), RoundedCornerShape(12.dp))
@@ -374,7 +394,12 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, factor: Float
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Label("Şimdi: $programTitle", (11 * factor).toInt(), Color(0xFFFFD735), Modifier.weight(1f), bold = true, maxLines = 1)
-                    Label("--:-- - --:--", (9 * factor).toInt(), Color(0xFFB0BEC5))
+                    Row(horizontalArrangement = Arrangement.spacedBy((4 * factor).dp), verticalAlignment = Alignment.CenterVertically) {
+                        Label(timeRangeText, (9 * factor).toInt(), Color(0xFFB0BEC5))
+                        if (progressPercentText != null) {
+                            Label(progressPercentText, (9 * factor).toInt(), Color(0xFFFFD735), bold = true)
+                        }
+                    }
                 }
                 Box(
                     Modifier
@@ -384,17 +409,20 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, factor: Float
                 ) {
                     Box(
                         Modifier
-                            .fillMaxWidth(if (t.streamTitle != null) 0.5f else 0.25f)
+                            .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
                             .fillMaxHeight()
                             .background(Color(0xFFFFD735), RoundedCornerShape(2.dp))
                     )
+                }
+                if (!nowProg?.desc.isNullOrBlank()) {
+                    Label(nowProg?.desc.orEmpty(), (9 * factor).toInt(), Color(0xFFCBD5E1), maxLines = 1)
                 }
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Label("Sonra: Program Bilgisi Bulunamadı", (10 * factor).toInt(), Color(0xFF86C9EF), Modifier.weight(1f), maxLines = 1)
+                    Label("Sonra: $nextText", (10 * factor).toInt(), Color(0xFF86C9EF), Modifier.weight(1f), maxLines = 1)
                     Label("Oran: ${s.data.pref("format").substringBefore(" (")}", (9 * factor).toInt(), Color(0xFF94A2B7))
                 }
             }
@@ -525,14 +553,25 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
             }
             else if (vertical && !isMoving && e.key == Key.DirectionLeft && e.type == KeyEventType.KeyDown) { s.categoryMenu = true; true } else false
         }, content = {
-            if (vertical) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val cardNowTitle = remember(ch, s.epgRevision) { s.epgNowNext(ch).now?.title }
+            if (vertical) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.width(2.5.dp).fillMaxHeight().background(if (ch.id == s.selected) Color(0xFFF28B1B) else Color.Transparent))
                 image(ch.logo, Modifier.size(30.dp))
-                BasicText(number + ch.name, Modifier.weight(1f), style = TextStyle(color = Color(0xFFDEDEDE), fontSize = 10.sp, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    BasicText(number + ch.name, style = TextStyle(color = Color(0xFFDEDEDE), fontSize = 10.sp, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!cardNowTitle.isNullOrBlank()) {
+                        BasicText(cardNowTitle, style = TextStyle(color = Color(0xFF94A2B7), fontSize = 8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
                 if (ch.id in s.data.favorites) image("yildiz", Modifier.size(10.dp))
             } else Box(Modifier.fillMaxSize()) {
-                image(ch.logo, Modifier.align(Alignment.TopCenter).offset(y = 8.dp).size(55.dp, 45.dp))
-                BasicText(number + ch.name, Modifier.align(Alignment.BottomCenter).padding(horizontal = 1.dp, vertical = 4.dp), style = TextStyle(color = Color.White, fontSize = 8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                image(ch.logo, Modifier.align(Alignment.TopCenter).offset(y = 5.dp).size(52.dp, 40.dp))
+                Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 1.dp, vertical = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    BasicText(number + ch.name, style = TextStyle(color = Color.White, fontSize = 8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!cardNowTitle.isNullOrBlank()) {
+                        BasicText(cardNowTitle, style = TextStyle(color = Color(0xFF94A2B7), fontSize = 7.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
                 if (ch.id in s.data.favorites) image("yildiz", Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = 5.dp).size(10.dp))
             }
         }) { if (isMoving) s.moveFinish() else { requester.requestFocus(); s.select(ch.id) } }
@@ -618,6 +657,13 @@ private val settingIcons = mapOf(
                             SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
                             SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
                             SettingTile("Dosyadan Yükle", "M3U dosyası seç", "ikon_dosya", image) { s.dialog = "file" }
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("EPG (PROGRAM REHBERİ)")
+                            SettingTile(
+                                "XMLTV EPG URL",
+                                s.data.pref("epgUrl").ifBlank { "Yerleşik örnek EPG (epg_sample.xml) aktif" },
+                                "ikon_saat",
+                                image
+                            ) { s.sourceForm("epg") }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL DÜZENİ")
                             SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "ikon_category", image) { s.dialog = "categories" }
                         }

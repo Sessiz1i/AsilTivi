@@ -34,13 +34,13 @@ class AndroidPublicCatalog(private val context: Context, private val cacheName: 
     private fun encode(channels: List<PreviewChannel>) = PreviewCodec.pack(channels.map { ch ->
         val d = ch.definition!!
         PreviewCodec.pack(listOf(PreviewCodec.id(ch.id), ch.name, ch.logo, PreviewCodec.pack(ch.groups), ch.providerId, d.address.raw,
-            PreviewCodec.pack(d.headers.flatMap { listOf(it.name, it.value) }), PreviewCodec.pack(d.unknownRequiredDirectives)))
+            PreviewCodec.pack(d.headers.flatMap { listOf(it.name, it.value) }), PreviewCodec.pack(d.unknownRequiredDirectives), ch.tvgName))
     })
     private fun decode(text: String) = PreviewCodec.unpack(text).map { value ->
-        val fields = PreviewCodec.unpack(value); require(fields.size == 8)
+        val fields = PreviewCodec.unpack(value); require(fields.size in 8..9)
         val groups = PreviewCodec.unpack(fields[3]); require(groups.isNotEmpty())
         val headers = PreviewCodec.unpack(fields[6]); require(headers.size % 2 == 0)
         PreviewChannel(PreviewCodec.id(fields[0]), fields[1], groups.first(), fields[2], definition = PlaybackDefinition(Address.fromForm(fields[5]),
-            headers.chunked(2).map { Header(it[0], it[1]) }, unknownRequiredDirectives = PreviewCodec.unpack(fields[7])), groups = groups, providerId = fields[4])
+            headers.chunked(2).map { Header(it[0], it[1]) }, unknownRequiredDirectives = PreviewCodec.unpack(fields[7])), groups = groups, providerId = fields[4], tvgName = fields.getOrElse(8) { "" })
     }
 }

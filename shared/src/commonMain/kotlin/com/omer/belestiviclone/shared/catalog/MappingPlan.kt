@@ -8,6 +8,7 @@ data class ChannelContribution(
     val name: String? = null,
     val logo: String? = null,
     val providerHint: String? = null,
+    val tvgName: String = "",
 ) {
     override fun toString(): String = "ChannelContribution([redacted])"
 }

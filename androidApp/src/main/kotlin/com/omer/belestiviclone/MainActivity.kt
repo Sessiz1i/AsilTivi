@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val scope = rememberCoroutineScope()
-            val state = remember { PreviewState(store, scope, publicStore, AndroidSourceLoader(applicationContext)) }
+            val state = remember { PreviewState(store, scope, publicStore, AndroidSourceLoader(applicationContext), epgLoader = AndroidEpgLoader(applicationContext)) }
             var captionReservedBottomPx by remember { mutableIntStateOf(0) }
             DocumentBridge(state)
             SideEffect { previewState = state }

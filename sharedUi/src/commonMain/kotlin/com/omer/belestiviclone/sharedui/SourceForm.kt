@@ -12,7 +12,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-internal val sourceFormKinds = setOf("m3u", "supplement", "xtream", "file")
+internal val sourceFormKinds = setOf("m3u", "supplement", "xtream", "file", "epg")
 
 /** Same settings shell and footer; back drops the secret draft through PreviewState.dismiss. */
 @Composable
@@ -23,6 +23,7 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
         "xtream" -> s.message("XTREAM BİLGİLERİ", "XTREAM DETAILS", "XTREAM-ZUGANGSDATEN")
         "supplement" -> s.message("Ek Liste", "Extra List", "Zusatzliste")
         "file" -> s.message("Cihazdan M3U Dosyası Yükle", "Load M3U File", "M3U-Datei laden")
+        "epg" -> s.message("XMLTV EPG KAYNAĞI", "XMLTV EPG SOURCE", "XMLTV EPG-QUELLE")
         else -> s.message(if (s.editing == null) "YENİ LİSTE EKLE" else "LİSTEYİ DÜZENLE", if (s.editing == null) "ADD NEW LIST" else "EDIT LIST", if (s.editing == null) "NEUE LISTE" else "LISTE BEARBEITEN")
     }
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 19.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -41,6 +42,14 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
                 image("ikon_dosya", Modifier.size(40.dp, 29.dp)); Label(title, 12, bold = true)
                 Label(s.message("Seçilen M3U uygulamaya kopyalanır; dış dosyadan bağımsızdır.", "The selected M3U is copied into the app.", "Die gewählte M3U wird in die App kopiert."), 10, Color(0xFF94A2B7))
             }
+        } else if (kind == "epg") {
+            Field(
+                s.formAddress,
+                s.message("XMLTV EPG URL", "XMLTV EPG URL", "XMLTV EPG-URL"),
+                "ikon_url",
+                image,
+                placeholder = s.message("https://.../epg.xml veya epg.xml.gz", "https://.../epg.xml or epg.xml.gz", "https://.../epg.xml oder epg.xml.gz")
+            ) { s.formAddress = it }
         } else {
             if (kind != "xtream") Field(s.formName, s.message("LİSTE ADI", "LIST NAME", "LISTENNAME"), "ikon_liste_adi", image, placeholder = s.message("Örn: Evdeki TV, Yedek Liste", "Example: Home TV, Backup List", "Beispiel: TV zu Hause, Ersatzliste")) { s.formName = it }
             if (!s.editingFile) Field(s.formAddress, if (kind == "xtream") s.message("SUNUCU ADRESİ", "SERVER ADDRESS", "SERVERADRESSE") else "M3U URL", if (kind == "xtream") "ikon_sunucu" else "ikon_url", image, placeholder = if (kind == "xtream") "http://ornek-sunucu.com:8080" else s.message("http://... veya https://...", "http://... or https://...", "http://... oder https://...")) { s.formAddress = it }
@@ -59,11 +68,13 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
             when (kind) {
                 "file" -> s.requestDocument("file")
                 "xtream" -> s.notice = s.message("Hesap bağlantısı bağlı değil; bilgiler saklanmaz.", "Account connection unavailable; credentials are not stored.", "Kontoverbindung nicht verfügbar; Daten werden nicht gespeichert.")
+                "epg" -> s.saveEpgUrl()
                 else -> if (kind == "supplement" && s.data.library?.extra != null) s.dialog = "replaceExtra" else s.saveSource()
             }
         }
-        Label(if (kind == "xtream") s.message("Hesap bağlantısı bağlı değil; bilgiler saklanmaz.", "Account connection unavailable; credentials are not stored.", "Kontoverbindung nicht verfügbar; Daten werden nicht gespeichert.") else s.message("Başarıyla yüklenip kaydedilene kadar önceki kaynak korunur.", "Previous source is preserved until loading and saving succeed.", "Vorherige Quelle bleibt bis zum erfolgreichen Speichern erhalten."), 10, Color(0xFF94A2B7), Modifier.padding(top = 12.dp))
+        Label(if (kind == "xtream") s.message("Hesap bağlantısı bağlı değil; bilgiler saklanmaz.", "Account connection unavailable; credentials are not stored.", "Kontoverbindung nicht verfügbar; Daten werden nicht gespeichert.") else if (kind == "epg") s.message("Boş bırakıp kaydederseniz yerleşik örnek EPG (epg_sample.xml) kullanılır.", "Leave blank and save to use the built-in sample EPG (epg_sample.xml).", "Leer lassen, um das integrierte Beispiel-EPG zu verwenden.") else s.message("Başarıyla yüklenip kaydedilene kadar önceki kaynak korunur.", "Previous source is preserved until loading and saving succeed.", "Vorherige Quelle bleibt bis zum erfolgreichen Speichern erhalten."), 10, Color(0xFF94A2B7), Modifier.padding(top = 12.dp))
         if (s.busy) Action(s.message("İPTAL", "CANCEL", "ABBRECHEN"), Modifier.fillMaxWidth(), enabled = !s.committingSource, click = s::cancelSource)
+        if (kind == "epg" && s.data.pref("epgUrl").isNotBlank()) Action(s.message("VARSAYILAN ÖRNEK EPG'YE DÖN", "RESET TO SAMPLE EPG", "STANDARD-EPG WIEDERHERSTELLEN"), Modifier.fillMaxWidth(), enabled = !s.busy, click = s::clearEpgUrl)
         if (kind == "supplement" && s.data.library?.extra != null) Action(s.message("EK LİSTEYİ KALDIR", "REMOVE EXTRA LIST", "ZUSATZLISTE ENTFERNEN"), Modifier.fillMaxWidth(), enabled = !s.busy) { s.dialog = "removeExtra" }
         if (kind == "m3u") {
             Spacer(Modifier.height(23.dp)); Label(s.message("KAYITLI LİSTELERİM", "MY SAVED LISTS", "GESPEICHERTE LISTEN") + " (${s.savedSources.size})", 10, Color(0xFF94A2B7), bold = true, letterSpacing = 1f)
