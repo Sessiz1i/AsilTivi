@@ -11,12 +11,6 @@ import kotlinx.coroutines.withContext
 
 /** Opaque random IDs allocated once, stored atomically with the last successful catalog. No migration. */
 class AndroidPublicCatalog(private val context: Context, private val cacheName: String = "public-trlist-catalog-v1") {
-    /** R23 must never turn an absent/corrupt cache into fresh identities. */
-    suspend fun readExisting(): List<PreviewChannel> = withContext(Dispatchers.IO) {
-        val base = File(context.filesDir, cacheName)
-        if (!base.isFile || File(base.path + ".bak").exists()) throw TransitionProblem("missing-or-unsettled-cache")
-        decode(base.readText(Charsets.UTF_8))
-    }
     suspend fun load(): List<PreviewChannel> = withContext(Dispatchers.IO) {
         val file = AtomicFile(File(context.filesDir, cacheName))
         if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()) return@withContext decode(file.readFully().toString(Charsets.UTF_8)).also { logBinding("cache", it) }

@@ -10,7 +10,7 @@ data class SavedSource(
 ) {
     override fun toString() = "SavedSource([redacted])"
 }
-data class SourceLibrary(val records: List<SavedSource>, val active: SourceId, val snapshot: CatalogSnapshot, val transition: TransitionJournal? = null, val r26: R26Journal? = null, val r28: R28Journal? = null, val r33: R33Journal? = null, val r38b: R38BJournal? = null, val r38c: R38CJournal? = null) {
+data class SourceLibrary(val records: List<SavedSource>, val active: SourceId, val snapshot: CatalogSnapshot) {
     val saved get() = records.filter { !it.deleted && it.parent == null && it.kind != SourceKind.DEFAULT }
     val main get() = records.first { it.id == active && !it.deleted }
     val extra get() = records.firstOrNull { !it.deleted && it.parent == active }
@@ -75,7 +75,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
     }
     fun default(data: PreviewData, text: String): PreviewData {
         val library = bootstrap(data)
-        val source = R38CProfileTransition.defaultSource(R38BProfileTransition.defaultSource(R33ProfileTransition.defaultSource(R28ProfileTransition.defaultSource(R26ProfileTransition.defaultSource(VerifiedDefinitionTransition.defaultSource(parsed(PublicM3u.source, "trlist", SourceKind.DEFAULT, PublicM3u.url, text), library.transition), library.r26), library.r28), library.r33), library.r38b), library.r38c)
+        val source = parsed(PublicM3u.source, "trlist", SourceKind.DEFAULT, PublicM3u.url, text)
         return rebuild(data, library.copy(records = library.records.filter { it.id != source.id } + source, active = source.id))
     }
     fun delete(data: PreviewData, id: SourceId): PreviewData {
@@ -88,17 +88,6 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         return rebuild(data, library.copy(records = library.records.map { if (it.parent == library.active) it.copy(deleted = true, rows = emptyList()) else it }))
     }
     fun rebuild(data: PreviewData, library: SourceLibrary): PreviewData {
-        // The pilot's unchanged source is already a complete committed snapshot. Replanning
-        // duplicate seed rows would unnecessarily allocate memberships on an unchanged default.
-        if ((library.transition != null || VerifiedDefinitionTransition.legacyDefault(library)) && data.library?.let { old -> old.active == library.active &&
-                old.records.toSet() == library.records.toSet() && old.snapshot == library.snapshot && old.transition == library.transition && old.r26 == library.r26 && old.r28 == library.r28 && old.r33 == library.r33 && old.r38b == library.r38b && old.r38c == library.r38c } == true) {
-            return data.copy(library = library)
-        }
-        if (library.r38c != null) throw TransitionProblem("r38c-layer-protected")
-        if (library.r38b != null) throw TransitionProblem("r38b-layer-must-rollback-first")
-        if (library.r33 != null) throw TransitionProblem("r33-layer-must-rollback-first")
-        if (library.r28 != null) throw TransitionProblem("r28-layer-must-rollback-first")
-        if (library.r26 != null) throw TransitionProblem("r26-layer-must-rollback-first")
         val sources = library.records.map { SourceRecord(it.id, if (it.parent == null) SourceRole.MAIN else SourceRole.SUPPLEMENT,
             !it.deleted && (it.id == library.active || it.parent == library.active), it.parent) }
         val rows = library.records.filter { !it.deleted }.flatMap { it.rows }
@@ -143,32 +132,6 @@ object LibraryCodec {
     }
     fun encode(data: PreviewData): String {
         val library = data.library ?: return pack("BT-PROFILE-1", PreviewCodec.pack(data.sources), channels(data.channels))
-        library.r38c?.let { journal ->
-            require(library.r33 == null && library.r38b == null && library.r28 == journal.previous && library.r26 == journal.previous.previous && library.transition == journal.previous.previous.previous)
-            require((journal.manifest == R38CProfileTransition.normalManifest && journal.target.id == R38CProfileTransition.targetId) ||
-                (journal.manifest == R38CProfileTransition.fixtureManifest && journal.target.id == R38CProfileTransition.syntheticId))
-            return pack(R38CProfileTransition.envelope, encode(data.copy(library = library.copy(r38c = null))), R38CJournalCodec.encode(journal))
-        }
-        library.r38b?.let { journal ->
-            require(library.r33 == null && library.r28 == journal.previous && library.r26 == journal.previous.previous && library.transition == journal.previous.previous.previous)
-            require(journal.manifest == R38BProfileTransition.fixtureManifest && journal.target.id == R38BProfileTransition.targetId)
-            return pack(R38BProfileTransition.envelope, encode(data.copy(library = library.copy(r38b = null))), R38BJournalCodec.encode(journal))
-        }
-        library.r33?.let { journal ->
-            require(library.r28 == journal.previous && library.r26 == journal.previous.previous && library.transition == journal.previous.previous.previous)
-            return pack("BT-SOURCES-5", encode(data.copy(library = library.copy(r33 = null))), R33JournalCodec.encode(journal))
-        }
-        library.r28?.let { journal ->
-            require(library.r26 == journal.previous && library.transition == journal.previous.previous)
-            return pack("BT-SOURCES-4", encode(data.copy(library = library.copy(r28 = null))), R28JournalCodec.encode(journal))
-        }
-        library.r26?.let { journal ->
-            require(library.transition == journal.previous)
-            return pack("BT-SOURCES-3", encode(data.copy(library = library.copy(r26 = null))), R26JournalCodec.encode(journal))
-        }
-        library.transition?.let { journal ->
-            return pack("BT-SOURCES-2", encode(data.copy(library = library.copy(transition = null))), TransitionJournalCodec.encode(journal))
-        }
         val snapshot = library.snapshot
         val records = PreviewCodec.pack(library.records.map { source -> pack(id(source.id), source.name, source.kind.name, source.address, source.parent?.let(::id).orEmpty(), source.deleted.toString(), source.rawCount.toString(), source.skippedCount.toString(),
             PreviewCodec.pack(source.rows.map { row -> pack(row.rowOrder.toString(), definition(row.definition), label(row.category), row.name.orEmpty(), row.logo.orEmpty(), row.providerHint.orEmpty()) })) })
@@ -177,50 +140,17 @@ object LibraryCodec {
         val member = PreviewCodec.pack(snapshot.memberships.map { pack(PreviewCodec.id(it.id.value), PreviewCodec.id(it.channelId.value), id(it.sourceId), PreviewCodec.id(it.categoryId.value), it.isCurrent.toString()) })
         return pack("BT-SOURCES-1", PreviewCodec.pack(data.sources), records, id(library.active), ch, cat, member, channels(data.channels))
     }
+    private fun legacyInner(f: List<String>): String? {
+        val tag = f.firstOrNull() ?: return null
+        if (!tag.startsWith("BT-SOURCES-") || tag == "BT-SOURCES-1" || f.size < 2) return null
+        val inner = runCatching { PreviewCodec.unpack(f[1]).firstOrNull() }.getOrNull() ?: return null
+        return f[1].takeIf { inner.startsWith("BT-SOURCES-") }
+    }
     fun decode(value: String, base: PreviewData): PreviewData {
         val f = PreviewCodec.unpack(value)
-        if (f.firstOrNull() == R38CProfileTransition.envelope) {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-4")
-            val decoded = decode(f[1], base)
-            val journal = R38CJournalCodec.decode(f[2])
-            require(decoded.library!!.r33 == null && decoded.library.r38b == null && decoded.library.r28 == journal.previous && decoded.library.r26 == journal.previous.previous && decoded.library.transition == journal.previous.previous.previous)
-            require((journal.manifest == R38CProfileTransition.normalManifest && journal.target.id == R38CProfileTransition.targetId) ||
-                (journal.manifest == R38CProfileTransition.fixtureManifest && journal.target.id == R38CProfileTransition.syntheticId))
-            return decoded.copy(library = decoded.library.copy(r38c = journal))
-        }
-        if (f.firstOrNull() == R38BProfileTransition.envelope) {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-4")
-            val decoded = decode(f[1], base)
-            val journal = R38BJournalCodec.decode(f[2])
-            require(decoded.library!!.r33 == null && decoded.library.r28 == journal.previous && decoded.library.r26 == journal.previous.previous && decoded.library.transition == journal.previous.previous.previous)
-            return decoded.copy(library = decoded.library.copy(r38b = journal))
-        }
-        if (f.firstOrNull() == "BT-SOURCES-5") {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-4")
-            val decoded = decode(f[1], base)
-            val journal = R33JournalCodec.decode(f[2])
-            require(decoded.library!!.r28 == journal.previous && decoded.library.r26 == journal.previous.previous && decoded.library.transition == journal.previous.previous.previous)
-            return decoded.copy(library = decoded.library.copy(r33 = journal))
-        }
-        if (f.firstOrNull() == "BT-SOURCES-4") {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-3")
-            val decoded = decode(f[1], base)
-            val journal = R28JournalCodec.decode(f[2])
-            require(decoded.library!!.r26 == journal.previous && decoded.library.transition == journal.previous.previous)
-            return decoded.copy(library = decoded.library.copy(r28 = journal))
-        }
-        if (f.firstOrNull() == "BT-SOURCES-3") {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-2")
-            val decoded = decode(f[1], base)
-            val journal = R26JournalCodec.decode(f[2])
-            require(decoded.library!!.transition == journal.previous)
-            return decoded.copy(library = decoded.library.copy(r26 = journal))
-        }
-        if (f.firstOrNull() == "BT-SOURCES-2") {
-            require(f.size == 3 && PreviewCodec.unpack(f[1]).firstOrNull() == "BT-SOURCES-1")
-            val decoded = decode(f[1], base)
-            return decoded.copy(library = decoded.library!!.copy(transition = TransitionJournalCodec.decode(f[2])))
-        }
+        // BT-SOURCES-2..7 were debug transition journals wrapped around a complete inner envelope.
+        // The inner BT-SOURCES-1 row already holds the committed definitions; journals are dropped.
+        legacyInner(f)?.let { return decode(it, base) }
         require(f.firstOrNull()?.startsWith("BT-SOURCES-") != true || f.firstOrNull() == "BT-SOURCES-1") { "Unsupported source envelope" }
         if (f.firstOrNull() == "BT-PROFILE-1") { require(f.size == 3); return base.copy(sources = PreviewCodec.unpack(f[1]), channels = channels(f[2])) }
         if (f.firstOrNull() != "BT-SOURCES-1") return base.copy(sources = f)

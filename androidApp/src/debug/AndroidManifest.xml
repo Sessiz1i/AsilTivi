@@ -1,41 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <activity android:name=".R42FourActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R41TracksActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R40QualityActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R39RenderActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R38CNormalActivity" android:exported="true" android:permission="android.permission.DUMP" />
-        <activity android:name=".R38CSyntheticActivity" android:exported="true" android:permission="android.permission.DUMP" />
-        <activity android:name=".R38BSyntheticActivity" android:exported="true" android:permission="android.permission.DUMP" />
-        <activity android:name=".R38AIdentityActivity" android:exported="true" android:permission="android.permission.DUMP" />
-        <activity android:name=".R38APlaybackActivity" android:exported="true" android:permission="android.permission.DUMP" />
-        <activity android:name=".R38PlaybackActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R33ProfileInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R31SnapshotActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R30RenderActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R28ProfileInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R26ProfileInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R23ProfileInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R22CompatibilityInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
-        <activity android:name=".R21PilotInspectionActivity" android:exported="true"
-            android:permission="android.permission.DUMP" />
         <!-- Shell inspection only; absent from release and from product navigation. -->
         <activity android:name=".HeadingInspectionActivity" android:exported="true" android:launchMode="singleTop"
             android:permission="android.permission.DUMP" />

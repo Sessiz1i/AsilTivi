@@ -12,8 +12,8 @@ android {
         applicationId = "com.omer.belestiviclone"
         minSdk = 23
         targetSdk = 36
-        versionCode = 61
-        versionName = "0.6.22-preview-r42-four"
+        versionCode = 62
+        versionName = "0.7.0-temiz"
     }
     signingConfigs {
         getByName("debug") {
