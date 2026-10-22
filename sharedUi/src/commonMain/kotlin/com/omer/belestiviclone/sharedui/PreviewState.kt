@@ -26,11 +26,11 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     val profileName get() = data.library?.main?.name ?: if (isPublic) "trlist" else "Örnek profil"
     var data by mutableStateOf(PreviewData()); private set
     var loaded by mutableStateOf(false); private set
-    var storage by mutableStateOf("Örnek profil açılıyor…"); private set
+    var storage by mutableStateOf("Kanallar yükleniyor…"); private set
     var busy by mutableStateOf(false); private set
-    var page by mutableStateOf("home")
+    var page by mutableStateOf("live")
     var exitRequested by mutableStateOf(false)
-    var origin by mutableStateOf("home")
+    var origin by mutableStateOf("live")
     var section by mutableStateOf(0)
     var category by mutableStateOf("Favoriler")
     var query by mutableStateOf("")
@@ -93,17 +93,17 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun text(tr: String, en: String) = if (data.pref("language") == "English") en else tr
     suspend fun load() {
-        try { data = store.load(); storage = "Örnek profil · yerel kayıt" }
+        try { data = store.load(); storage = "Yerel kayıt" }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { sessionOnly = true; storage = "Örnek profil · yalnız bu oturumda"; notice = "Yerel kayıt açılamadı. Örnek değişiklikler yalnız bu oturumda tutulacak." }
+        catch (_: Exception) { sessionOnly = true; storage = "Yalnız bu oturumda"; notice = "Yerel kayıt açılamadı. Değişiklikler yalnız bu oturumda tutulacak." }
         demo = data
         selected = data.startup(data.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
         if (publicStore != null) {
             try { publicData = publicStore.load(); switchProfile(true) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { notice = "Kamu listesi açılamadı. Mevcut demo ve son başarılı kayıt korunuyor." }
+            catch (_: Exception) { notice = "Kamu listesi açılamadı. Mevcut liste korunuyor." }
         }
-        if (playbackUri(channel) != null) page = "live"
+        page = "live"
         loaded = true
     }
     fun switchProfile(public: Boolean) {
@@ -114,6 +114,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         selected = next.startup(next.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
         leaveLiveLayers(); panel = true; dialog = null; multi = null
         storage = "$profileName · yerel kayıt"
+        page = "live"
     }
     fun commit(next: PreviewData, done: () -> Unit = {}) {
         if (busy) return
@@ -158,7 +159,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun select(id: OpaqueId) { selected = id; paused = false; if (playbackUri(channel) == null) notice = if (channel?.available == false)
         message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
-        else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Örnek kanal kartı; yayın bağlantısı yok." }
+        else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı." }
     /** Called by a real first-frame/audio-advancing event, never by focus or channel selection. */
     fun played(id: OpaqueId) {
         if (busy || data.channels.none { it.id == id && it.available }) return
@@ -210,7 +211,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             page == "settings" -> { page = origin; panel = false; if (returnAfterClear) clearReturn() }
             page == "multi" -> { selected = multi?.returnChannel() ?: selected; multi = null; page = "live"; pref("format", "Orijinal") }
             page == "live" && panel -> panel = false
-            page == "live" -> page = "home"
+            page == "live" -> dialog = "exit"
         }
     }
     fun channelChange(next: PreviewData) {

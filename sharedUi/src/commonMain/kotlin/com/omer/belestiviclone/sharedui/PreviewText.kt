@@ -54,6 +54,8 @@ private val translations = mapOf(
     "DEVAM ET" to "CONTINUE", "DEVAM" to "CONTINUE", "Performans Uyarısı" to "Performance warning",
     "Çoklu Ekran Düzeni" to "Multi screen layout", "2 Ekran" to "2 Screens", "4 Ekran" to "4 Screens",
     "+ Kanal Ekle" to "+ Add channel", "Ekrana Sığdır" to "Fit to screen", "× ÇIKIŞ" to "× EXIT",
+    "Çıkmak İstiyor Musunuz?" to "Do you want to exit?", "EVET, ÇIKIŞ" to "YES, EXIT", "HAYIR, DEVAM" to "NO, CONTINUE",
+    "Radyo" to "Radio", "Görüntü" to "Display", "Bilgi" to "Info", "Çıkış" to "Exit",
     "Örnek panel · yayın yok" to "Sample panel · no stream", "Orijinal · görünüm tercihi" to "Original · display preference",
     "Liste Adı" to "List name", "M3U URL (örnek)" to "M3U URL (sample)",
     "Sunucu Adresi (örnek)" to "Server address (sample)", "Örnek kullanıcı adı" to "Sample username",
@@ -99,7 +101,8 @@ private val german = mapOf(
     "Ek Liste" to "Zusatzliste", "Listeyi Güncelle" to "Liste aktualisieren", "Son başarılı snapshot korunur" to "Letzter erfolgreicher Stand bleibt erhalten", "Ana kaynağa bağlı tek ek liste" to "Eine Zusatzliste pro Hauptquelle", "Varsayılana Dön" to "Standard wiederherstellen", "Klonun trlist kaynağı; favoriler korunur" to "trlist-Quelle; Favoriten bleiben erhalten",
     "M3U URL" to "M3U URL", "Özel liste adresi ile bağlan" to "Eigene Listenadresse verwenden", "Xtream Codes" to "Xtream Codes", "Sunucu bilgileri ile bağlantı" to "Mit Serverdaten verbinden", "Dosyadan Yükle" to "Aus Datei laden", "M3U dosyası seç" to "M3U-Datei wählen", "Kategorileri Yönet" to "Kategorien verwalten", "Sıralama ve görünürlük" to "Reihenfolge und Sichtbarkeit",
     "Favorileri Dışa Aktar" to "Favoriten exportieren", "Favori listesini yedekle" to "Favoritenliste sichern", "Favorileri İçe Aktar" to "Favoriten importieren", "Yedekten geri yükle" to "Aus Sicherung laden",
-    "DOSYA SEÇ" to "DATEI WÄHLEN", "Ayarlar" to "Einstellungen", "ÇIKIŞ" to "BEENDEN", "Paneli Kapat" to "Fenster schließen", "Yerel kayıt" to "Lokal gespeichert", "İşlem sürüyor…" to "Vorgang läuft…", "Uygulama Dili" to "Sprache", "UYGULAMA DİLİ" to "SPRACHE", "UYGULAMA" to "ANWENDUNG", "DİL" to "SPRACHE"
+    "DOSYA SEÇ" to "DATEI WÄHLEN", "Ayarlar" to "Einstellungen", "ÇIKIŞ" to "BEENDEN", "Paneli Kapat" to "Fenster schließen", "Yerel kayıt" to "Lokal gespeichert", "İşlem sürüyor…" to "Vorgang läuft…", "Uygulama Dili" to "Sprache", "UYGULAMA DİLİ" to "SPRACHE", "UYGULAMA" to "ANWENDUNG", "DİL" to "SPRACHE",
+    "Çıkmak İstiyor Musunuz?" to "Möchten Sie beenden?", "EVET, ÇIKIŞ" to "JA, BEENDEN", "HAYIR, DEVAM" to "NEIN, WEITER", "Radyo" to "Radio", "Görüntü" to "Bildformat", "Bilgi" to "Info", "Çıkış" to "Beenden"
 )
 private val connectedEnglish = mapOf(
     "Kanallar Ve Listeler" to "Channels and Lists", "Yedekleme Ve Aktarım" to "Backup and Transfer", "Yardım Ve Hakkında" to "Help and About",

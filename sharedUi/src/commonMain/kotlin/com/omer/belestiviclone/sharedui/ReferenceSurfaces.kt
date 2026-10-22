@@ -89,7 +89,6 @@ internal fun LayoutChooser(s: PreviewState, image: @Composable (String, Modifier
                     }
                 }) { s.startMulti(count) }
             }
-            Label("İki bağımsız yayın; dört yayın kapasitesi doğrulanmadı.", 9, Color(0xFF9AA8BC), Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
         }
         LaunchedEffect(Unit) { first.requestFocus() }
     }
@@ -115,7 +114,6 @@ internal fun MultiWarning(s: PreviewState, image: @Composable (String, Modifier)
                     Action("DEVAM ET", Modifier.weight(1f).height(38.dp), tint = Color(0xFFED8017), radius = 10.dp, strokeWidth = 0.dp, content = { Label("DEVAM ET", 11, bold = true) }) { s.dialog = "layout" }
                 }
             }
-            Label("İki bağımsız yayın; dört yayın kapasitesi doğrulanmadı.", 9, Color(0xFFBCC9DB), Modifier.fillMaxWidth().padding(top = 6.dp), textAlign = TextAlign.Center)
         }
         LaunchedEffect(Unit) { cancel.requestFocus() }
     }

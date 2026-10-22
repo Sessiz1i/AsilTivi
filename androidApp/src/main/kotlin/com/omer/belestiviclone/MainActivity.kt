@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
             DocumentBridge(state)
             SideEffect { previewState = state }
             LaunchedEffect(state.exitRequested) { if (state.exitRequested) finish() }
-            BackHandler(enabled = state.page != "home" || state.dialog != null, onBack = state::back)
+            BackHandler(enabled = true, onBack = state::back)
             PreviewApp(state, appVersionName = BuildConfig.VERSION_NAME,
                 onFocusTarget = { focusTarget = it; if (BuildConfig.DEBUG) android.util.Log.i("BelesNav", "focus=$it route=${state.page} dialog=${state.dialog}") },
                 onNavigationKey = { observeKey(it.nativeKeyEvent, "compose") },

@@ -50,10 +50,10 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
             }
         }
         Spacer(Modifier.height(9.dp))
-        Action(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else if (kind == "xtream") s.message("BAĞLAN · ÖNİZLEME", "CONNECT · PREVIEW", "VERBINDEN · VORSCHAU") else s.message("KAYDET VE YÜKLE", "SAVE AND LOAD", "SPEICHERN UND LADEN"), Modifier.fillMaxWidth().height(42.dp), tint = Color(0xFFE67E22), strokeWidth = 0.dp, enabled = !s.busy, content = {
+        Action(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else if (kind == "xtream") s.message("BAĞLAN", "CONNECT", "VERBINDEN") else s.message("KAYDET VE YÜKLE", "SAVE AND LOAD", "SPEICHERN UND LADEN"), Modifier.fillMaxWidth().height(42.dp), tint = Color(0xFFE67E22), strokeWidth = 0.dp, enabled = !s.busy, content = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (kind == "xtream") Label("🚀", 12) else image(if (kind == "file") "ikon_dosya" else "ikon_kaydet", Modifier.size(12.dp, 13.dp))
-                Label(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else if (kind == "xtream") s.message("BAĞLAN · ÖNİZLEME", "CONNECT · PREVIEW", "VERBINDEN · VORSCHAU") else s.message("KAYDET VE YÜKLE", "SAVE AND LOAD", "SPEICHERN UND LADEN"), 11, bold = true)
+                Label(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else if (kind == "xtream") s.message("BAĞLAN", "CONNECT", "VERBINDEN") else s.message("KAYDET VE YÜKLE", "SAVE AND LOAD", "SPEICHERN UND LADEN"), 11, bold = true)
             }
         }) {
             when (kind) {

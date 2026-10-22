@@ -34,7 +34,8 @@ class PreviewStateTest {
         s.searching = true; s.query = "trt"; s.categoryMenu = true
         s.clearHistory(); yield()
         assertFalse(s.searching); assertEquals("", s.query); assertFalse(s.categoryMenu); assertFalse(s.panel)
-        s.back(); assertEquals("home", s.page)
+        s.back(); assertEquals("exit", s.dialog); assertEquals("live", s.page)
+        s.back(); assertNull(s.dialog); assertEquals("live", s.page)
     }
     @Test fun failedDirectClearPreservesHistoryListChannelPanelAndLayers() = runBlocking {
         val store = Store().also { it.fail = true }
@@ -173,5 +174,23 @@ class PreviewStateTest {
         val store = Store().also { it.failLoad = true }; val s = PreviewState(store, this); s.load()
         assertTrue(s.sessionOnly); assertTrue(s.storage.contains("oturum"))
         s.commit(s.data.copy(favorites = emptyList())); yield(); assertTrue(s.data.favorites.isEmpty()); assertEquals(0, store.writes)
+    }
+    @Test fun directLiveStartupAndExitConfirmationFlow() = runBlocking {
+        val s = PreviewState(Store(), this)
+        assertEquals("live", s.page)
+        s.load()
+        assertEquals("live", s.page)
+        assertTrue(s.panel)
+        s.back()
+        assertFalse(s.panel)
+        assertNull(s.dialog)
+        assertEquals("live", s.page)
+        s.back()
+        assertEquals("exit", s.dialog)
+        assertEquals("live", s.page)
+        s.back()
+        assertNull(s.dialog)
+        assertEquals("live", s.page)
+        assertFalse(s.exitRequested)
     }
 }

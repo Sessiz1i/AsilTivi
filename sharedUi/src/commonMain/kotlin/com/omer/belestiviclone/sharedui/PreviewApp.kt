@@ -174,7 +174,6 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
     Box(Modifier.fillMaxSize()) {
         if (!s.loaded) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Label(s.storage) }
         else when (s.page) {
-            "home" -> Home(s, image)
             "settings" -> Settings(s, image, appVersionName)
             "multi" -> Multi(s, image, video)
             else -> Live(s, image, video)
@@ -245,18 +244,20 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         var qualityInfo by remember(s.selected, s.retry) { mutableStateOf("") }
         video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), PlaybackPreferences(s.data.pref("quality"),s.data.pref("audio"),s.data.pref("subtitle")), { qualityInfo = it }, Modifier.fillMaxSize())
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Örnek kanal · yayın bağlantısı yok", 11) }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
         }
         Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { s.panel = true } })
         val boundsObserver = LocalBoundsObserver.current
         if (s.liveHeadingVisible) LiveHeading(s.channel?.name ?: "", s.channel?.logo ?: "ikon_tv", "${s.profileName} · EPG bilgisi yok", image,
             Modifier.liveHeadingPlacement(s.data.pref("format"), maxWidth.value, maxHeight.value).widthIn(max = maxWidth * .43f), includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
         if (s.panel) {
-            Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                IconAction("Çoklu Ekran", "ikon_coklu", image, width = 104.dp) { s.dialog = "warning" }
-                IconAction("Format: ${s.data.pref("format")}", "ikon_format", image, width = 120.dp, visibleLabel = "Format: ${when (s.data.pref("format")) { "Sığdır (Fit)" -> "Fit"; "Tam Ekran (Kes)" -> "Kes"; else -> "Orijinal" }}", click = s::cycleLiveFormat)
-                IconAction("Ayarlar", "ikon_ayar", image, width = 79.dp, click = s::settings)
-                IconAction("Kapat", "ikon_cikis", image, width = 68.dp) { s.back() }
+            Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconAction("Radyo", "ikon_audio", image) { s.notice = s.message("Radyo modu yakında eklenecektir.", "Radio mode coming soon.", "Radiomodus demnächst verfügbar.") }
+                IconAction("Çoklu Ekran", "ikon_coklu", image) { s.dialog = "warning" }
+                IconAction("Görüntü", "ikon_format", image, click = s::cycleLiveFormat)
+                IconAction("Bilgi", "ikon_saat", image) { s.info = !s.info }
+                IconAction("Ayarlar", "ikon_ayar", image, click = s::settings)
+                IconAction("Çıkış", "ikon_cikis", image) { s.dialog = "exit" }
             }
             if (vertical) {
                 val panelWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
@@ -285,7 +286,6 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 if (s.searching) Search(s)
             }
             Row(Modifier.align(Alignment.BottomEnd).padding(bottom = if (vertical) 29.dp else panelHeight + 27.dp, end = 30.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                IconAction("Bilgi", "ikon_saat", image) { s.info = !s.info }
                 IconAction(if (s.paused) "Oynat" else "Duraklat", "ikon_duraklat", image) { s.paused = !s.paused }
                 IconAction(if (s.muted) "Ses aç" else "Sessiz", "ikon_ses", image) { s.muted = !s.muted }
                 IconAction("Yeniden dene", "ikon_canli", image) { s.retry++ }
@@ -488,10 +488,10 @@ private val settingIcons = mapOf("list" to "ikon_list", "opacity" to "ikon_opaci
                         }
                         5 -> {
                             SettingsGroup("UYGULAMA")
-                            SettingTile("Beleş Tivi Clone", "Android/TV önizleme · $appVersionName", "ikon_hakkinda", image) { }
+                            SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK")
-                            SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Önizleme: dış destek mesajı gönderilmez." }
-                            SettingTile("Telegram", "Topluluk", "ikon_telegram", image) { s.notice = "Önizleme: dış bağlantı açılmaz." }
+                            SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
+                            SettingTile("Telegram", "Topluluk", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("DİĞER İŞLEMLER")
                             SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "ikon_cache", image) { s.dialog = "cache" }
                         }
@@ -568,7 +568,6 @@ private fun Confirmation(s: PreviewState, image: @Composable (String, Modifier) 
                 if (warning) Column(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     image("ikon_uyari", Modifier.size(44.dp)); Spacer(Modifier.height(17.dp)); Label("Performans Uyarısı", 17, bold = true)
                     Spacer(Modifier.height(14.dp)); Label("Çoklu ekran cihazınızı ve internetinizi yoğun kullanır. Düşük donanımlı cihazlarda donma yaşanabilir.", 11, Color(0xFF9AA8BC))
-                    Label("İki bağımsız yayın; dört yayın kapasitesi doğrulanmadı.", 10, Color(0xFF9AA8BC))
                 } else {
                     Label(if (kind == "clear") "Geçmişi Temizle?" else "Önbelleği Temizle?", 16, bold = true)
                     Label(if (kind == "clear") "${s.data.history.size} geçmiş kaydı silinecek. Favoriler korunur." else "Yalnız indirilen logo önbelleği temizlenir. Kaynaklar ve tercihler korunur.", 11, Color(0xFF9AA8BC), Modifier.offset(y = 31.dp))
@@ -586,8 +585,45 @@ private fun Confirmation(s: PreviewState, image: @Composable (String, Modifier) 
     }
 }
 @Composable
+private fun ExitDialog(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
+    val stayRequester = remember { FocusRequester() }
+    val contentDensity = LocalDensity.current
+    Dialog(onDismissRequest = s::dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        CompositionLocalProvider(LocalDensity provides contentDensity) {
+            Box(Modifier.width(420.dp).background(card, RoundedCornerShape(12.dp)).border(1.dp, Color(0xFF344454), RoundedCornerShape(12.dp)).padding(22.dp).focusGroup().semantics { paneTitle = "Çıkış Onayı" }) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    image("ikon_cikis", Modifier.size(36.dp))
+                    Label("Çıkmak İstiyor Musunuz?", 16, bold = true, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Action(
+                            label = "HAYIR, DEVAM",
+                            modifier = Modifier.weight(1f).height(42.dp).focusRequester(stayRequester),
+                            tint = Color(0xFF1E3557),
+                            radius = 8.dp,
+                            strokeWidth = 0.dp,
+                            content = { Label("HAYIR, DEVAM", 11, Color.White, bold = true) },
+                            click = s::dismiss
+                        )
+                        Action(
+                            label = "EVET, ÇIKIŞ",
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            tint = Color(0xFFD8222A),
+                            radius = 8.dp,
+                            strokeWidth = 0.dp,
+                            content = { Label("EVET, ÇIKIŞ", 11, Color.White, bold = true) },
+                            click = { s.exitRequested = true }
+                        )
+                    }
+                }
+            }
+            LaunchedEffect(Unit) { stayRequester.requestFocus() }
+        }
+    }
+}
+@Composable
 private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
     val kind = s.dialog ?: return
+    if (kind == "exit") { ExitDialog(s, image); return }
     if (kind in sourceFormKinds || kind == "categories") return
     if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }
@@ -604,7 +640,7 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
             when {
                 kind in choices -> choices.getValue(kind).forEach { value -> Action(value, Modifier.fillMaxWidth().height(44.5.dp), tint = Color.Transparent, strokeWidth = 0.dp, focusColor = amber, enabled = !s.busy, content = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Label(value, 12, modifier = Modifier.weight(1f), bold = true); if (s.data.pref(kind) == value) Label("✓", 20, amber) } }) { s.pref(kind, value) } }
                 kind == "clear" -> { Label("${s.data.history.size} geçmiş kaydı silinecek. Favoriler korunur.", 11, Color(0xFF98A5B8), Modifier.padding(vertical = 9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Action("İPTAL", Modifier.height(40.dp), tint = Color.Transparent, click = s::dismiss); Action("EVET, SİL", Modifier.height(40.dp), enabled = !s.busy, tint = Color.Transparent, content = { Label("EVET, SİL", 11, Color(0xFFFF4B48), bold = true) }) { s.clearHistory() } } }
-                kind == "warning" -> { image("ikon_uyari", Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp).size(44.dp)); Label("Çoklu ekran modu cihazınızın işlemcisini ve internetinizi yoğun kullanır. Eski veya düşük donanımlı cihazlarda donma yaşanabilir. Devam etmek istiyor musunuz?"); Label("Önizleme: panel atamaları gösterilir. Dört gerçek yayın doğrulanmadı.", 13, Color(0xFFBCC9DB)); Action("İPTAL", Modifier.fillMaxWidth(), click = s::dismiss); Action("DEVAM ET", Modifier.fillMaxWidth(), tint = amber) { s.dialog = "layout" } }
+                kind == "warning" -> { image("ikon_uyari", Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp).size(44.dp)); Label("Çoklu ekran modu cihazınızın işlemcisini ve internetinizi yoğun kullanır. Eski veya düşük donanımlı cihazlarda donma yaşanabilir. Devam etmek istiyor musunuz?"); Action("İPTAL", Modifier.fillMaxWidth(), click = s::dismiss); Action("DEVAM ET", Modifier.fillMaxWidth(), tint = amber) { s.dialog = "layout" } }
                 kind == "layout" -> listOf(2, 4).forEach { count -> Action("$count Ekran", Modifier.fillMaxWidth().height(if (count == 2) 106.dp else 140.dp), tint = Color.Transparent, strokeWidth = 0.dp, content = { Column(horizontalAlignment = Alignment.CenterHorizontally) { image(if (count == 2) "ikon_iki" else "ikon_dort", Modifier.size(68.dp, if (count == 2) 33.dp else 66.dp)); Label("$count Ekran", 12, bold = true) } }) { s.startMulti(count) } }
                 kind == "assign" -> { Action("Paneli Kapat", Modifier.fillMaxWidth()) { s.multi?.let { it.slots[it.selected] = null; s.multiRevision++ }; s.dismiss() }; s.data.channels.filter { it.available && it.id !in s.data.hidden }.forEach { ch -> Action(ch.name, Modifier.fillMaxWidth()) { s.multi!!.slots[s.multi!!.selected] = ch.id; s.multiRevision++; s.dismiss() } } }
                 kind == "categories" -> {
@@ -667,7 +703,7 @@ private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                             else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 if (ch != null) image(ch.logo, Modifier.size(30.dp)) else Label("+", 20, Color(0xFF626669))
                                 Label(ch?.name ?: "Kanal Ekle", 14, bold = true)
-                                if (ch != null) Label(if (s.isPublic) "Yayın kullanılamıyor" else "Örnek panel · yayın yok", 10, Color.LightGray)
+                                if (ch != null) Label("Yayın kullanılamıyor", 10, Color.LightGray)
                             }
                         }) { if (m.selected == index) s.dialog = "assign" else { m.selected = index; s.multiRevision++ } }
                     }

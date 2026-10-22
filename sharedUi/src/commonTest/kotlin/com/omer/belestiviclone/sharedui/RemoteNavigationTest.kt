@@ -61,8 +61,9 @@ class RemoteNavigationTest {
         s.back(); assertFalse(s.searching); assertTrue(s.panel)
         s.back(); assertFalse(s.panel); assertFalse(s.liveHeadingVisible)
         s.revealLiveControls(); assertTrue(s.panel); assertTrue(s.liveHeadingVisible)
-        s.back(); s.back(); assertEquals("home", s.page)
-        s.revealLiveControls(); assertEquals("home", s.page); assertFalse(s.liveHeadingVisible)
+        s.back(); s.back(); assertEquals("exit", s.dialog); assertEquals("live", s.page)
+        s.revealLiveControls(); assertEquals("live", s.page); assertFalse(s.liveHeadingVisible)
+        s.back(); assertNull(s.dialog); assertEquals("live", s.page)
         assertEquals(selected, s.selected); assertEquals(uri, playbackUri(s.channel)); assertEquals(data, s.data)
         assertTrue(s.paused); assertTrue(s.muted); assertEquals(3, s.retry); assertEquals(0, store.writes)
     }
