@@ -242,7 +242,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         val panelHeight = if (s.searching) 160.dp else 120.dp
         val opacity = s.data.pref("opacity").toFloat() / 100f
         var qualityInfo by remember(s.selected, s.retry) { mutableStateOf("") }
-        video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), PlaybackPreferences(s.data.pref("quality"),s.data.pref("audio"),s.data.pref("subtitle")), { qualityInfo = it }, Modifier.fillMaxSize())
+        val playbackPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
+        video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), playbackPrefs, { qualityInfo = it }, Modifier.fillMaxSize())
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
         }
@@ -539,10 +540,54 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
 
 private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Yardım Ve Hakkında")
 private val sectionsEn = listOf("Channels And Lists", "Appearance", "Playback", "Application", "Backup And Transfer", "Help And About")
-private val choices = mapOf("list" to listOf("Yatay (Alt)", "Dikey (Sidebar)"), "position" to listOf("Sol", "Orta", "Sağ"), "size" to listOf("Küçük", "Normal", "Büyük"), "language" to listOf("Türkçe", "English", "Deutsch"), "quality" to listOf("360p", "480p", "720p HD", "1080p FHD", "4K UHD"), "format" to LiveFormatOptions, "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"), "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"))
-private val titles = mapOf("list" to "Liste Konumu", "opacity" to "Liste Şeffaflığı", "position" to "Kanal Bilgisi Konum", "size" to "Kanal Bilgisi Boyut", "language" to "Uygulama Dili", "quality" to "Görüntü Kalitesi", "format" to "Varsayılan Görüntü Formatı", "audio" to "Tercih Edilen Ses Dili", "subtitle" to "Altyazı Varsayılanı")
+private val choices = mapOf(
+    "list" to listOf("Yatay (Alt)", "Dikey (Sidebar)"),
+    "position" to listOf("Sol", "Orta", "Sağ"),
+    "size" to listOf("Küçük", "Normal", "Büyük"),
+    "language" to listOf("Türkçe", "English", "Deutsch"),
+    "quality" to listOf("360p", "480p", "720p HD", "1080p FHD", "4K UHD"),
+    "format" to LiveFormatOptions,
+    "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"),
+    "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"),
+    "theme" to listOf("Beleş TiVi Klasik", "Modern"),
+    "sleepTimer" to listOf("Kapalı", "15 dk", "30 dk", "45 dk", "60 dk", "90 dk", "120 dk"),
+    "subtitleSize" to listOf("Küçük", "Normal", "Büyük", "Çok Büyük"),
+    "subtitleColor" to listOf("Beyaz", "Sarı", "Yeşil", "Camgöbeği"),
+    "subtitleBgOpacity" to listOf("%0 (Saydam)", "%25", "%50", "%75", "%100 (Siyah)"),
+)
+private val titles = mapOf(
+    "list" to "Liste Konumu",
+    "opacity" to "Liste Şeffaflığı",
+    "position" to "Kanal Bilgisi Konum",
+    "size" to "Kanal Bilgisi Boyut",
+    "language" to "Uygulama Dili",
+    "quality" to "Görüntü Kalitesi",
+    "format" to "Varsayılan Görüntü Formatı",
+    "audio" to "Tercih Edilen Ses Dili",
+    "subtitle" to "Altyazı Varsayılanı",
+    "theme" to "Tema Seçimi",
+    "sleepTimer" to "Uyku Zamanlayıcısı",
+    "subtitleSize" to "Altyazı Boyutu",
+    "subtitleColor" to "Altyazı Rengi",
+    "subtitleBgOpacity" to "Altyazı Arka Plan Opaklığı",
+)
 private val sectionIcons = listOf("ikon_kaynak", "ikon_gorunum", "ikon_oynatma", "ikon_app", "ikon_export", "ikon_hakkinda")
-private val settingIcons = mapOf("list" to "ikon_list", "opacity" to "ikon_opacity", "position" to "ikon_position", "size" to "ikon_size", "language" to "ikon_language", "quality" to "ikon_quality", "format" to "ikon_format", "audio" to "ikon_ses", "subtitle" to "ikon_subtitle")
+private val settingIcons = mapOf(
+    "list" to "ikon_list",
+    "opacity" to "ikon_opacity",
+    "position" to "ikon_position",
+    "size" to "ikon_size",
+    "language" to "ikon_language",
+    "quality" to "ikon_quality",
+    "format" to "ikon_format",
+    "audio" to "ikon_ses",
+    "subtitle" to "ikon_subtitle",
+    "theme" to "ikon_gorunum",
+    "sleepTimer" to "ikon_saat",
+    "subtitleSize" to "ikon_size",
+    "subtitleColor" to "ikon_gorunum",
+    "subtitleBgOpacity" to "ikon_opacity",
+)
 @Composable private fun Settings(s: PreviewState, image: @Composable (String, Modifier) -> Unit, appVersionName: String) {
     val contentScroll = rememberScrollState()
     BoxWithConstraints(Modifier.fillMaxSize().background(ink)) {
@@ -579,18 +624,28 @@ private val settingIcons = mapOf("list" to "ikon_list", "opacity" to "ikon_opaci
                         1 -> {
                             SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
                             Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL BİLGİSİ"); SettingCard(s, "position", image); SettingCard(s, "size", image)
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("TEMA"); SettingCard(s, "theme", image)
                         }
                         2 -> {
-                            SettingsGroup("VİDEO"); SettingCard(s, "quality", image); SettingCard(s, "format", image)
+                            SettingsGroup("ZAMANLAYICI"); SettingCard(s, "sleepTimer", image)
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("VİDEO"); SettingCard(s, "quality", image); SettingCard(s, "format", image)
                             Spacer(Modifier.height(20.dp)); SettingsGroup("SES & ALTYAZI")
                             SettingCard(s, "audio", image); SettingCard(s, "subtitle", image)
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("ALTYAZI GÖRÜNÜMÜ")
+                            SettingCard(s, "subtitleSize", image)
+                            SettingCard(s, "subtitleColor", image)
+                            SettingCard(s, "subtitleBgOpacity", image)
+                            SubtitlePreviewBox(s)
                             Label(s.message("Kalite bir üst sınırdır. Bilgi alanında işlenen format ve gerçek ses/altyazı seçimi gösterilir; kaynakta olmayan dil uygulanamaz.", "Quality is a ceiling. Info shows the input format and actual audio/subtitle selection; unavailable languages cannot be applied.", "Qualität ist eine Obergrenze. Info zeigt das Eingabeformat und die tatsächliche Ton-/Untertitelauswahl; fehlende Sprachen sind nicht verfügbar."), 10, Color(0xFF69798F), Modifier.padding(top = 12.dp))
                         }
                         3 -> {
                             SettingsGroup("DİL")
                             SettingCard(s, "language", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("BAŞLATMA")
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("BAŞLATMA & DAVRANIŞ")
+                            SettingTile("Favorilerden Başlat", "Açılışta doğrudan favori kanallardan birini aç", "kategori_favoriler", image, s.data.pref("startupFavorites"), true) { s.pref("startupFavorites", if (s.data.pref("startupFavorites") == "Açık") "Kapalı" else "Açık") }
                             SettingTile("Açılışta Son İzlenen Kanala Git", "Uygulama açılış tercihi", "ikon_startup", image, s.data.pref("startup"), true) { s.pref("startup", if (s.data.pref("startup") == "Açık") "Kapalı" else "Açık") }
+                            SettingTile("Arka Planda Sesi Sürdür", "Uygulama arka plandayken ses çalmaya devam eder", "ikon_ses", image, s.data.pref("backgroundAudio"), true) { s.pref("backgroundAudio", if (s.data.pref("backgroundAudio") == "Açık") "Kapalı" else "Açık") }
+                            SettingTile("Resim İçinde Resim (PiP)", "Home veya arka plana geçişte otomatik PiP", "ikon_coklu", image, s.data.pref("autoPip"), true) { s.pref("autoPip", if (s.data.pref("autoPip") == "Açık") "Kapalı" else "Açık") }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("GEÇMİŞ")
                             SettingTile("İzleme Geçmişi", "Son izlenen kanalları göster", "kategori_gecmis", image, s.data.pref("history"), true) { s.pref("history", if (s.data.pref("history") == "Açık") "Kapalı" else "Açık") }
                             SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "ikon_cop", image, danger = true) { s.dialog = "clear" }
@@ -630,7 +685,61 @@ private val settingIcons = mapOf("list" to "ikon_list", "opacity" to "ikon_opaci
 }
 @Composable private fun SettingCard(s: PreviewState, key: String, image: @Composable (String, Modifier) -> Unit) {
     if (key == "opacity") OpacityControl(s, image)
-    else SettingTile(titles.getValue(key), "", settingIcons.getValue(key), image, s.data.pref(key), visibleTitle = when (key) { "position" -> "Konum"; "size" -> "Boyut"; else -> titles.getValue(key) }) { s.dialog = key }
+    else SettingTile(titles.getValue(key), "", settingIcons.getValue(key), image, s.data.pref(key), visibleTitle = when (key) { "position" -> "Konum"; "size" -> "Boyut"; "subtitleSize" -> "Boyut"; "subtitleColor" -> "Renk"; "subtitleBgOpacity" -> "Arka Plan Opaklığı"; "sleepTimer" -> "Süre"; else -> titles.getValue(key) }) { s.dialog = key }
+}
+
+@Composable
+private fun SubtitlePreviewBox(s: PreviewState) {
+    val sizePref = s.data.pref("subtitleSize")
+    val colorPref = s.data.pref("subtitleColor")
+    val opacityPref = s.data.pref("subtitleBgOpacity")
+
+    val textColor = when (colorPref) {
+        "Sarı" -> Color(0xFFFFEB3B)
+        "Yeşil" -> Color(0xFF4CAF50)
+        "Camgöbeği" -> Color(0xFF00E5FF)
+        else -> Color.White
+    }
+    val fontSize = when (sizePref) {
+        "Küçük" -> 11.sp
+        "Büyük" -> 17.sp
+        "Çok Büyük" -> 21.sp
+        else -> 14.sp
+    }
+    val bgAlpha = when (opacityPref) {
+        "%0", "%0 (Saydam)" -> 0.0f
+        "%25" -> 0.25f
+        "%50" -> 0.50f
+        "%100", "%100 (Siyah)" -> 1.0f
+        else -> 0.75f
+    }
+
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp).background(Color(0xFF0D1726), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF223651), RoundedCornerShape(10.dp)).padding(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Label("Canlı Altyazı Önizlemesi", 10, Color(0xFF86C9EF), bold = true)
+            Label("$sizePref · $colorPref · $opacityPref", 9, Color(0xFF69798F))
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier.fillMaxWidth().height(54.dp).background(Color(0xFF05080E), RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                Modifier.background(Color.Black.copy(alpha = bgAlpha), RoundedCornerShape(4.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                BasicText(
+                    "Beleş TiVi Canlı Yayın Örnek Altyazı",
+                    style = TextStyle(
+                        color = textColor,
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.SansSerif
+                    )
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -811,7 +920,8 @@ private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                     val index = row * 2 + column
                     val ch = s.data.channels.find { it.id == m.slots[index] }
                     Box(Modifier.weight(1f).fillMaxHeight().border(if (index == m.selected) 6.dp else 1.5.dp, if (index == m.selected) Color(0xFFF1C40F) else Color(0xFF3498DB))) {
-                        if (playbackUri(ch) != null) key(index) { video(ch, false, s.muted || index != m.selected, s.retry, if (m.fit[index]) "Sığdır (Fit)" else "Orijinal (Panel)", PlaybackPreferences(s.data.pref("quality"),s.data.pref("audio"),s.data.pref("subtitle")), {}, Modifier.fillMaxSize().padding(if (index == m.selected) 6.dp else 1.5.dp)) }
+                        val multiPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
+                        if (playbackUri(ch) != null) key(index) { video(ch, false, s.muted || index != m.selected, s.retry, if (m.fit[index]) "Sığdır (Fit)" else "Orijinal (Panel)", multiPrefs, {}, Modifier.fillMaxSize().padding(if (index == m.selected) 6.dp else 1.5.dp)) }
                         Action(ch?.name ?: "+ Kanal Ekle", Modifier.fillMaxSize(), selected = m.selected == index, tint = Color.Transparent, selectedTint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, long = { if (m.selected == index && ch != null) { m.fit[index] = !m.fit[index]; s.multiRevision++; s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal" } }, double = { if (ch != null) { m.fit[index] = !m.fit[index]; s.multiRevision++; s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal" } }, content = {
                             if (ch != null && playbackUri(ch) != null) Box(Modifier.fillMaxSize()) { Label(ch.name, 11, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) }
                             else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {

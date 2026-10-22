@@ -48,7 +48,27 @@ data class PreviewData(
     val history: List<OpaqueId> = PreviewFixture.channels.take(3).map { it.id },
     val categories: List<String> = PreviewFixture.categories,
     val hiddenCategories: Set<String> = emptySet(),
-    val preferences: Map<String, String> = mapOf("list" to "Yatay (Alt)", "opacity" to "72", "position" to "Orta", "size" to "Normal", "language" to "Türkçe", "history" to "Açık", "startup" to "Açık", "quality" to "720p HD", "format" to "Orijinal", "audio" to "Türkçe", "subtitle" to "Kapalı"),
+    val preferences: Map<String, String> = mapOf(
+        "list" to "Yatay (Alt)",
+        "opacity" to "72",
+        "position" to "Orta",
+        "size" to "Normal",
+        "language" to "Türkçe",
+        "history" to "Açık",
+        "startup" to "Açık",
+        "quality" to "720p HD",
+        "format" to "Orijinal",
+        "audio" to "Türkçe",
+        "subtitle" to "Kapalı",
+        "theme" to "Beleş TiVi Klasik",
+        "sleepTimer" to "Kapalı",
+        "subtitleSize" to "Normal",
+        "subtitleColor" to "Beyaz",
+        "subtitleBgOpacity" to "%75",
+        "startupFavorites" to "Kapalı",
+        "backgroundAudio" to "Kapalı",
+        "autoPip" to "Açık"
+    ),
     val sources: List<String> = listOf("Örnek kayıt"),
     val channels: List<PreviewChannel> = PreviewFixture.channels,
     val profileId: OpaqueId = OpaqueId(0x50524556, 0),
@@ -71,8 +91,14 @@ data class PreviewData(
         val order = favorites.toMutableList(); order.remove(id); order.add(index.coerceIn(0, order.size), id)
         return copy(favorites = order)
     }
-    fun startup(last: OpaqueId?): OpaqueId? = last?.takeIf { pref("startup") == "Açık" && channels.any { ch -> ch.id == it && ch.available } }
-        ?: filtered("Favoriler", "").firstOrNull { it.available }?.id ?: filtered("Tümü", "").firstOrNull()?.id
+    fun startup(last: OpaqueId?): OpaqueId? {
+        if (preferences["startupFavorites"] == "Açık") {
+            val favoriteFirst = filtered("Favoriler", "").firstOrNull { it.available }?.id
+            if (favoriteFirst != null) return favoriteFirst
+        }
+        return last?.takeIf { pref("startup") == "Açık" && channels.any { ch -> ch.id == it && ch.available } }
+            ?: filtered("Favoriler", "").firstOrNull { it.available }?.id ?: filtered("Tümü", "").firstOrNull()?.id
+    }
 }
 interface PreviewStore {
     suspend fun load(): PreviewData

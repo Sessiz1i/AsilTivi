@@ -119,4 +119,20 @@ class PreviewModelTest {
         m.selected = 1; assertEquals(id, m.returnChannel())
         m.slots[1] = PreviewFixture.channels.last().id; assertEquals(PreviewFixture.channels.last().id, m.returnChannel())
     }
+    @Test fun startupFavoritesPrioritizesFavoritesEvenIfLastChannelProvided() {
+        val data = PreviewData().withPref("startupFavorites", "Açık")
+        val last = PreviewFixture.channels.last().id
+        assertEquals(data.favorites.first(), data.startup(last))
+    }
+    @Test fun defaultPreferencesContainV41Features() {
+        val data = PreviewData()
+        assertEquals("Beleş TiVi Klasik", data.pref("theme"))
+        assertEquals("Kapalı", data.pref("sleepTimer"))
+        assertEquals("Normal", data.pref("subtitleSize"))
+        assertEquals("Beyaz", data.pref("subtitleColor"))
+        assertEquals("%75", data.pref("subtitleBgOpacity"))
+        assertEquals("Kapalı", data.pref("startupFavorites"))
+        assertEquals("Kapalı", data.pref("backgroundAudio"))
+        assertEquals("Açık", data.pref("autoPip"))
+    }
 }

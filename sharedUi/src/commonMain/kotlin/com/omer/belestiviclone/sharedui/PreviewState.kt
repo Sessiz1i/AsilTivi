@@ -66,6 +66,29 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     var returnAfterClear by mutableStateOf(false)
     var sessionOnly by mutableStateOf(false); private set
+    private var sleepTimerJob: Job? = null
+    var sleepTimerRemainingSeconds by mutableStateOf<Int?>(null); private set
+    fun applySleepTimer(value: String) {
+        sleepTimerJob?.cancel()
+        if (value == "Kapalı") {
+            sleepTimerJob = null
+            sleepTimerRemainingSeconds = null
+            return
+        }
+        val minutes = value.removeSuffix(" dk").trim().toIntOrNull() ?: return
+        sleepTimerRemainingSeconds = minutes * 60
+        sleepTimerJob = scope.launch {
+            var remaining = minutes * 60
+            while (remaining > 0) {
+                sleepTimerRemainingSeconds = remaining
+                delay(1000)
+                remaining--
+            }
+            sleepTimerRemainingSeconds = 0
+            paused = true
+            exitRequested = true
+        }
+    }
     val visibleData get() = draft ?: data
     val channel get() = data.channels.find { it.id == selected }
     val channelNumber: Int get() {
@@ -152,6 +175,12 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         dialog = null
         if (key == "quality") notice = message("Kalite üst sınırı kaydedildi. İşlenen çözünürlüğü Bilgi alanından görebilirsiniz.", "Quality ceiling saved. See Info for the processed resolution.", "Qualitätsgrenze gespeichert. Verarbeitete Auflösung unter Info.")
         if (key in listOf("audio", "subtitle")) notice = message("Tercih kaydedildi. Gerçek ses/altyazı seçimini Bilgi alanından kontrol edebilirsiniz.", "Preference saved. Check Info for the actual audio/subtitle selection.", "Einstellung gespeichert. Tatsächliche Ton-/Untertitelauswahl unter Info prüfen.")
+        if (key == "sleepTimer") {
+            applySleepTimer(value)
+            notice = if (value == "Kapalı") "Uyku zamanlayıcısı kapatıldı." else "Uyku zamanlayıcısı $value olarak ayarlandı."
+        }
+        if (key in listOf("subtitleSize", "subtitleColor", "subtitleBgOpacity")) notice = "Altyazı görünüm tercihi güncellendi."
+        if (key == "theme") notice = "Tema: $value seçildi."
     }
     fun chooseCategory(value: String) { category = value; query = ""; categoryMenu = false }
     fun categoryAction(route: String) {

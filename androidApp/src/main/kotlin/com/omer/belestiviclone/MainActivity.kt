@@ -109,6 +109,28 @@ class MainActivity : ComponentActivity() {
         return false
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        val s = previewState
+        if (s != null && s.data.pref("autoPip") == "Açık" && !s.paused && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            try {
+                val params = android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(android.util.Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            } catch (_: Exception) {}
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        val s = previewState
+        if (isInPictureInPictureMode && s != null) {
+            s.panel = false
+            s.info = false
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The public Window callback preserves Android/Compose dispatch for every unowned event.
@@ -588,15 +610,27 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
     LaunchedEffect(paused, muted) { player.pause(paused); player.mute(muted) }
     DisposableEffect(player, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) player.pause(true)
-            if (event == Lifecycle.Event.ON_START) player.pause(currentPaused)
+            if (event == Lifecycle.Event.ON_STOP) {
+                if (preferences.backgroundAudio != "Açık") player.pause(true)
+            }
+            if (event == Lifecycle.Event.ON_START) {
+                if (!currentPaused) player.pause(false)
+            }
         }
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer); player.release() }
     }
     Box(modifier.clipToBounds().background(Color.Black)) {
         VideoTexture(player, format, Modifier.fillMaxSize())
-        CaptionOverlay(if (TrackLanguage.subtitle(preferences.subtitle).mode in listOf(LanguageMode.OFF,LanguageMode.UNKNOWN)) emptyList() else player.captions,Modifier.fillMaxSize(),{ _, _ -> },captionBottomInsetPx)
+        CaptionOverlay(
+            if (TrackLanguage.subtitle(preferences.subtitle).mode in listOf(LanguageMode.OFF,LanguageMode.UNKNOWN)) emptyList() else player.captions,
+            Modifier.fillMaxSize(),
+            { _, _ -> },
+            captionBottomInsetPx,
+            subtitleSize = preferences.subtitleSize,
+            subtitleColor = preferences.subtitleColor,
+            subtitleBgOpacity = preferences.subtitleBgOpacity,
+        )
         val text = player.error ?: when (player.status) { PlaybackStatus.LOADING -> "${channel?.name.orEmpty()} yükleniyor…"; PlaybackStatus.ENDED -> "${channel?.name.orEmpty()} bitti · Yeniden dene"; else -> "" }
         if (text.isNotEmpty()) {
             BasicText(text, Modifier.align(Alignment.Center).padding(16.dp), style = TextStyle(color = Color.White, fontSize = 20.sp,

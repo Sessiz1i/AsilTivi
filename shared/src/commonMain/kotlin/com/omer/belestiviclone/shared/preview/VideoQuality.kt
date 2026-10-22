@@ -1,7 +1,15 @@
 package com.omer.belestiviclone.shared.preview
 
 /** A resolution ceiling, never a promise to upscale or choose a particular variant. */
-data class PlaybackPreferences(val quality: String = "720p HD", val audio: String = "Türkçe", val subtitle: String = "Kapalı") {
+data class PlaybackPreferences(
+    val quality: String = "720p HD",
+    val audio: String = "Türkçe",
+    val subtitle: String = "Kapalı",
+    val subtitleSize: String = "Normal",
+    val subtitleColor: String = "Beyaz",
+    val subtitleBgOpacity: String = "%75",
+    val backgroundAudio: String = "Kapalı",
+) {
     val cap: VideoQualityCap? get() = when (quality) {
         "360p" -> VideoQualityCap(640, 360)
         "480p" -> VideoQualityCap(854, 480)

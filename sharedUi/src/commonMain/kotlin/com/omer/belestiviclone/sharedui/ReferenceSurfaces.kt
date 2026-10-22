@@ -45,7 +45,15 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
     val selected = remember(kind) { FocusRequester() }
     ReferenceOverlay(s, title, quality) {
         val width = if (quality) maxWidth * (256f / 855f) else 470.dp.coerceAtMost(maxWidth - 32.dp)
-        val height = when (kind) { "list" -> 144.dp; "format" -> 368.dp; "audio", "subtitle" -> 413.dp; "quality" -> 211.dp; else -> 188.dp }
+        val height = when (kind) {
+            "list" -> 144.dp
+            "format" -> 368.dp
+            "audio", "subtitle" -> 413.dp
+            "quality" -> 211.dp
+            "sleepTimer" -> 340.dp
+            "subtitleBgOpacity" -> 270.dp
+            else -> (values.size * 45 + 50).dp.coerceIn(144.dp, 400.dp)
+        }
         val placement = if (quality) Modifier.offset(x = maxWidth * (560f / 855f), y = maxHeight * (135f / 481f))
             else Modifier.align(Alignment.Center)
         Column(placement.width(width).heightIn(max = maxHeight - 12.dp).height(height)
@@ -63,7 +71,7 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
                         padding = PaddingValues(horizontal = 2.dp), content = {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 Label(value, 12, Color(0xFFE9EEF5), bold = true)
-                                if (chosen) Label("✓", 20, Color(0xFFE67E22), if (quality || format) Modifier.align(Alignment.CenterEnd).padding(end = 5.dp) else Modifier.offset(x = 184.dp))
+                                if (chosen) Label("✓", 20, Color(0xFFE67E22), Modifier.align(Alignment.CenterEnd).padding(end = 5.dp))
                             }
                         }) { s.pref(kind, value) }
                 }

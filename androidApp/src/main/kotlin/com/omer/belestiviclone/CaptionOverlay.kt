@@ -17,9 +17,27 @@ import androidx.media3.common.text.Cue
 /** One non-interactive overlay shared by Live and every Multi slot. Texture geometry is untouched. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-internal fun CaptionOverlay(cues: List<Cue>, modifier: Modifier, observed: (Int,Int) -> Unit, bottomInsetPx: Int = 0) {
+internal fun CaptionOverlay(
+    cues: List<Cue>,
+    modifier: Modifier,
+    observed: (Int,Int) -> Unit,
+    bottomInsetPx: Int = 0,
+    subtitleSize: String = "Normal",
+    subtitleColor: String = "Beyaz",
+    subtitleBgOpacity: String = "%75"
+) {
     val supported=cues.filter { it.verticalType == Cue.TYPE_UNSET && it.shearDegrees == 0f }
-    AndroidView(factory={ CaptionView(it) },modifier=modifier,update={ it.cues=supported;it.bottomInsetPx=bottomInsetPx })
+    AndroidView(
+        factory = { CaptionView(it) },
+        modifier = modifier,
+        update = {
+            it.cues = supported
+            it.bottomInsetPx = bottomInsetPx
+            it.subtitleSize = subtitleSize
+            it.subtitleColor = subtitleColor
+            it.subtitleBgOpacity = subtitleBgOpacity
+        }
+    )
     SideEffect { observed(supported.size,cues.size-supported.size) }
 }
 
@@ -30,6 +48,37 @@ private class CaptionView(context: Context): View(context) {
     var cues: List<Cue> = emptyList()
         set(value) { if (field == value) return;field=value
             contentDescription=value.mapNotNull { it.text }.joinToString("\n");invalidate() }
+    var subtitleSize = "Normal"
+        set(value) { if (field != value) { field = value; invalidate() } }
+    var subtitleColor = "Beyaz"
+        set(value) {
+            if (field != value) {
+                field = value
+                val c = when (value) {
+                    "Sarı" -> 0xFFFFEB3B.toInt()
+                    "Yeşil" -> 0xFF4CAF50.toInt()
+                    "Camgöbeği" -> 0xFF00E5FF.toInt()
+                    else -> Color.WHITE
+                }
+                paint.color = c
+                invalidate()
+            }
+        }
+    var subtitleBgOpacity = "%75"
+        set(value) {
+            if (field != value) {
+                field = value
+                val alpha = when (value) {
+                    "%0", "%0 (Saydam)" -> 0x00
+                    "%25" -> 0x40
+                    "%50" -> 0x80
+                    "%100", "%100 (Siyah)" -> 0xFF
+                    else -> 0xB0
+                }
+                background.color = (alpha shl 24)
+                invalidate()
+            }
+        }
     private val paint=TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.WHITE;setShadowLayer(2f,1f,1f,Color.BLACK) }
     private val background=Paint().apply { color=0xB0000000.toInt() }
     init { isClickable=false;isFocusable=false;importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES }
@@ -42,11 +91,18 @@ private class CaptionView(context: Context): View(context) {
         canvas.clipRect(0,0,width,available)
         for (cue in cues.sortedBy { it.zIndex }) {
             val w=(width*(if(cue.size == Cue.DIMEN_UNSET) .86f else cue.size)).coerceIn(1f,width.toFloat())
-            paint.textSize=when(cue.textSizeType) {
+            val sizeScale = when (subtitleSize) {
+                "Küçük" -> 0.8f
+                "Büyük" -> 1.25f
+                "Çok Büyük" -> 1.5f
+                else -> 1.0f
+            }
+            val baseSize = when(cue.textSizeType) {
                 Cue.TEXT_SIZE_TYPE_ABSOLUTE -> cue.textSize
                 Cue.TEXT_SIZE_TYPE_FRACTIONAL,Cue.TEXT_SIZE_TYPE_FRACTIONAL_IGNORE_PADDING -> height*cue.textSize
                 else -> height*.048f
             }.coerceAtLeast(1f)
+            paint.textSize = (baseSize * sizeScale).coerceAtLeast(1f)
             val layout=cue.text?.let { StaticLayout.Builder.obtain(it,0,it.length,paint,w.toInt())
                 .setAlignment(cue.textAlignment ?: Layout.Alignment.ALIGN_CENTER).setIncludePad(true).build() }
             val bitmap=cue.bitmap
@@ -62,8 +118,9 @@ private class CaptionView(context: Context): View(context) {
             val left=x.coerceIn(0f,(width-w).coerceAtLeast(0f));val top=y.coerceIn(0f,(available-h).coerceAtLeast(0f))
             if(bitmap != null) canvas.drawBitmap(bitmap,null,RectF(left,top,left+w,top+h),null)
             else if(layout != null) {
-                background.color=if(cue.windowColorSet) cue.windowColor else 0xB0000000.toInt()
-                canvas.drawRect(left,top,left+w,top+h,background)
+                val cueBg = if(cue.windowColorSet) cue.windowColor else background.color
+                val drawBg = Paint().apply { color = cueBg }
+                canvas.drawRect(left,top,left+w,top+h,drawBg)
                 canvas.save();canvas.translate(left,top);layout.draw(canvas);canvas.restore()
             }
         }

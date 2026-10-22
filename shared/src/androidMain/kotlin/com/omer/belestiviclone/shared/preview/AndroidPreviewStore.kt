@@ -32,7 +32,7 @@ class AndroidPreviewStore(context: Context, private val key: Int = 1, private va
             hidden = PreviewCodec.unpack(row.hidden).map(PreviewCodec::id).toSet(),
             history = PreviewCodec.unpack(row.history).map(PreviewCodec::id),
             categories = PreviewCodec.unpack(row.categories), hiddenCategories = PreviewCodec.unpack(row.hiddenCategories).toSet(),
-            preferences = prefs.chunked(2).associate { it[0] to it[1] }.also { require(it.keys.containsAll(PreviewData().preferences.keys)) },
+            preferences = (base.preferences + prefs.chunked(2).associate { it[0] to it[1] }),
         )
         // An unreadable source envelope must not lock the profile: favorites, history and
         // settings are kept and the packaged default list is used until the next source save.

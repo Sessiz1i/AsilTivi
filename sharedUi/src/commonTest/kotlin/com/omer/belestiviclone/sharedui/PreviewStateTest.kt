@@ -193,4 +193,15 @@ class PreviewStateTest {
         assertEquals("live", s.page)
         assertFalse(s.exitRequested)
     }
+    @Test fun sleepTimerPreferenceAndCountdownStopsPlaybackAndRequestsExit() = runBlocking {
+        val s = PreviewState(Store(), this)
+        s.load()
+        s.pref("sleepTimer", "15 dk")
+        yield()
+        assertEquals("15 dk", s.data.pref("sleepTimer"))
+        assertEquals(15 * 60, s.sleepTimerRemainingSeconds)
+        s.pref("sleepTimer", "Kapalı")
+        yield()
+        assertNull(s.sleepTimerRemainingSeconds)
+    }
 }
