@@ -1,7 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <!-- Shell inspection only; absent from release and from product navigation. -->
-        <activity android:name=".HeadingInspectionActivity" android:exported="true" android:launchMode="singleTop"
-            android:permission="android.permission.DUMP" />
-    </application>
-</manifest>
