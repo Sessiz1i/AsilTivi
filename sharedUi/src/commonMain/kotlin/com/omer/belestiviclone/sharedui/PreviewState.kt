@@ -64,7 +64,18 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var formAddress by mutableStateOf("")
     var formUser by mutableStateOf("")
     var formPassword by mutableStateOf("")
+    var formMac by mutableStateOf("")
     var editing by mutableStateOf<Int?>(null)
+    var lastXtreamAccount by mutableStateOf<XtreamAccountInfo?>(null); private set
+    var lastStalkerSession by mutableStateOf<StalkerSession?>(null); private set
+    val activeSourceKind: SourceKind get() = data.library?.main?.kind ?: SourceKind.DEFAULT
+    val activeSourceKindBadge: String get() = data.library?.main?.kindBadge() ?: "VARSAYILAN"
+    val enabledCountryCodes: Set<String> get() = CountryListsCatalog.parseEnabledCodes(data.preferences["countryLists"])
+    val countryListsSubtitle: String get() {
+        val codes = enabledCountryCodes
+        return if (codes.isEmpty()) "Türkiye aktif · KKTC, AZ, Almanya, Dünya ekle"
+        else "Türkiye + ${codes.joinToString(", ")} dahil edildi"
+    }
     var isRadioMode by mutableStateOf(false); private set
     var lastTvChannel by mutableStateOf<OpaqueId?>(null); private set
     var lastRadioChannel by mutableStateOf<OpaqueId?>(null); private set
@@ -281,7 +292,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     fun dismiss() {
         if (committingSource) return
         cancelSource(); documentRequest = null
-        dialog = null; formPassword = ""; formUser = ""; formAddress = ""; formName = ""; editing = null
+        dialog = null; formPassword = ""; formUser = ""; formMac = ""; formAddress = ""; formName = ""; editing = null
     }
     fun moveStart() { moving = target; draft = data; dialog = null }
     fun moveBy(delta: Int) { val id = moving ?: return; val d = draft ?: return; draft = d.move(id, d.favorites.indexOf(id) + delta) }
@@ -330,12 +341,31 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (busy) return
         if (type == "epg") {
             editing = null; formName = ""; formAddress = data.pref("epgUrl")
-            formUser = ""; formPassword = ""; dialog = "epg"
+            formUser = ""; formPassword = ""; formMac = ""; dialog = "epg"
             return
         }
         val source = if (type == "supplement") data.library?.extra else index?.let { savedSources.getOrNull(it) }
-        editing = index; formName = source?.name.orEmpty(); formAddress = source?.address.orEmpty()
-        formUser = ""; formPassword = ""; dialog = type
+        editing = index
+        formName = source?.name.orEmpty()
+        formUser = ""
+        formPassword = ""
+        formMac = ""
+        when (source?.kind) {
+            SourceKind.XTREAM -> {
+                formAddress = source.address.substringBefore("?user=")
+                formUser = source.address.substringAfter("?user=", "")
+                dialog = "xtream"
+            }
+            SourceKind.STALKER -> {
+                formAddress = source.address.substringBefore("?mac=")
+                formMac = source.address.substringAfter("?mac=", "")
+                dialog = "stalker"
+            }
+            else -> {
+                formAddress = source?.address.orEmpty()
+                dialog = type
+            }
+        }
     }
     fun saveEpgUrl() {
         if (busy) return
@@ -384,6 +414,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         saveEpgUrl()
     }
     fun saveSource() {
+        when (dialog) {
+            "xtream" -> { saveXtreamSource(); return }
+            "stalker" -> { saveStalkerSource(); return }
+        }
         if (editingFile) {
             val id = savedSources[editing!!].id; val name = formName
             sourceOperation { before -> sources.renameFile(before, id, name) }; return
@@ -395,10 +429,118 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         catch (error: SourceProblem) { sourceError(error); return }
         sourceOperation { before -> sources.save(before, name, address, loader.fetch(address), id, extra) }
     }
+    fun saveXtreamSource() {
+        val loader = sourceLoader ?: run { notice = "Kaynak yükleyici kullanılamıyor."; return }
+        val name = formName.trim()
+        val serverUrl = formAddress.trim()
+        val user = formUser.trim()
+        val pass = formPassword.trim()
+        try {
+            XtreamCodesClient.normalizeBaseUrl(serverUrl)
+            if (user.isEmpty() || pass.isEmpty()) throw SourceProblem("credentials")
+            if (name.length > 120) throw SourceProblem("name")
+        } catch (error: SourceProblem) {
+            sourceError(error)
+            return
+        }
+        val id = editing?.let { savedSources.getOrNull(it)?.id }
+        sourceOperation { before ->
+            val (account, m3uText) = XtreamCodesClient.connectAndBuildM3u(loader, serverUrl, user, pass)
+            lastXtreamAccount = account
+            sources.saveXtream(before, name, serverUrl, user, m3uText, id)
+        }
+    }
+    fun saveStalkerSource() {
+        val loader = sourceLoader ?: run { notice = "Kaynak yükleyici kullanılamıyor."; return }
+        val name = formName.trim()
+        val portalUrl = formAddress.trim()
+        val mac = formMac.trim().ifEmpty { formUser.trim() }
+        try {
+            StalkerPortalClient.normalizePortalBaseUrl(portalUrl)
+            StalkerPortalClient.normalizeMac(mac)
+            if (name.length > 120) throw SourceProblem("name")
+        } catch (error: SourceProblem) {
+            sourceError(error)
+            return
+        }
+        val id = editing?.let { savedSources.getOrNull(it)?.id }
+        sourceOperation { before ->
+            val (session, m3uText) = StalkerPortalClient.connectAndBuildM3u(loader, portalUrl, mac)
+            lastStalkerSession = session
+            sources.saveStalker(before, name, portalUrl, mac, m3uText, id)
+        }
+    }
+    fun toggleCountryList(code: String) {
+        if (busy) return
+        val preset = CountryListsCatalog.byCode(code) ?: return
+        if (preset.code == "TR") {
+            if (data.library != null && data.library?.active != PublicM3u.source && sourceLoader != null) {
+                restoreDefault()
+            } else {
+                notice = message("Türkiye varsayılan kanal listesi zaten aktif.", "Turkey default channel list is already active.", "Standard-Kanalliste Türkei ist bereits aktiv.")
+            }
+            return
+        }
+        val current = enabledCountryCodes
+        val upper = preset.code.uppercase()
+        val nextCodes = if (upper in current) current - upper else current + upper
+        val added = upper in nextCodes
+        val nextData = sources.applyCountryLists(data, nextCodes)
+        commit(nextData) {
+            notice = if (added) {
+                message("${preset.flag} ${preset.name} kanalları listeye dahil edildi (${preset.groupTitle}).", "${preset.flag} ${preset.name} channels added (${preset.groupTitle}).", "${preset.flag} ${preset.name}-Kanäle hinzugefügt (${preset.groupTitle}).")
+            } else {
+                message("${preset.flag} ${preset.name} kanalları listeden çıkarıldı.", "${preset.flag} ${preset.name} channels removed.", "${preset.flag} ${preset.name}-Kanäle entfernt.")
+            }
+        }
+    }
+    fun activateCountrySource(code: String) {
+        if (busy) return
+        val preset = CountryListsCatalog.byCode(code) ?: return
+        if (preset.code == "TR" && sourceLoader != null) {
+            restoreDefault()
+            return
+        }
+        sourceOperation { before ->
+            sources.saveCountry(before, preset, preset.builtinM3u)
+        }
+    }
+    fun filterByCountry(code: String) {
+        if (busy) return
+        val preset = CountryListsCatalog.byCode(code) ?: return
+        val upper = preset.code.uppercase()
+        if (upper != "TR" && upper !in enabledCountryCodes) {
+            val nextData = sources.applyCountryLists(data, enabledCountryCodes + upper)
+            commit(nextData) {
+                category = preset.groupTitle
+                query = ""
+                dismiss()
+                page = "live"
+                panel = true
+                data.filtered(preset.groupTitle, "").firstOrNull()?.let { select(it.id) }
+                notice = "${preset.flag} ${preset.name} kategorisi açıldı."
+            }
+        } else {
+            category = preset.groupTitle
+            query = ""
+            dismiss()
+            page = "live"
+            panel = true
+            data.filtered(preset.groupTitle, "").firstOrNull()?.let { select(it.id) }
+            notice = "${preset.flag} ${preset.name} kategorisi açıldı."
+        }
+    }
     private fun sourceError(error: Exception) {
         notice = when ((error as? SourceProblem)?.code) {
             "name" -> message("Ad gerekli; en fazla 120 karakter kullanın.", "Name is required (up to 120 characters).", "Name erforderlich (maximal 120 Zeichen).")
             "url" -> message("Geçerli bir HTTP/HTTPS adresi girin.", "Enter a valid HTTP/HTTPS address.", "Gültige HTTP/HTTPS-Adresse eingeben.")
+            "credentials" -> message("Kullanıcı adı ve şifre boş bırakılamaz.", "Username and password are required.", "Benutzername und Passwort erforderlich.")
+            "xtream-auth" -> message("Kimlik doğrulama başarısız: Kullanıcı adı veya şifre geçersiz.", "Authentication failed: Invalid username or password.", "Authentifizierung fehlgeschlagen: Ungültige Zugangsdaten.")
+            "xtream-expired" -> message("Xtream hesabı aktif değil veya süresi dolmuş.", "Xtream account is inactive or expired.", "Xtream-Konto ist inaktiv oder abgelaufen.")
+            "mac" -> message("Geçerli bir MAC adresi girin (Örn: 00:1A:79:12:34:56).", "Enter a valid MAC address (e.g. 00:1A:79:12:34:56).", "Gültige MAC-Adresse eingeben (z.B. 00:1A:79:12:34:56).")
+            "stalker-auth" -> message("Stalker portal el sıkışması başarısız: MAC adresi yetkisiz veya portal yanıt vermedi.", "Stalker handshake failed: Unauthorized MAC or no response.", "Stalker-Handshake fehlgeschlagen: MAC nicht autorisiert.")
+            "network" -> message("Ağ hatası: Sunucuya ulaşılamadı. Adresi ve bağlantınızı kontrol edin.", "Network error: Could not reach server.", "Netzwerkfehler: Server nicht erreichbar.")
+            "content" -> message("Geçersiz veya boş kanal listesi alındı. Önceki kaynak korundu.", "Invalid or empty channel list. Previous source preserved.", "Ungültige oder leere Kanalliste. Vorherige Quelle beibehalten.")
             "duplicate" -> message("Bu URL zaten kayıtlı. Mevcut kaydı kullanın; adı değiştirilmedi.", "URL already saved. Use the existing record; its name was preserved.", "URL bereits gespeichert. Vorhandenen Eintrag verwenden; Name unverändert.")
             "active-delete" -> message("Önce başka bir ana kaynak seçin. Aktif kayıt silinemez.", "Select another main source before deleting this record.", "Vor dem Löschen eine andere Hauptquelle wählen.")
             else -> message("İşlem tamamlanamadı. Önceki kaynak ve favoriler korundu.", "Operation failed. Previous source and favorites were preserved.", "Vorgang fehlgeschlagen. Quelle und Favoriten bleiben erhalten.")
@@ -439,8 +581,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     fun loadSource(index: Int) {
         val record = savedSources.getOrNull(index) ?: return
         sourceOperation { before ->
-            val loader = requireNotNull(sourceLoader)
-            val updated = if (record.kind == SourceKind.URL) sources.save(before, record.name, record.address, loader.fetch(record.address), record.id) else sources.activate(before, record.id)
+            val loader = sourceLoader
+            val updated = when (record.kind) {
+                SourceKind.URL -> if (loader != null) sources.save(before, record.name, record.address, loader.fetch(record.address), record.id) else sources.activate(before, record.id)
+                SourceKind.COUNTRY -> {
+                    val preset = CountryListsCatalog.presets.firstOrNull { it.remoteUrl == record.address }
+                    if (preset != null) sources.saveCountry(before, preset, preset.builtinM3u) else sources.activate(before, record.id)
+                }
+                else -> sources.activate(before, record.id)
+            }
             updated
         }
     }
@@ -452,12 +601,25 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     fun refreshSource() {
         sourceOperation { before ->
             val library = sources.bootstrap(before); val main = library.main
+            val loader = requireNotNull(sourceLoader)
             var next = when (main.kind) {
-                SourceKind.DEFAULT -> sources.default(before, requireNotNull(sourceLoader).fetch(PublicM3u.url))
-                SourceKind.URL -> sources.save(before, main.name, main.address, requireNotNull(sourceLoader).fetch(main.address), main.id)
-                SourceKind.FILE -> sources.activate(before, main.id)
+                SourceKind.DEFAULT -> sources.default(before, loader.fetch(PublicM3u.url))
+                SourceKind.URL -> sources.save(before, main.name, main.address, loader.fetch(main.address), main.id)
+                SourceKind.COUNTRY -> {
+                    val preset = CountryListsCatalog.presets.firstOrNull { it.remoteUrl == main.address }
+                    if (preset != null) sources.saveCountry(before, preset, preset.builtinM3u) else sources.activate(before, main.id)
+                }
+                SourceKind.STALKER -> {
+                    val portal = main.address.substringBefore("?mac=")
+                    val mac = main.address.substringAfter("?mac=", "")
+                    if (portal.isNotBlank() && mac.isNotBlank()) {
+                        val (_, m3u) = StalkerPortalClient.connectAndBuildM3u(loader, portal, mac)
+                        sources.saveStalker(before, main.name, portal, mac, m3u, main.id)
+                    } else sources.activate(before, main.id)
+                }
+                SourceKind.XTREAM, SourceKind.FILE -> sources.activate(before, main.id)
             }
-            library.extra?.let { extra -> next = sources.save(next, extra.name, extra.address, requireNotNull(sourceLoader).fetch(extra.address), extra.id, extra = true) }
+            library.extra?.let { extra -> next = sources.save(next, extra.name, extra.address, loader.fetch(extra.address), extra.id, extra = true) }
             next
         }
     }

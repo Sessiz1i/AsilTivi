@@ -2,12 +2,30 @@ package com.omer.belestiviclone.shared.preview
 
 import com.omer.belestiviclone.shared.catalog.*
 
-enum class SourceKind { DEFAULT, URL, FILE }
+enum class SourceKind { DEFAULT, URL, FILE, XTREAM, STALKER, COUNTRY }
 data class SavedSource(
     val id: SourceId, val name: String, val kind: SourceKind, val address: String,
     val rows: List<ChannelContribution>, val parent: SourceId? = null, val deleted: Boolean = false,
     val rawCount: Int = rows.size, val skippedCount: Int = 0,
 ) {
+    fun kindBadge(): String = when (kind) {
+        SourceKind.DEFAULT -> "VARSAYILAN"
+        SourceKind.URL -> "M3U URL"
+        SourceKind.FILE -> "DOSYA"
+        SourceKind.XTREAM -> "XTREAM"
+        SourceKind.STALKER -> "STALKER / MAC"
+        SourceKind.COUNTRY -> "ÜLKE LİSTESİ"
+    }
+
+    fun maskedAddress(): String = when (kind) {
+        SourceKind.FILE -> "Uygulamaya alınmış dosya kopyası"
+        SourceKind.DEFAULT -> "Yerleşik Türkiye Kanal Listesi (trlist.m3u)"
+        SourceKind.COUNTRY -> "Ülke Paketi · ${address.substringAfterLast('/')}"
+        else -> address
+            .replace(Regex("//[^/@]*@"), "//***@")
+            .replace(Regex("(?i)(password=)[^&\\s]+"), "$1***")
+    }
+
     override fun toString() = "SavedSource([redacted])"
 }
 data class SourceLibrary(val records: List<SavedSource>, val active: SourceId, val snapshot: CatalogSnapshot) {
@@ -18,6 +36,7 @@ data class SourceLibrary(val records: List<SavedSource>, val active: SourceId, v
 }
 interface SourceLoader {
     suspend fun fetch(address: String): String
+    suspend fun fetch(address: String, headers: Map<String, String>): String = fetch(address)
     suspend fun defaultText(): String
 }
 class SourceProblem(val code: String) : IllegalArgumentException(code)
@@ -27,7 +46,9 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
     fun bootstrap(data: PreviewData): SourceLibrary {
         data.library?.let { return it }
         val default = PublicM3u.source
-        val channels = data.channels.filter { it.definition != null }
+        val presetIds = CountryListsCatalog.presets.filter { it.code != "TR" }
+            .flatMap { CountryListsCatalog.buildChannelsForPreset(it) }.map { it.id }.toSet()
+        val channels = data.channels.filter { it.definition != null && it.id !in presetIds }
         val categories = channels.flatMap { it.groups }.distinct().mapIndexed { index, label -> CategoryRecord(CategoryId(allocate()), CategoryLabel.fromRaw(label), index.toLong()) }
         val rows = channels.flatMapIndexed { index, ch -> ch.groups.mapIndexed { group, label ->
             ChannelContribution(default, index.toLong() * 1000 + group, ch.definition!!, CategoryLabel.fromRaw(label), ch.name, ch.logo, ch.providerId, ch.tvgName)
@@ -78,6 +99,94 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         val source = parsed(PublicM3u.source, "trlist", SourceKind.DEFAULT, PublicM3u.url, text)
         return rebuild(data, library.copy(records = library.records.filter { it.id != source.id } + source, active = source.id))
     }
+    fun saveXtream(
+        data: PreviewData,
+        name: String,
+        serverUrl: String,
+        username: String,
+        text: String,
+        editing: SourceId? = null,
+    ): PreviewData {
+        val library = bootstrap(data)
+        val cleanBase = XtreamCodesClient.normalizeBaseUrl(serverUrl)
+        val cleanUser = username.trim()
+        if (cleanUser.isEmpty() || cleanUser.length > 120) throw SourceProblem("credentials")
+        val resolvedName = name.trim().ifEmpty {
+            val host = cleanBase.substringAfter("://").substringBefore('/').substringBefore(':')
+            "Xtream ($host · $cleanUser)"
+        }
+        if (resolvedName.length > 120) throw SourceProblem("name")
+        if (editing == null && library.records.count { !it.deleted } >= 64) throw SourceProblem("limit")
+        val addressRecord = "$cleanBase?user=$cleanUser"
+        val id = editing ?: library.records.firstOrNull {
+            !it.deleted && it.kind == SourceKind.XTREAM && it.address.equals(addressRecord, ignoreCase = true)
+        }?.id ?: SourceId(allocate())
+        val source = parsed(id, resolvedName, SourceKind.XTREAM, addressRecord, text)
+        val records = library.records.filter { it.id != id } + source
+        return rebuild(data, library.copy(records = records, active = id))
+    }
+    fun saveStalker(
+        data: PreviewData,
+        name: String,
+        portalUrl: String,
+        macAddress: String,
+        text: String,
+        editing: SourceId? = null,
+    ): PreviewData {
+        val library = bootstrap(data)
+        val cleanPortal = StalkerPortalClient.normalizePortalBaseUrl(portalUrl)
+        val cleanMac = StalkerPortalClient.normalizeMac(macAddress)
+        val resolvedName = name.trim().ifEmpty {
+            val host = cleanPortal.substringAfter("://").substringBefore('/').substringBefore(':')
+            "Stalker ($host · $cleanMac)"
+        }
+        if (resolvedName.length > 120) throw SourceProblem("name")
+        if (editing == null && library.records.count { !it.deleted } >= 64) throw SourceProblem("limit")
+        val addressRecord = "$cleanPortal?mac=$cleanMac"
+        val id = editing ?: library.records.firstOrNull {
+            !it.deleted && it.kind == SourceKind.STALKER && it.address.equals(addressRecord, ignoreCase = true)
+        }?.id ?: SourceId(allocate())
+        val source = parsed(id, resolvedName, SourceKind.STALKER, addressRecord, text)
+        val records = library.records.filter { it.id != id } + source
+        return rebuild(data, library.copy(records = records, active = id))
+    }
+    fun saveCountry(
+        data: PreviewData,
+        preset: CountryListPreset,
+        text: String = preset.builtinM3u,
+    ): PreviewData {
+        if (preset.code.equals("TR", ignoreCase = true)) return default(data, text)
+        val library = bootstrap(data)
+        val addressRecord = preset.remoteUrl
+        val existingId = library.records.firstOrNull {
+            !it.deleted && it.kind == SourceKind.COUNTRY && it.address == addressRecord
+        }?.id
+        val id = existingId ?: SourceId(allocate())
+        val source = parsed(id, "${preset.flag} ${preset.name}", SourceKind.COUNTRY, addressRecord, text)
+        val records = library.records.filter { it.id != id } + source
+        return rebuild(data, library.copy(records = records, active = id))
+    }
+    fun applyCountryLists(data: PreviewData, enabledCodes: Collection<String>): PreviewData {
+        val formatted = CountryListsCatalog.formatEnabledCodes(enabledCodes)
+        val allPresetChannels = CountryListsCatalog.presets
+            .filter { it.code != "TR" }
+            .flatMap { CountryListsCatalog.buildChannelsForPreset(it) }
+        val presetIds = allPresetChannels.map { it.id }.toSet()
+        val baseChannels = data.channels.filter { it.id !in presetIds }
+        val existingKeys = baseChannels.filter { it.available }.mapNotNull { it.definition?.let(ComparisonV1::playbackKey) }.toSet()
+        val activeCodes = CountryListsCatalog.parseEnabledCodes(formatted)
+        val addedChannels = CountryListsCatalog.presets
+            .filter { it.code in activeCodes }
+            .flatMap { CountryListsCatalog.buildChannelsForPreset(it) }
+            .filter { ch -> ch.definition?.let(ComparisonV1::playbackKey) !in existingKeys }
+        val mergedChannels = baseChannels + addedChannels
+        val newGroups = addedChannels.flatMap { it.groups }.distinct()
+        val updatedCategories = data.categories + newGroups.filter { it !in data.categories }
+        return data.withPref("countryLists", formatted).copy(
+            channels = mergedChannels,
+            categories = updatedCategories,
+        )
+    }
     fun delete(data: PreviewData, id: SourceId): PreviewData {
         val library = bootstrap(data)
         if (id == library.active) throw SourceProblem("active-delete")
@@ -105,7 +214,9 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         val archived = data.channels.filter { it.id !in activeIds }.map { it.copy(available = false) }
         val snapshot = CatalogSnapshot(sources, plan.channels.map { it.record }, plan.memberships.map { it.record.copy(isCurrent = it.isCurrentInPlan) }, plan.categories)
         val categories = data.categories + active.flatMap { it.groups }.filter { it !in data.categories }.distinct()
-        return data.copy(channels = active + archived, categories = categories, library = library.copy(snapshot = snapshot))
+        val baseRebuilt = data.copy(channels = active + archived, categories = categories, library = library.copy(snapshot = snapshot))
+        val enabledCountries = CountryListsCatalog.parseEnabledCodes(data.preferences["countryLists"])
+        return if (enabledCountries.isEmpty()) baseRebuilt else applyCountryLists(baseRebuilt, enabledCountries)
     }
 }
 

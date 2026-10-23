@@ -459,7 +459,7 @@ private fun categorySymbol(cat: String) = when (cat) {
     "Ara" -> "🔍"; "Favoriler" -> "⭐"; "Son İzlenenler" -> "🕒"; "Tümü" -> "🌐"
     "Ulusal" -> "🇹🇷"; "Haber" -> "📰"; "Spor", "SPOR" -> "⚽"; "Çocuk" -> "🧸"
     "Müzik" -> "🎵"; "Belgesel" -> "🌍"; "Dini" -> "🕌"; "Yerel" -> "📍"
-    "AZERBAYCAN" -> "🇦🇿"; "Ekonomi" -> "📈"; "Kurumlar" -> "🏛️"; "Diğer" -> "📺"
+    "AZERBAYCAN" -> "🇦🇿"; "KKTC" -> "🇨🇾"; "Almanya / Avrupa" -> "🇩🇪"; "Dünya" -> "🌍"; "Ekonomi" -> "📈"; "Kurumlar" -> "🏛️"; "Diğer" -> "📺"
     "ÇOKLU EKRAN", "AYARLAR" -> null
     else -> if (cat.startsWith("7/24")) "🎬" else "🌍"
 }
@@ -470,7 +470,7 @@ private fun categorySymbol(cat: String) = when (cat) {
         "Ara" -> listOf(Color(0xFF247675)); "Favoriler" -> listOf(Color(0xFFE1B700)); "Son İzlenenler" -> listOf(Color(0xFF8751AF), Color(0xFF297EAD))
         "Tümü" -> listOf(Color(0xFF30495C)); "Ulusal" -> listOf(Color(0xFFFAFAFA)); "Haber" -> listOf(Color(0xFF315D77)); "Spor", "SPOR" -> listOf(Color(0xFF1A9B67))
         "Çocuk" -> listOf(Color(0xFF7A4FAC), Color(0xFF568AD1)); "Müzik" -> listOf(Color(0xFFDC4835), Color(0xFFE99A18)); "Belgesel" -> listOf(Color(0xFF455B65)); "Dini" -> listOf(Color(0xFF1BAE91))
-        "Yerel" -> listOf(Color(0xFF87918F)); "AZERBAYCAN" -> listOf(Color(0xFF96253F), Color(0xFFE14F60))
+        "Yerel" -> listOf(Color(0xFF87918F)); "AZERBAYCAN" -> listOf(Color(0xFF96253F), Color(0xFFE14F60)); "KKTC" -> listOf(Color(0xFFC0392B), Color(0xFFE74C3C)); "Almanya / Avrupa" -> listOf(Color(0xFF2C3E50), Color(0xFFD35400)); "Dünya" -> listOf(Color(0xFF1565C0), Color(0xFF00ACC1))
         "7/24 Youtube" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
         else -> listOf(Color(0xFF2684A6), Color(0xFF18B59F))
     }
@@ -654,13 +654,17 @@ private val settingIcons = mapOf(
                     when (s.section) {
                         0 -> {
                             SettingsGroup("LİSTEM")
+                            SettingTile("Aktif Listem", "${s.activeSourceKindBadge} · ${s.activeCount} içerik", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
                             SettingTile("Ek Liste", s.data.library?.extra?.name ?: "Ana kaynağa bağlı tek ek liste", "ikon_list", image) { s.sourceForm("supplement") }
                             SettingTile("Listeyi Güncelle", "Son başarılı snapshot korunur", "ikon_canli", image) { s.refreshSource() }
                             SettingTile("Varsayılana Dön", "Klonun trlist kaynağı; favoriler korunur", "ikon_tv", image) { s.dialog = "defaultSource" }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
                             SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
                             SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
+                            SettingTile("Stalker / MAC", "Portal adresi ve kayıtlı MAC ile bağlan", "ikon_sunucu", image) { s.sourceForm("stalker") }
                             SettingTile("Dosyadan Yükle", "M3U dosyası seç", "ikon_dosya", image) { s.dialog = "file" }
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("ÜLKE LİSTELERİ")
+                            SettingTile("Ülke Listeleri", s.countryListsSubtitle, "kategori_dunya", image) { s.sourceForm("countries") }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("EPG (PROGRAM REHBERİ)")
                             SettingTile(
                                 "XMLTV EPG URL",

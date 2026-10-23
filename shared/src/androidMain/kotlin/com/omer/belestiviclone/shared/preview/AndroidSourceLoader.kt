@@ -9,12 +9,14 @@ class AndroidSourceLoader(private val context: Context) : SourceLoader {
     override suspend fun defaultText(): String = withContext(Dispatchers.IO) {
         context.assets.open("trlist.m3u").use { it.boundedText(4 * 1024 * 1024) }
     }
-    override suspend fun fetch(address: String): String = withContext(Dispatchers.IO) {
+    override suspend fun fetch(address: String): String = fetch(address, emptyMap())
+    override suspend fun fetch(address: String, headers: Map<String, String>): String = withContext(Dispatchers.IO) {
         var uri = URI(address)
         repeat(6) { redirects ->
             require(uri.scheme.lowercase() in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.rawUserInfo == null)
             val connection = uri.toURL().openConnection() as HttpURLConnection
             connection.connectTimeout = 8000; connection.readTimeout = 8000; connection.instanceFollowRedirects = false
+            headers.forEach { (k, v) -> if (k.isNotBlank() && v.isNotBlank()) connection.setRequestProperty(k, v) }
             // Disconnect promptly on cancellation, including blocking connect/read.
             val watcher = launch(Dispatchers.IO) { try { awaitCancellation() } finally { connection.disconnect() } }
             try {
