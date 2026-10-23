@@ -60,7 +60,7 @@ private val LocalFocusReturn = staticCompositionLocalOf<FocusReturn?> { null }
 private val LocalKeySignal = staticCompositionLocalOf<(KeyEvent) -> KeyPressSignal> { { KeyPressSignal() } }
 private val LocalFocusObserver = staticCompositionLocalOf<(String) -> Unit> { {} }
 private val LocalNavigationObserver = staticCompositionLocalOf<(KeyEvent) -> Unit> { {} }
-private val LocalBoundsObserver = staticCompositionLocalOf<(String, Rect) -> Unit> { { _, _ -> } }
+internal val LocalBoundsObserver = staticCompositionLocalOf<(String, Rect) -> Unit> { { _, _ -> } }
 private val colors = listOf(Color(0xFFB68B08), Color(0xFF007D9E), Color(0xFF5A6C80), Color(0xFFB1AFA7), Color(0xFFAF4546), Color(0xFF37875B), Color(0xFF466BAB))
 @Composable
 internal fun Label(value: String, size: Int = 12, color: Color = Color.White, modifier: Modifier = Modifier, bold: Boolean = false, lineHeight: Float = size * 1.333f, letterSpacing: Float = 0f, maxLines: Int = Int.MAX_VALUE, textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Unspecified, decoration: androidx.compose.ui.text.style.TextDecoration? = null) {
@@ -254,6 +254,10 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         }
         val playbackPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
         video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), playbackPrefs, { qualityInfo = it }, Modifier.fillMaxSize())
+        if (s.isRadioMode) {
+            RadioScreen(s, image, Modifier.fillMaxSize())
+            return@BoxWithConstraints
+        }
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
         }
@@ -265,7 +269,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             Modifier.liveHeadingPlacement(s.data.pref("format"), maxWidth.value, maxHeight.value).widthIn(max = maxWidth * .43f), includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
         if (s.panel) {
             Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconAction("Radyo", "ikon_audio", image) { s.notice = s.message("Radyo modu yakında eklenecektir.", "Radio mode coming soon.", "Radiomodus demnächst verfügbar.") }
+                IconAction("Radyo", "ikon_audio", image, click = s::enterRadioMode)
                 IconAction("Çoklu Ekran", "ikon_coklu", image) { s.dialog = "warning" }
                 IconAction("Görüntü", "ikon_format", image, click = s::openFormatMenu)
                 IconAction("Bilgi", "ikon_saat", image, click = s::toggleInfo)

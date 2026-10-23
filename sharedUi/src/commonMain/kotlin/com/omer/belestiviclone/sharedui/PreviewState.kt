@@ -65,6 +65,31 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var formUser by mutableStateOf("")
     var formPassword by mutableStateOf("")
     var editing by mutableStateOf<Int?>(null)
+    var isRadioMode by mutableStateOf(false); private set
+    var lastTvChannel by mutableStateOf<OpaqueId?>(null); private set
+    var lastRadioChannel by mutableStateOf<OpaqueId?>(null); private set
+    val radioChannels get() = data.channels.filter { it.available && it.isAudioOrRadio }.ifEmpty { PreviewFixture.radioChannels }
+    fun enterRadioMode() {
+        if (isRadioMode) return
+        lastTvChannel = selected
+        isRadioMode = true
+        panel = true
+        val target = lastRadioChannel?.takeIf { id -> radioChannels.any { it.id == id } } ?: radioChannels.firstOrNull()?.id
+        if (target != null && target != selected) select(target)
+        notice = message("Radyo modu açıldı.", "Radio mode enabled.", "Radiomodus aktiviert.")
+    }
+    fun exitRadioMode() {
+        if (!isRadioMode) return
+        lastRadioChannel = selected
+        isRadioMode = false
+        val tvChannels = data.channels.filter { it.available && !it.isAudioOrRadio }
+        val target = lastTvChannel?.takeIf { id -> tvChannels.any { it.id == id } } ?: tvChannels.firstOrNull()?.id
+        if (target != null && target != selected) select(target)
+        notice = message("TV moduna dönüldü.", "Returned to TV mode.", "Zurück zum TV-Modus.")
+    }
+    fun toggleRadioMode() {
+        if (isRadioMode) exitRadioMode() else enterRadioMode()
+    }
     var opacityDraft by mutableStateOf<Int?>(null); private set
     val opacityValue get() = opacityDraft ?: data.pref("opacity").toInt().coerceIn(0, 100)
     fun updateOpacity(value: Int) { if (!busy) opacityDraft = value.coerceIn(0, 100) }
@@ -129,7 +154,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun stepChannel(delta: Int) {
         if (!normalLiveControls || delta !in listOf(-1, 1)) return
-        val candidates = visibleData.filtered(category, query)
+        val candidates = if (isRadioMode) radioChannels else visibleData.filtered(category, query)
         if (candidates.isEmpty()) return
         val current = candidates.indexOfFirst { it.id == selected }
         val next = if (current < 0) { if (delta > 0) 0 else candidates.lastIndex }
@@ -227,9 +252,14 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val order = data.categories.toMutableList(); order.removeAt(from); order.add(to, category)
         commit(data.copy(categories = order))
     }
-    fun select(id: OpaqueId) { if (selected != id) technicalInfo = StreamTechnicalInfo(); selected = id; paused = false; if (playbackUri(channel) == null) notice = if (channel?.available == false)
-        message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
-        else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı." }
+    fun select(id: OpaqueId) {
+        if (selected != id) technicalInfo = StreamTechnicalInfo()
+        selected = id
+        paused = false
+        if (playbackUri(channel) == null) notice = if (channel?.available == false)
+            message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
+            else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı."
+    }
     /** Called by a real first-frame/audio-advancing event, never by focus or channel selection. */
     fun played(id: OpaqueId) {
         if (busy || data.channels.none { it.id == id && it.available }) return
@@ -281,6 +311,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             page == "settings" -> { page = origin; panel = false; if (returnAfterClear) clearReturn() }
             page == "multi" -> { selected = multi?.returnChannel() ?: selected; multi = null; page = "live" }
             page == "live" && info -> info = false
+            page == "live" && isRadioMode && panel -> panel = false
+            page == "live" && isRadioMode -> exitRadioMode()
             page == "live" && panel -> panel = false
             page == "live" -> dialog = "exit"
         }

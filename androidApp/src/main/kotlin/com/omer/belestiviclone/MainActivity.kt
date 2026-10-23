@@ -193,6 +193,8 @@ class MainActivity : ComponentActivity() {
 }
 
 private val previewDrawables = mapOf(
+    "bg_retro_radio" to R.drawable.bg_retro_radio,
+    "logo_radio" to R.drawable.logo_radio,
     "beles_tivi_plus" to R.drawable.beles_tivi_plus,
     "ev_cikis" to R.drawable.ev_cikis,
     "ev_dizi" to R.drawable.ev_dizi,

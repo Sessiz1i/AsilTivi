@@ -62,7 +62,10 @@ object PublicM3u {
         return plan.catalog.map { ch ->
             val row = ch.contributions.first().input
             val groups = ch.categoryIds.map { labels.getValue(it) }
-            PreviewChannel(ch.id.value, ch.name ?: "Adsız kanal", groups.first(), ch.logo.orEmpty(), definition = row.definition, groups = groups, providerId = row.providerHint.orEmpty(), tvgName = row.tvgName)
+            val isRadio = groups.any { it.equals("Radyo", ignoreCase = true) } ||
+                (ch.name?.contains("Radyo", ignoreCase = true) == true) ||
+                (ch.name?.contains(" FM", ignoreCase = true) == true)
+            PreviewChannel(ch.id.value, ch.name ?: "Adsız kanal", groups.first(), ch.logo.orEmpty(), definition = row.definition, groups = groups, providerId = row.providerHint.orEmpty(), tvgName = row.tvgName, isRadio = isRadio)
         }
     }
 }

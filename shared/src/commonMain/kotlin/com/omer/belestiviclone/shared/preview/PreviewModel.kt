@@ -6,7 +6,9 @@ import com.omer.belestiviclone.shared.catalog.ComparisonV1
 
 data class PreviewChannel(val id: OpaqueId, val name: String, val category: String, val logo: String, val video: Boolean = false,
     val definition: PlaybackDefinition? = null, val groups: List<String> = listOf(category), val providerId: String = "", val available: Boolean = true,
-    val sourceReferences: List<OpaqueId> = emptyList(), val tvgName: String = "")
+    val sourceReferences: List<OpaqueId> = emptyList(), val tvgName: String = "", val isRadio: Boolean = false) {
+    val isAudioOrRadio: Boolean get() = isRadio || groups.any { it.equals("Radyo", ignoreCase = true) } || category.equals("Radyo", ignoreCase = true)
+}
 object PreviewFixture {
     val channels = listOf(
         PreviewChannel(OpaqueId(0x50524556, 1), "Örnek video", "Örnek", "ikon_tv", true),
@@ -21,6 +23,11 @@ object PreviewFixture {
         PreviewChannel(OpaqueId(0x50524556, 10), "TRT GENÇ", "Çocuk", "logo_trtgenc"),
         PreviewChannel(OpaqueId(0x50524556, 11), "TRT Belgesel", "Belgesel", "logo_trtbelgesel"),
         PreviewChannel(OpaqueId(0x50524556, 12), "TRT 4K", "Ulusal", "logo_trt4k"),
+    )
+    val radioChannels = listOf(
+        PreviewChannel(OpaqueId(0x50524556, 101), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
+        PreviewChannel(OpaqueId(0x50524556, 102), "Kral FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
+        PreviewChannel(OpaqueId(0x50524556, 103), "Power FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
     )
     val categories = listOf("Örnek", "Ulusal", "Haber", "Spor", "Çocuk", "Müzik", "Belgesel")
     const val videoUri = "https://storage.googleapis.com/exoplayer-test-media-1/mp4/android-screens-10s.mp4"
