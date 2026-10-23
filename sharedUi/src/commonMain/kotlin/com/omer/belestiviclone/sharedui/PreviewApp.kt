@@ -706,13 +706,17 @@ private val settingIcons = mapOf(
                             SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "ikon_cop", image, danger = true) { s.dialog = "clear" }
                         }
                         4 -> {
-                            SettingsGroup("FAVORİLER")
+                            SettingsGroup("TELEFONDAN AKTAR")
+                            SettingTile("Telefondan Aktar", "Yerel ağ üzerinden M3U / Xtream / Stalker gönder", "ikon_export", image) { s.openWebTransfer() }
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("FAVORİLER")
                             SettingTile("Favorileri Dışa Aktar", "Favori listesini yedekle", "ikon_export", image) { s.dialog = "export" }
                             SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "ikon_import", image) { s.dialog = "import" }
                         }
                         5 -> {
                             SettingsGroup("UYGULAMA")
                             SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("AĞ VE YAYIN KONTROLÜ")
+                            SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "ikon_canli", image) { s.openNetworkDiagnostics() }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK")
                             SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
                             SettingTile("Telegram", "Topluluk", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
@@ -902,6 +906,8 @@ private fun ExitDialog(s: PreviewState, image: @Composable (String, Modifier) ->
 private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
     val kind = s.dialog ?: return
     if (kind == "exit") { ExitDialog(s, image); return }
+    if (kind == "webTransfer") { WebTransferDialog(s, image); return }
+    if (kind == "networkDiagnostics") { NetworkDiagnosticsDialog(s, image); return }
     if (kind in sourceFormKinds || kind == "categories") return
     if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), if (kind == "format" && s.page == "live") "GÖRÜNTÜ ORANI" else optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }

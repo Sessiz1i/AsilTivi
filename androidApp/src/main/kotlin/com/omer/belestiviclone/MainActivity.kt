@@ -54,6 +54,8 @@ import androidx.media3.datasource.DataSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.omer.belestiviclone.shared.preview.*
+import com.omer.belestiviclone.shared.transfer.*
+import com.omer.belestiviclone.shared.diagnostics.*
 import com.omer.belestiviclone.sharedui.PreviewApp
 import com.omer.belestiviclone.sharedui.PreviewState
 
@@ -155,7 +157,19 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val scope = rememberCoroutineScope()
-            val state = remember { PreviewState(store, scope, publicStore, AndroidSourceLoader(applicationContext), epgLoader = AndroidEpgLoader(applicationContext)) }
+            val state = remember {
+                PreviewState(
+                    store,
+                    scope,
+                    publicStore,
+                    AndroidSourceLoader(applicationContext),
+                    epgLoader = AndroidEpgLoader(applicationContext),
+                    webTransferServerFactory = { onPayload -> AndroidWebTransferServer(onPayload) },
+                    networkDiagnosticsRunner = { testUrl, onProgress ->
+                        AndroidNetworkDiagnostics.runFullDiagnostics(applicationContext, testUrl, onProgress)
+                    }
+                )
+            }
             var captionReservedBottomPx by remember { mutableIntStateOf(0) }
             DocumentBridge(state)
             SideEffect { previewState = state }

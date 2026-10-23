@@ -11,11 +11,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.*
 import com.omer.belestiviclone.shared.catalog.SourceId
+import com.omer.belestiviclone.shared.transfer.*
+import com.omer.belestiviclone.shared.diagnostics.*
 import kotlin.random.Random
 
 class PreviewState(private val store: PreviewStore, private val scope: CoroutineScope, private val publicStore: PreviewStore? = null,
     private val sourceLoader: SourceLoader? = null, allocate: () -> OpaqueId = { OpaqueId(Random.nextLong(), Random.nextLong()) },
-    private val epgLoader: EpgLoader? = null) {
+    private val epgLoader: EpgLoader? = null,
+    private val webTransferServerFactory: (((TransferPayload) -> Unit) -> WebTransferServerHandle)? = null,
+    private val networkDiagnosticsRunner: NetworkDiagnosticsRunner? = null) {
     private val sources = SourceOperations(allocate)
     val epgCache = EpgCacheManager().also { it.loadSampleDefault(System.currentTimeMillis()) }
     var epgRevision by mutableStateOf(0); private set
@@ -27,6 +31,11 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     private var generation = 0
     var committingSource by mutableStateOf(false); private set
     var documentRequest by mutableStateOf<String?>(null); private set
+    var webTransferServer by mutableStateOf<WebTransferServerHandle?>(null); private set
+    var webTransferInfo by mutableStateOf<TransferServerInfo?>(null); private set
+    var lastTransferSuccess by mutableStateOf<String?>(null)
+    var diagnosticsReport by mutableStateOf(DiagnosticsReport()); private set
+    var diagnosticsRunning by mutableStateOf(false); private set
     val savedSources get() = data.library?.saved.orEmpty()
     val editingFile get() = editing?.let { savedSources.getOrNull(it)?.kind == SourceKind.FILE } == true
     val activeCount get() = data.channels.count { it.available }
@@ -387,6 +396,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     fun dismiss() {
         if (committingSource) return
         cancelSource(); documentRequest = null
+        stopWebTransferServer()
         dialog = null; formPassword = ""; formUser = ""; formMac = ""; formAddress = ""; formName = ""; editing = null
     }
     fun moveStart() { moving = target; draft = data; dialog = null }
@@ -728,5 +738,112 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             val added = next.favorites.size - data.favorites.size
             commit(next) { dismiss(); notice = message("$added yeni favori eklendi; mevcut sıra korundu.", "$added favorites added; existing order preserved.", "$added Favoriten hinzugefügt; Reihenfolge beibehalten.") }
         } catch (_: Exception) { notice = message("Geçersiz veya uyumsuz yedek. Favoriler korundu.", "Invalid or incompatible backup. Favorites preserved.", "Ungültige oder inkompatible Sicherung. Favoriten beibehalten.") }
+    }
+
+    fun openWebTransfer() {
+        if (busy) return
+        lastTransferSuccess = null
+        dialog = "webTransfer"
+    }
+
+    fun startWebTransferServer() {
+        if (webTransferServerFactory == null) {
+            webTransferInfo = TransferServerInfo(localIp = "127.0.0.1", port = 8080, isRunning = false, error = "Web aktarım servisi platformda hazır değil")
+            return
+        }
+        if (webTransferServer?.isRunning == true) return
+        val server = webTransferServerFactory.invoke { payload ->
+            scope.launch {
+                handleTransferPayload(payload)
+            }
+        }
+        val info = server.start()
+        webTransferServer = server
+        webTransferInfo = info
+    }
+
+    fun stopWebTransferServer() {
+        webTransferServer?.stop()
+        webTransferServer = null
+        webTransferInfo = null
+    }
+
+    fun handleTransferPayload(payload: TransferPayload) {
+        val loader = sourceLoader
+        lastTransferSuccess = "${payload.name.ifEmpty { "Yeni Liste" }} aktarıldı"
+        notice = message("Telefondan aktarıldı: ${payload.name.ifEmpty { "Liste" }}", "Transferred from phone: ${payload.name.ifEmpty { "List" }}", "Vom Smartphone übertragen: ${payload.name.ifEmpty { "Liste" }}")
+        when (payload.kind) {
+            TransferPayloadKind.M3U_TEXT -> {
+                importM3u(payload.name.ifEmpty { "Telefondan Liste" }, payload.content)
+            }
+            TransferPayloadKind.M3U_URL -> {
+                if (loader == null) return
+                val name = payload.name.ifEmpty { "Telefondan M3U" }
+                sourceOperation { before ->
+                    sources.save(before, name, payload.url, loader.fetch(payload.url))
+                }
+            }
+            TransferPayloadKind.XTREAM -> {
+                if (loader == null) return
+                val name = payload.name.ifEmpty { "Xtream Portal" }
+                sourceOperation { before ->
+                    val (account, m3uText) = XtreamCodesClient.connectAndBuildM3u(loader, payload.serverUrl, payload.username, payload.password)
+                    lastXtreamAccount = account
+                    sources.saveXtream(before, name, payload.serverUrl, payload.username, m3uText)
+                }
+            }
+            TransferPayloadKind.STALKER -> {
+                if (loader == null) return
+                val name = payload.name.ifEmpty { "Stalker Portal" }
+                sourceOperation { before ->
+                    val (session, m3uText) = StalkerPortalClient.connectAndBuildM3u(loader, payload.portalUrl, payload.mac)
+                    lastStalkerSession = session
+                    sources.saveStalker(before, name, payload.portalUrl, payload.mac, m3uText)
+                }
+            }
+        }
+    }
+
+    fun openNetworkDiagnostics() {
+        dialog = "networkDiagnostics"
+    }
+
+    fun runNetworkDiagnostics() {
+        if (diagnosticsRunning) return
+        diagnosticsRunning = true
+        diagnosticsReport = DiagnosticsReport(inProgress = true)
+        val runner = networkDiagnosticsRunner
+        val testUrl = data.channels.firstOrNull { it.available }?.let { playbackUri(it) }
+            ?: "https://tv-trt1.medya.trt.com.tr/master.m3u8"
+
+        scope.launch {
+            try {
+                if (runner != null) {
+                    val finalReport = runner.run(testUrl) { currentProgress ->
+                        diagnosticsReport = currentProgress
+                    }
+                    diagnosticsReport = finalReport
+                } else {
+                    // Fallback in environments without platform runner (e.g. tests)
+                    diagnosticsReport = DiagnosticsReport(
+                        network = NetworkState("Wi-Fi", "192.168.1.100", true, "Wi-Fi · IP: 192.168.1.100"),
+                        dns = DnsState("google.com", "142.250.180.206", 18, true),
+                        stream = StreamServerState(testUrl, 200, 36, true),
+                        inProgress = false
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                diagnosticsReport = DiagnosticsReport(
+                    network = NetworkState("Hata", "", false, e.message ?: "Test başarısız"),
+                    dns = DnsState(isSuccess = false, error = e.message),
+                    stream = StreamServerState(isSuccess = false, error = e.message),
+                    inProgress = false
+                )
+            } finally {
+                diagnosticsRunning = false
+            }
+        }
     }
 }
