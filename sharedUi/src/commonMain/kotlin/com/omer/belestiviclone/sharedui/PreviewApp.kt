@@ -69,7 +69,7 @@ internal fun Label(value: String, size: Int = 12, color: Color = Color.White, mo
 
 /** Key repeat is consumed; long OK never produces an additional short action. */
 @Composable
-internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, click: () -> Unit) {
+internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, onFocused: (() -> Unit)? = null, click: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val gate = remember { OkGesture() }
     val clock = remember { TimeSource.Monotonic.markNow() }
@@ -93,7 +93,7 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
         .focusRequester(requester).focusProperties { canFocus = canInteract }.semantics { contentDescription = accessibilityLabel }
         .onFocusChanged {
             focused = it.isFocused
-            if (it.isFocused) { returns?.focused = requester; focusObserver(focusKey ?: "action:${label.hashCode()}") }
+            if (it.isFocused) { returns?.focused = requester; focusObserver(focusKey ?: "action:${label.hashCode()}"); onFocused?.invoke() }
             else { gate.reset(); if (returns?.focused == requester) { returns.focused = null; focusObserver("none") } }
         }
         .onPreviewKeyEvent { e ->
@@ -155,6 +155,7 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
                         val key = when (s.page) {
                             "home" -> "home:live"
                             "settings" -> "settings:section:${s.section}"
+                            "multi" -> "multi:slot:${s.multi?.selected ?: 0}"
                             else -> "channel:${PreviewCodec.id(s.selected)}"
                         }
                         returns.registry.entryTarget(key, returns.active)
@@ -905,6 +906,9 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
     if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), if (kind == "format" && s.page == "live") "GÖRÜNTÜ ORANI" else optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }
     if (kind == "layout") { LayoutChooser(s, image); return }
+    if (kind == "assign") { MultiChannelPicker(s, image); return }
+    if (kind == "savedLayouts") { SavedLayoutsModal(s, image); return }
+    if (kind == "saveMultiLayout") { SaveMultiLayoutDialog(s, image); return }
     if (kind == "favorite" || kind == "channel") { ChannelMenu(s, image); return }
     if (kind in listOf("clear", "cache", "warning")) { Confirmation(s, image, kind); return }
     val first = remember(kind) { FocusRequester() }
@@ -966,33 +970,173 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
 private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit, video: @Composable (PreviewChannel?, Boolean, Boolean, Int, String, PlaybackPreferences, (String) -> Unit, Modifier) -> Unit) {
     val m = s.multi ?: return
     val revision = s.multiRevision
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        repeat(if (m.count == 4) 2 else 1) { row ->
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                repeat(2) { column ->
-                    val index = row * 2 + column
-                    val ch = s.data.channels.find { it.id == m.slots[index] }
-                    Box(Modifier.weight(1f).fillMaxHeight().border(if (index == m.selected) 6.dp else 1.5.dp, if (index == m.selected) Color(0xFFF1C40F) else Color(0xFF3498DB))) {
-                        val multiPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
-                        if (playbackUri(ch) != null) key(index) { video(ch, false, s.muted || index != m.selected, s.retry, if (m.fit[index]) "Sığdır (Fit)" else "Orijinal (Panel)", multiPrefs, {}, Modifier.fillMaxSize().padding(if (index == m.selected) 6.dp else 1.5.dp)) }
-                        Action(ch?.name ?: "+ Kanal Ekle", Modifier.fillMaxSize(), selected = m.selected == index, tint = Color.Transparent, selectedTint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, long = { if (m.selected == index && ch != null) { m.fit[index] = !m.fit[index]; s.multiRevision++; s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal" } }, double = { if (ch != null) { m.fit[index] = !m.fit[index]; s.multiRevision++; s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal" } }, content = {
-                            if (ch != null && playbackUri(ch) != null) Box(Modifier.fillMaxSize()) { Label(ch.name, 11, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) }
-                            else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                if (ch != null) image(ch.logo, Modifier.size(30.dp)) else Label("+", 20, Color(0xFF626669))
-                                Label(ch?.name ?: "Kanal Ekle", 14, bold = true)
-                                if (ch != null) Label("Yayın kullanılamıyor", 10, Color.LightGray)
-                            }
-                        }) { if (m.selected == index) s.dialog = "assign" else { m.selected = index; s.multiRevision++ } }
+    val multiPrefs = remember(
+        s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"),
+        s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio")
+    ) {
+        PlaybackPreferences(
+            s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"),
+            s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio")
+        )
+    }
+
+    @Composable
+    fun SlotCell(index: Int, modifier: Modifier) {
+        val ch = s.data.channels.find { it.id == m.slots.getOrNull(index) }
+        val isFocusedSlot = index == m.selected
+        val borderWidth = if (isFocusedSlot) 4.dp else 1.5.dp
+        val borderColor = if (isFocusedSlot) Color(0xFFFFD600) else Color(0xFF284266)
+        Box(
+            modifier
+                .border(borderWidth, borderColor)
+                .background(Color.Black)
+        ) {
+            if (playbackUri(ch) != null) {
+                key(index, m.mode.code) {
+                    video(
+                        ch,
+                        false,
+                        s.muted || !isFocusedSlot,
+                        s.retry,
+                        if (m.fit[index]) "Sığdır (Fit)" else "Orijinal (Panel)",
+                        multiPrefs,
+                        {},
+                        Modifier.fillMaxSize().padding(borderWidth)
+                    )
+                }
+            }
+            Action(
+                label = ch?.name ?: "+ Kanal Ekle",
+                modifier = Modifier.fillMaxSize(),
+                focusKey = "multi:slot:$index",
+                selected = isFocusedSlot,
+                tint = Color.Transparent,
+                selectedTint = Color.Transparent,
+                radius = 0.dp,
+                strokeWidth = 0.dp,
+                focusColor = Color(0xFFFFD600),
+                onFocused = {
+                    if (m.selected != index) {
+                        m.selected = index
+                        s.multiRevision++
                     }
+                },
+                long = {
+                    if (ch != null) {
+                        m.fit[index] = !m.fit[index]
+                        s.multiRevision++
+                        s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal"
+                    }
+                },
+                double = {
+                    if (ch != null) {
+                        m.fit[index] = !m.fit[index]
+                        s.multiRevision++
+                        s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal"
+                    }
+                },
+                content = {
+                    if (ch != null && playbackUri(ch) != null) {
+                        Box(Modifier.fillMaxSize()) {
+                            Row(
+                                Modifier.align(Alignment.BottomStart)
+                                    .padding(10.dp)
+                                    .background(Color(0xB8000000), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Label("#${index + 1}", 10, if (isFocusedSlot) Color(0xFFFFD600) else Color(0xFF94A2B7), bold = true)
+                                Label(ch.name, 11, Color.White, bold = true)
+                                if (isFocusedSlot && !s.muted) {
+                                    Label("🔊", 10, Color(0xFFFFD600))
+                                }
+                            }
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (ch != null) image(ch.logo, Modifier.size(32.dp)) else Label("+", 24, if (isFocusedSlot) Color(0xFFFFD600) else Color(0xFF626669), bold = true)
+                            Label(ch?.name ?: "Kanal Ekle (Ekran ${index + 1})", 13, if (isFocusedSlot) Color(0xFFFFD600) else Color.White, bold = true)
+                            if (ch != null) Label("Yayın kullanılamıyor · Değiştirmek için dokunun", 10, Color.LightGray)
+                            else Label("Kategori ve arama ile kanal seçin", 9, Color(0xFF8A9AB0))
+                        }
+                    }
+                }
+            ) {
+                if (m.selected == index) s.openMultiChannelPicker(index)
+                else {
+                    m.selected = index
+                    s.multiRevision++
                 }
             }
         }
     }
-    Row(Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconAction("Ayarlar", "ikon_ayar", image, width = 79.dp, click = s::settings)
-        Action("ÇIKIŞ", Modifier.width(72.dp).height(29.dp), tint = Color(0xFFD32B2B), radius = 0.dp, strokeWidth = 0.dp, click = s::back)
-    }
-    Label("${m.count} Ekran · " + if (m.slots[m.selected] != null && !s.muted) "Ses: ${m.selected + 1}" else "Sessiz", 9, Color.LightGray, Modifier.align(Alignment.TopStart).padding(16.dp).background(Color(0xB8000000), RoundedCornerShape(7.dp)).padding(6.dp))
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        when (m.mode) {
+            MultiLayoutMode.TWO_SIDE_BY_SIDE -> {
+                Row(Modifier.fillMaxSize()) {
+                    SlotCell(0, Modifier.weight(1f).fillMaxHeight())
+                    SlotCell(1, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+            MultiLayoutMode.ONE_BIG_TWO_SMALL -> {
+                Row(Modifier.fillMaxSize()) {
+                    SlotCell(0, Modifier.weight(1.85f).fillMaxHeight())
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        SlotCell(1, Modifier.weight(1f).fillMaxWidth())
+                        SlotCell(2, Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+            MultiLayoutMode.ONE_BIG_THREE_SMALL -> {
+                Row(Modifier.fillMaxSize()) {
+                    SlotCell(0, Modifier.weight(2.1f).fillMaxHeight())
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        SlotCell(1, Modifier.weight(1f).fillMaxWidth())
+                        SlotCell(2, Modifier.weight(1f).fillMaxWidth())
+                        SlotCell(3, Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+            MultiLayoutMode.FOUR_EQUAL -> {
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.weight(1f).fillMaxWidth()) {
+                        SlotCell(0, Modifier.weight(1f).fillMaxHeight())
+                        SlotCell(1, Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(Modifier.weight(1f).fillMaxWidth()) {
+                        SlotCell(2, Modifier.weight(1f).fillMaxHeight())
+                        SlotCell(3, Modifier.weight(1f).fillMaxHeight())
+                    }
+                }
+            }
+        }
+
+        Row(Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            IconAction("Düzen", "ikon_coklu", image) { s.dialog = "layout" }
+            IconAction("Kaydet", "ikon_kaydet", image, click = s::openSaveMultiLayoutDialog)
+            IconAction("Paketler", "ikon_kaydedildi", image) { s.dialog = "savedLayouts" }
+            IconAction("Ayarlar", "ikon_ayar", image, click = s::settings)
+            Action("ÇIKIŞ", Modifier.width(68.dp).height(29.dp), tint = Color(0xFFD32B2B), radius = 9.dp, strokeWidth = 0.dp, click = s::back)
+        }
+
+        val activeName = s.data.channels.find { it.id == m.slots.getOrNull(m.selected) }?.name
+        val audioStatus = if (m.slots.getOrNull(m.selected) != null && !s.muted) {
+            "Ses Odağı: Ekran ${m.selected + 1}" + (activeName?.let { " ($it)" } ?: "")
+        } else {
+            "Sessiz"
+        }
+        Label(
+            "${m.mode.title} · $audioStatus",
+            10,
+            Color(0xFFFFD600),
+            Modifier.align(Alignment.TopStart)
+                .padding(16.dp)
+                .background(Color(0xCC0A1628), RoundedCornerShape(8.dp))
+                .border(1.dp, Color(0xFF2B4263), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            bold = true
+        )
     }
 }

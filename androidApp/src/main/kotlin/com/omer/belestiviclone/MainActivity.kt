@@ -172,7 +172,8 @@ class MainActivity : ComponentActivity() {
             }, video = { channel, paused, muted, retry, format, preferences, onQuality, modifier ->
                 SampleVideo(channel, paused, muted, retry, format, modifier, state::played, preferences, onQuality,
                     captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0,
-                    onTechnicalInfo = { state.technicalInfo = it })
+                    onTechnicalInfo = { if (state.page == "live") state.technicalInfo = it },
+                    isMultiScreen = state.page == "multi")
             })
         }
     }
@@ -310,7 +311,7 @@ private val previewDrawables = mapOf(
 
 /** Android objects never cross into common code. Public channels retain their own exact URI. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-class AndroidPreviewPlayer(private val context: android.content.Context, private val onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}) : PreviewPlayer {
+class AndroidPreviewPlayer(private val context: android.content.Context, private val isMultiScreen: Boolean = false, private val onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}) : PreviewPlayer {
     val exo = ExoPlayer.Builder(context).build()
     override var status by mutableStateOf(PlaybackStatus.IDLE); private set
     override var error by mutableStateOf<String?>(null); private set
@@ -518,10 +519,11 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             override fun onPlayerError(eventTime: AnalyticsListener.EventTime, value: PlaybackException) {
                 val active = observedAttempt(eventTime) ?: return
                 val http = httpStatus(value)
-                val stage = PlaybackFailure.classify(value.errorCode, http)
+                val causes = causeClasses(value)
+                val stage = PlaybackFailure.classify(value.errorCode, http, causes)
                 status = PlaybackStatus.ERROR
-                error = "${channel?.name.orEmpty()} · ${stage.message}"
-                log(active, "status=ERROR stage=$stage code=${value.errorCodeName} codeNumber=${value.errorCode} exception=${value.javaClass.simpleName} causes=${causeClasses(value)} http=${http ?: "unobserved"}")
+                error = stage.displayMessage(channel?.name, isMultiScreen)
+                log(active, "status=ERROR stage=$stage code=${value.errorCodeName} codeNumber=${value.errorCode} exception=${value.javaClass.simpleName} causes=$causes http=${http ?: "unobserved"}")
             }
         })
     }
@@ -575,11 +577,14 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     stage = PlaybackFailure.PLAYER
                     exo.prepare(); exo.playWhenReady = !requestedPause
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) {
+                catch (failure: Throwable) {
                     if (released || attempt?.accepts(active.id) != true) return@launch
+                    val causes = causeClasses(failure)
+                    val classified = PlaybackFailure.classify(PlaybackException.ERROR_CODE_UNSPECIFIED, httpStatus(failure), causes)
+                    val effectiveStage = if (classified == PlaybackFailure.DECODER) PlaybackFailure.DECODER else stage
                     status = PlaybackStatus.ERROR
-                    error = "${channel.name} · ${stage.message}"
-                    log(active, "status=ERROR stage=$stage exception=${failure.javaClass.simpleName} causes=${causeClasses(failure)}")
+                    error = effectiveStage.displayMessage(channel.name, isMultiScreen)
+                    log(active, "status=ERROR stage=$effectiveStage exception=${failure.javaClass.simpleName} causes=$causes")
                 }
             }
         } else status = PlaybackStatus.IDLE
@@ -600,11 +605,11 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
 }
 
 @Composable
-internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}) {
+internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val played by rememberUpdatedState(onPlayed)
-    val player = remember { AndroidPreviewPlayer(context.applicationContext) { played(it) } }
+    val player = remember(isMultiScreen) { AndroidPreviewPlayer(context.applicationContext, isMultiScreen) { played(it) } }
     val currentPaused by rememberUpdatedState(paused)
     LaunchedEffect(channel, retry) { player.preferences(preferences); player.mute(muted); player.select(channel); player.pause(paused) }
     LaunchedEffect(preferences) { player.preferences(preferences) }

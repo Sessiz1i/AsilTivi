@@ -114,6 +114,28 @@ class PreviewModelTest {
         assertEquals(0, m.selected); m.layout(4)
         assertEquals(PreviewFixture.channels.last().id, m.slots[3])
     }
+    @Test fun multiLayoutModesAndSavedLayoutCodecRoundtrip() {
+        val ch1 = PreviewFixture.channels[0].id
+        val ch2 = PreviewFixture.channels[1].id
+        val ch3 = PreviewFixture.channels[2].id
+        val m = MultiSession(ch1)
+        m.applyMode(MultiLayoutMode.ONE_BIG_TWO_SMALL)
+        assertEquals(3, m.count)
+        m.slots[1] = ch2
+        m.slots[2] = ch3
+        m.fit[1] = false
+        val saved = m.toSaved("Spor Paketi")
+        val encoded = MultiLayoutCodec.encodeList(listOf(saved))
+        val decoded = MultiLayoutCodec.decodeList(encoded).single()
+        assertEquals("Spor Paketi", decoded.name)
+        assertEquals(MultiLayoutMode.ONE_BIG_TWO_SMALL, decoded.mode)
+        assertEquals(listOf(ch1, ch2, ch3, null), decoded.slots)
+        assertEquals(listOf(true, false, true, true), decoded.fit)
+        assertEquals(3, decoded.activeSlotCount)
+
+        m.applyMode(MultiLayoutMode.ONE_BIG_THREE_SMALL)
+        assertEquals(4, m.count)
+    }
     @Test fun emptyMultiReturnUsesEntry() {
         val id = PreviewFixture.channels.first().id; val m = MultiSession(id)
         m.selected = 1; assertEquals(id, m.returnChannel())

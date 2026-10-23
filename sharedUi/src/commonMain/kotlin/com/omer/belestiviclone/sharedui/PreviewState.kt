@@ -60,6 +60,106 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var draft by mutableStateOf<PreviewData?>(null)
     var multi by mutableStateOf<MultiSession?>(null)
     var multiRevision by mutableStateOf(0)
+    var multiPickerCategory by mutableStateOf("Tümü")
+    var multiPickerQuery by mutableStateOf("")
+    val multiPickerCategories: List<String> get() =
+        listOf("Favoriler") +
+            (if (data.pref("history") == "Açık") listOf("Son İzlenenler") else emptyList()) +
+            listOf("Tümü") +
+            data.categories.filter { it !in data.hiddenCategories && data.channels.any { ch -> ch.available && it in ch.groups } }
+    val multiPickerChannels: List<PreviewChannel> get() =
+        data.filtered(multiPickerCategory, multiPickerQuery).filter { it.available }
+    val savedMultiLayouts: List<SavedMultiLayout> get() =
+        MultiLayoutCodec.decodeList(data.preferences["savedMultiLayouts"])
+    val lastMultiLayout: SavedMultiLayout? get() =
+        MultiLayoutCodec.decodeSingle(data.preferences["lastMultiLayout"].orEmpty())
+    fun openMultiChannelPicker(slotIndex: Int? = null) {
+        val m = multi ?: return
+        if (slotIndex != null && slotIndex in 0 until m.count) {
+            m.selected = slotIndex
+            multiRevision++
+        }
+        multiPickerQuery = ""
+        if (multiPickerCategory !in multiPickerCategories) multiPickerCategory = "Tümü"
+        dialog = "assign"
+    }
+    fun chooseMultiPickerCategory(cat: String) {
+        multiPickerCategory = cat
+        multiPickerQuery = ""
+    }
+    fun assignMultiChannel(channelId: OpaqueId?) {
+        val m = multi ?: return
+        if (m.selected in 0 until m.count) {
+            m.slots[m.selected] = channelId
+            multiRevision++
+        }
+        val encoded = MultiLayoutCodec.encodeSingle(m.toSaved("Son Çoklu Ekran"))
+        commit(data.withPref("lastMultiLayout", encoded)) {
+            dismiss()
+        }
+    }
+    private fun persistLastMultiLayout() {
+        val m = multi ?: return
+        val encoded = MultiLayoutCodec.encodeSingle(m.toSaved("Son Çoklu Ekran"))
+        if (data.preferences["lastMultiLayout"] == encoded) return
+        data = data.withPref("lastMultiLayout", encoded)
+    }
+    fun startMulti(count: Int) = startMulti(MultiLayoutMode.fromCount(count))
+    fun startMulti(mode: MultiLayoutMode) {
+        leaveLiveLayers()
+        if (multi == null) multi = MultiSession(selected)
+        multi!!.applyMode(mode)
+        multiRevision++
+        page = "multi"
+        persistLastMultiLayout()
+        dismiss()
+    }
+    fun openSaveMultiLayoutDialog() {
+        if (multi == null || busy) return
+        val m = multi!!
+        val chNames = (0 until m.count).mapNotNull { idx -> data.channels.find { it.id == m.slots[idx] }?.name }
+        formName = if (chNames.isNotEmpty()) chNames.take(2).joinToString(" + ") else m.mode.title
+        dialog = "saveMultiLayout"
+    }
+    fun saveCurrentMultiLayout(customName: String = formName) {
+        val m = multi ?: return
+        if (busy) return
+        val cleanName = customName.trim().take(80).ifEmpty {
+            val chNames = (0 until m.count).mapNotNull { idx -> data.channels.find { it.id == m.slots[idx] }?.name }
+            if (chNames.isNotEmpty()) chNames.take(2).joinToString(" + ") else m.mode.title
+        }
+        val entry = m.toSaved(cleanName)
+        val updated = listOf(entry) + savedMultiLayouts.filterNot { it.name.equals(cleanName, ignoreCase = true) }
+        val next = data
+            .withPref("savedMultiLayouts", MultiLayoutCodec.encodeList(updated))
+            .withPref("lastMultiLayout", MultiLayoutCodec.encodeSingle(m.toSaved("Son Çoklu Ekran")))
+        commit(next) {
+            dismiss()
+            notice = message("Çoklu ekran düzeni kaydedildi: $cleanName", "Multi-screen layout saved: $cleanName", "Mehrfachbild-Layout gespeichert: $cleanName")
+        }
+    }
+    fun loadSavedMultiLayout(saved: SavedMultiLayout) {
+        leaveLiveLayers()
+        if (multi == null) multi = MultiSession(selected)
+        multi!!.applySaved(saved)
+        multiRevision++
+        page = "multi"
+        persistLastMultiLayout()
+        dismiss()
+        notice = message("${saved.name} düzeni yüklendi.", "Loaded layout: ${saved.name}.", "Layout geladen: ${saved.name}.")
+    }
+    fun loadLastMultiLayout(): Boolean {
+        val last = lastMultiLayout ?: return false
+        loadSavedMultiLayout(last)
+        return true
+    }
+    fun deleteSavedMultiLayout(name: String) {
+        if (busy) return
+        val updated = savedMultiLayouts.filterNot { it.name == name }
+        commit(data.withPref("savedMultiLayouts", MultiLayoutCodec.encodeList(updated))) {
+            notice = message("Kayıtlı düzen silindi: $name", "Saved layout deleted: $name", "Gespeichertes Layout gelöscht: $name")
+        }
+    }
     var formName by mutableStateOf("")
     var formAddress by mutableStateOf("")
     var formUser by mutableStateOf("")
@@ -284,11 +384,6 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         moving = null; draft = null
     }
     fun settings() { cancelOpacity(); leaveLiveLayers(); origin = page; page = "settings"; dialog = null }
-    fun startMulti(count: Int) {
-        leaveLiveLayers()
-        if (multi == null) multi = MultiSession(selected)
-        multi!!.layout(count); multiRevision++; page = "multi"; dismiss()
-    }
     fun dismiss() {
         if (committingSource) return
         cancelSource(); documentRequest = null

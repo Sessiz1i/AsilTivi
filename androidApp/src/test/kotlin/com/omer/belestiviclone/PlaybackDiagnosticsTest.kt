@@ -18,6 +18,23 @@ class PlaybackDiagnosticsTest {
     @Test fun decoderFailureIsNotReportedAsNetwork() {
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODER_INIT_FAILED))
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED))
+        assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED))
+        assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED))
+        assertEquals(
+            PlaybackFailure.DECODER,
+            PlaybackFailure.classify(
+                PlaybackException.ERROR_CODE_UNSPECIFIED,
+                causeChain = "ExoPlaybackException>DecoderInitializationException>MediaCodecException"
+            )
+        )
+    }
+
+    @Test fun multiScreenDecoderFailureProducesFriendlyDeviceCapacityWarning() {
+        val singleMsg = PlaybackFailure.DECODER.displayMessage("TRT 1", isMultiScreen = false)
+        val multiMsg = PlaybackFailure.DECODER.displayMessage("TRT 1", isMultiScreen = true)
+        assertEquals("TRT 1 · Video veya ses çözümlenemedi.", singleMsg)
+        assertEquals("TRT 1 · Cihaz bu kadar yayını aynı anda desteklemiyor.", multiMsg)
+        assertEquals("Cihaz bu kadar yayını aynı anda desteklemiyor.", PlaybackFailure.DECODER.displayMessage(null, isMultiScreen = true))
     }
     @Test fun unknownFailureRemainsUnclassifiedPlayerFailure() {
         assertEquals(PlaybackFailure.PLAYER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_UNSPECIFIED))

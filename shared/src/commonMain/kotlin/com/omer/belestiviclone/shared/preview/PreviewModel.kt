@@ -75,7 +75,9 @@ data class PreviewData(
         "startupFavorites" to "Kapalı",
         "backgroundAudio" to "Kapalı",
         "autoPip" to "Açık",
-        "epgUrl" to ""
+        "epgUrl" to "",
+        "savedMultiLayouts" to "",
+        "lastMultiLayout" to ""
     ),
     val sources: List<String> = listOf("Örnek kayıt"),
     val channels: List<PreviewChannel> = PreviewFixture.channels,
@@ -112,13 +114,90 @@ interface PreviewStore {
     suspend fun load(): PreviewData
     suspend fun save(data: PreviewData)
 }
+enum class MultiLayoutMode(
+    val code: String,
+    val title: String,
+    val subtitle: String,
+    val slotCount: Int,
+) {
+    TWO_SIDE_BY_SIDE("TWO_SIDE_BY_SIDE", "2 Ekran · Yan Yana", "Sol ve sağ 2 eşit yayın · Orta performans", 2),
+    ONE_BIG_TWO_SMALL("ONE_BIG_TWO_SMALL", "1 Büyük + 2 Küçük", "Sol büyük ana yayın, sağda 2 küçük yayın", 3),
+    ONE_BIG_THREE_SMALL("ONE_BIG_THREE_SMALL", "1 Büyük + 3 Küçük", "Sol büyük ana yayın, sağda 3 küçük yayın", 4),
+    FOUR_EQUAL("FOUR_EQUAL", "4 Ekran · Eşit", "2x2 matriste 4 eşit yayın · Yüksek performans", 4);
+
+    companion object {
+        fun fromCode(code: String): MultiLayoutMode = entries.find { it.code == code } ?: TWO_SIDE_BY_SIDE
+        fun fromCount(count: Int): MultiLayoutMode = when (count) {
+            2 -> TWO_SIDE_BY_SIDE
+            3 -> ONE_BIG_TWO_SMALL
+            4 -> FOUR_EQUAL
+            else -> throw IllegalArgumentException("Unsupported screen count: $count")
+        }
+    }
+}
+
+data class SavedMultiLayout(
+    val name: String,
+    val mode: MultiLayoutMode,
+    val slots: List<OpaqueId?>,
+    val fit: List<Boolean> = List(4) { true },
+) {
+    val activeSlotCount: Int get() = slots.take(mode.slotCount).count { it != null }
+}
+
+object MultiLayoutCodec {
+    fun encodeSingle(layout: SavedMultiLayout): String {
+        val normSlots = List(4) { index -> layout.slots.getOrNull(index)?.let(PreviewCodec::id).orEmpty() }
+        val normFit = List(4) { index -> if (layout.fit.getOrNull(index) != false) "1" else "0" }
+        return PreviewCodec.pack(listOf(layout.name, layout.mode.code) + normSlots + normFit)
+    }
+
+    fun decodeSingle(encoded: String): SavedMultiLayout? {
+        if (encoded.isBlank()) return null
+        return runCatching {
+            val parts = PreviewCodec.unpack(encoded)
+            require(parts.size >= 6)
+            val name = parts[0]
+            val mode = MultiLayoutMode.fromCode(parts[1])
+            val slots = (2..5).map { idx -> parts[idx].takeIf { it.isNotEmpty() }?.let(PreviewCodec::id) }
+            val fit = if (parts.size >= 10) (6..9).map { idx -> parts[idx] != "0" } else List(4) { true }
+            SavedMultiLayout(name = name, mode = mode, slots = slots, fit = fit)
+        }.getOrNull()
+    }
+
+    fun encodeList(layouts: List<SavedMultiLayout>): String =
+        PreviewCodec.pack(layouts.map(::encodeSingle))
+
+    fun decodeList(encoded: String?): List<SavedMultiLayout> {
+        if (encoded.isNullOrBlank()) return emptyList()
+        return runCatching {
+            PreviewCodec.unpack(encoded).mapNotNull(::decodeSingle)
+        }.getOrDefault(emptyList())
+    }
+}
+
 class MultiSession(val entry: OpaqueId?) {
     val slots = MutableList<OpaqueId?>(4) { null }.also { it[0] = entry }
     val fit = MutableList(4) { true }
-    var count = 2; private set
+    var mode: MultiLayoutMode = MultiLayoutMode.TWO_SIDE_BY_SIDE; private set
+    val count: Int get() = mode.slotCount
     var selected = 0
-    fun layout(value: Int) { require(value == 2 || value == 4); count = value; if (selected >= count) selected = 0 }
-    fun returnChannel() = slots[selected] ?: entry
+    fun layout(value: Int) = applyMode(MultiLayoutMode.fromCount(value))
+    fun applyMode(nextMode: MultiLayoutMode) {
+        mode = nextMode
+        if (selected >= count) selected = 0
+    }
+    fun applySaved(saved: SavedMultiLayout) {
+        mode = saved.mode
+        for (i in 0 until 4) {
+            slots[i] = saved.slots.getOrNull(i)
+            fit[i] = saved.fit.getOrNull(i) ?: true
+        }
+        if (selected >= count) selected = 0
+    }
+    fun toSaved(name: String): SavedMultiLayout =
+        SavedMultiLayout(name = name.trim().ifEmpty { "Çoklu Ekran" }, mode = mode, slots = slots.toList(), fit = fit.toList())
+    fun returnChannel() = slots.getOrNull(selected) ?: slots.firstOrNull { it != null } ?: entry
 }
 enum class PlaybackStatus { IDLE, LOADING, READY, ENDED, ERROR }
 interface PreviewPlayer {
