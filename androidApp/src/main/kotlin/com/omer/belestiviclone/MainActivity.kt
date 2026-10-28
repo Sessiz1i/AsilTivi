@@ -187,7 +187,8 @@ class MainActivity : ComponentActivity() {
                 SampleVideo(channel, paused, muted, retry, format, modifier, state::played, preferences, onQuality,
                     captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0,
                     onTechnicalInfo = { if (state.page == "live") state.technicalInfo = it },
-                    isMultiScreen = state.page == "multi")
+                    isMultiScreen = state.page == "multi",
+                    liveSync = state.liveSyncRevision)
             })
         }
     }
@@ -609,6 +610,20 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         exo.volume = if (muted) 0f else 1f
     }
     override fun retry() { if (!released) select(channel) }
+    override fun syncLive() {
+        if (released) return
+        seekToDefaultPosition()
+        play()
+    }
+    fun seekToDefaultPosition() {
+        if (!released) exo.seekToDefaultPosition()
+    }
+    fun play() {
+        if (!released) {
+            requestedPause = false
+            exo.play()
+        }
+    }
     override fun release() {
         if (released) return
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
@@ -619,13 +634,19 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
 }
 
 @Composable
-internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false) {
+internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false, liveSync: Int = 0) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val played by rememberUpdatedState(onPlayed)
     val player = remember(isMultiScreen) { AndroidPreviewPlayer(context.applicationContext, isMultiScreen) { played(it) } }
     val currentPaused by rememberUpdatedState(paused)
     LaunchedEffect(channel, retry) { player.preferences(preferences); player.mute(muted); player.select(channel); player.pause(paused) }
+    LaunchedEffect(liveSync) {
+        if (liveSync > 0) {
+            player.seekToDefaultPosition()
+            player.play()
+        }
+    }
     LaunchedEffect(preferences) { player.preferences(preferences) }
     SideEffect { onQuality(player.qualityDescription); onTechnicalInfo(player.technicalInfo) }
     LaunchedEffect(paused, muted) { player.pause(paused); player.mute(muted) }

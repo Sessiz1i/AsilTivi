@@ -168,4 +168,57 @@ class EpgModelTest {
         assertEquals("https://ornek.com/epg.xml", PublicM3u.extractEpgUrl(m3u1))
         assertEquals("https://ornek.com/rehber.xml.gz", PublicM3u.extractEpgUrl(m3u2))
     }
+
+    @Test
+    fun formatsElapsedDurationCorrectlyForUnderHourAndOverHour() {
+        assertEquals("00:00", EpgLiveProgress.formatElapsed(0L))
+        assertEquals("00:00", EpgLiveProgress.formatElapsed(-5000L))
+        assertEquals("00:59", EpgLiveProgress.formatElapsed(59_000L))
+        assertEquals("04:22", EpgLiveProgress.formatElapsed(262_000L))
+        assertEquals("1:00:00", EpgLiveProgress.formatElapsed(3_600_000L))
+        assertEquals("2:19:29", EpgLiveProgress.formatElapsed(8_369_000L))
+    }
+
+    @Test
+    fun computesLiveProgressForActiveProgrammeAndFallbackWhenNoEpg() {
+        val start = 1_000_000L
+        val end = 2_000_000L // 1_000_000 ms duration
+        val prog = EpgProgramme(
+            channelId = "trt1.tr",
+            title = "Haber",
+            startEpochMs = start,
+            endEpochMs = end,
+        )
+
+        // 1. Program ortasında (250_000 ms geçmiş -> %25)
+        val progress25 = EpgLiveProgress.calculate(prog, nowEpochMs = start + 250_000L)
+        assertEquals(250_000L, progress25.elapsedMs)
+        assertEquals(1_000_000L, progress25.totalMs)
+        assertEquals(0.25f, progress25.progress, 0.001f)
+        assertEquals("04:10", progress25.elapsedLabel)
+
+        // 2. Program başlamadan önce
+        val progressBefore = EpgLiveProgress.calculate(prog, nowEpochMs = start - 10_000L)
+        assertEquals(0L, progressBefore.elapsedMs)
+        assertEquals(0.0f, progressBefore.progress, 0.001f)
+        assertEquals("00:00", progressBefore.elapsedLabel)
+
+        // 3. Program bittikten sonra
+        val progressAfter = EpgLiveProgress.calculate(prog, nowEpochMs = end + 50_000L)
+        assertEquals(1.0f, progressAfter.progress, 0.001f)
+
+        // 4. EPG yokken (prog == null) -> %100 doluluk ve oturum süresi
+        val sessionStart = 500_000L
+        val now = 500_000L + 135_000L // 2 dk 15 sn
+        val noEpgProgress = EpgLiveProgress.calculate(null, nowEpochMs = now, sessionStartMs = sessionStart)
+        assertEquals(135_000L, noEpgProgress.elapsedMs)
+        assertEquals(1.0f, noEpgProgress.progress, 0.001f)
+        assertEquals("02:15", noEpgProgress.elapsedLabel)
+
+        // 5. EpgNowNext liveProgress entegrasyonu
+        val nowNext = EpgNowNext(channelId = "trt1.tr", now = prog)
+        val nnProgress = nowNext.liveProgress(nowEpochMs = start + 250_000L)
+        assertEquals(0.25f, nnProgress.progress, 0.001f)
+        assertEquals("04:10", nnProgress.elapsedLabel)
+    }
 }

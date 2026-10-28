@@ -217,6 +217,7 @@ interface PreviewPlayer {
     fun pause(paused: Boolean)
     fun mute(muted: Boolean)
     fun retry()
+    fun syncLive() {}
     fun release()
 }
 

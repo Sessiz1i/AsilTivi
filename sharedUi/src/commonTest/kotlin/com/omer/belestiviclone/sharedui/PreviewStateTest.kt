@@ -217,4 +217,22 @@ class PreviewStateTest {
         s.stepChannel(1)
         assertTrue(s.panel)
     }
+    @Test fun syncLiveResumesPlaybackAndIncrementsRevision() = runBlocking {
+        val s = PreviewState(Store(), this)
+        s.load()
+        s.paused = true
+        val initialRev = s.liveSyncRevision
+        s.syncLive()
+        assertFalse(s.paused)
+        assertEquals(initialRev + 1, s.liveSyncRevision)
+    }
+    @Test fun livePlaybackProgressReturnsCalculatedOrFallbackSessionProgress() = runBlocking {
+        val s = PreviewState(Store(), this)
+        s.load()
+        val now = System.currentTimeMillis()
+        val progress = s.livePlaybackProgress(now)
+        assertNotNull(progress)
+        assertTrue(progress.progress in 0f..1f)
+        assertTrue(progress.elapsedLabel.isNotEmpty())
+    }
 }

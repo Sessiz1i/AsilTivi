@@ -23,6 +23,12 @@ data class EpgProgramme(
     fun progressPercentAt(nowEpochMs: Long): Int =
         (progressAt(nowEpochMs) * 100f).toInt().coerceIn(0, 100)
 
+    fun elapsedMsAt(nowEpochMs: Long): Long = (nowEpochMs - startEpochMs).coerceAtLeast(0L)
+
+    fun totalMs(): Long = (endEpochMs - startEpochMs).coerceAtLeast(1L)
+
+    fun elapsedLabelAt(nowEpochMs: Long): String = EpgLiveProgress.formatElapsed(elapsedMsAt(nowEpochMs))
+
     fun timeRangeLabel(utcOffsetMinutes: Int = EpgDateTime.TURKEY_OFFSET_MINUTES): String =
         "${EpgDateTime.formatHhMm(startEpochMs, utcOffsetMinutes)} - ${EpgDateTime.formatHhMm(endEpochMs, utcOffsetMinutes)}"
 }
@@ -32,6 +38,53 @@ data class EpgChannelInfo(
     val displayNames: List<String> = emptyList(),
     val iconUrl: String = "",
 )
+
+data class EpgLiveProgress(
+    val elapsedMs: Long,
+    val totalMs: Long,
+    val progress: Float,
+    val elapsedLabel: String,
+) {
+    companion object {
+        fun formatElapsed(elapsedMs: Long): String {
+            val totalSec = (elapsedMs / 1000L).coerceAtLeast(0L)
+            val hours = totalSec / 3600L
+            val mins = (totalSec / 60L) % 60L
+            val secs = totalSec % 60L
+            return if (hours > 0) {
+                "$hours:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
+            } else {
+                "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
+            }
+        }
+
+        fun calculate(
+            prog: EpgProgramme?,
+            nowEpochMs: Long = System.currentTimeMillis(),
+            sessionStartMs: Long = nowEpochMs,
+        ): EpgLiveProgress {
+            return if (prog != null) {
+                val elapsedMs = (nowEpochMs - prog.startEpochMs).coerceAtLeast(0L)
+                val totalMs = (prog.endEpochMs - prog.startEpochMs).coerceAtLeast(1L)
+                val progress = (elapsedMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
+                EpgLiveProgress(
+                    elapsedMs = elapsedMs,
+                    totalMs = totalMs,
+                    progress = progress,
+                    elapsedLabel = formatElapsed(elapsedMs),
+                )
+            } else {
+                val elapsedMs = (nowEpochMs - sessionStartMs).coerceAtLeast(0L)
+                EpgLiveProgress(
+                    elapsedMs = elapsedMs,
+                    totalMs = elapsedMs.coerceAtLeast(1L),
+                    progress = 1.0f,
+                    elapsedLabel = formatElapsed(elapsedMs),
+                )
+            }
+        }
+    }
+}
 
 data class EpgNowNext(
     val channelId: String? = null,
@@ -43,6 +96,9 @@ data class EpgNowNext(
     fun progressAt(nowEpochMs: Long): Float = now?.progressAt(nowEpochMs) ?: 0f
 
     fun progressPercentAt(nowEpochMs: Long): Int = now?.progressPercentAt(nowEpochMs) ?: 0
+
+    fun liveProgress(nowEpochMs: Long = System.currentTimeMillis(), sessionStartMs: Long = nowEpochMs): EpgLiveProgress =
+        EpgLiveProgress.calculate(now, nowEpochMs, sessionStartMs)
 
     fun nowTimeRange(utcOffsetMinutes: Int = EpgDateTime.TURKEY_OFFSET_MINUTES): String =
         now?.timeRangeLabel(utcOffsetMinutes) ?: "--:-- - --:--"

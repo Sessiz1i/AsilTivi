@@ -248,10 +248,15 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         LaunchedEffect(s.selected, s.info, s.panel, s.epgRevision) {
             nowEpochMs = System.currentTimeMillis()
             s.epgCache.evictExpired(nowEpochMs)
+            var ticks = 0
             while (s.info || s.panel) {
-                kotlinx.coroutines.delay(15_000)
+                kotlinx.coroutines.delay(1000L)
                 nowEpochMs = System.currentTimeMillis()
-                s.epgCache.evictExpired(nowEpochMs)
+                ticks++
+                if (ticks >= 15) {
+                    ticks = 0
+                    s.epgCache.evictExpired(nowEpochMs)
+                }
             }
         }
         val playbackPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
@@ -318,28 +323,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 Channels(s, image, false, Modifier.fillMaxWidth().height(68.dp))
                 if (s.searching) Search(s)
             }
-            val epgNow = currentEpg.now
-            val (playerTimeText, playerProgressFraction) = if (epgNow != null && epgNow.endEpochMs > epgNow.startEpochMs) {
-                val elapsedMs = (nowEpochMs - epgNow.startEpochMs).coerceAtLeast(0L)
-                val totalMs = epgNow.endEpochMs - epgNow.startEpochMs
-                val fraction = (elapsedMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-                val totalSec = elapsedMs / 1000L
-                val mins = (totalSec / 60) % 60
-                val secs = totalSec % 60
-                val hours = totalSec / 3600
-                val formatted = if (hours > 0) {
-                    "$hours:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
-                } else {
-                    "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
-                }
-                formatted to fraction
-            } else {
-                val secondOfHour = ((nowEpochMs / 1000L) % 3600L).coerceAtLeast(0L)
-                val mins = secondOfHour / 60L
-                val secs = secondOfHour % 60L
-                val fraction = secondOfHour.toFloat() / 3600f
-                "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}" to fraction
-            }
+            val liveProgress = currentEpg.liveProgress(nowEpochMs, s.channelSessionStartMs)
+            val playerTimeText = liveProgress.elapsedLabel
+            val playerProgressFraction = liveProgress.progress
 
             val barStartPadding = if (vertical) {
                 val pWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
@@ -378,7 +364,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     iconContent = { Box(Modifier.size(7.dp).background(Color(0xFFE53935), CircleShape)) },
                     click = {
                         s.paused = false
-                        s.retry++
+                        s.syncLive()
                     }
                 )
 

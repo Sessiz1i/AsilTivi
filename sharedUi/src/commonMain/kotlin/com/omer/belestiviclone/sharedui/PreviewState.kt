@@ -65,6 +65,18 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var paused by mutableStateOf(false)
     var muted by mutableStateOf(false)
     var retry by mutableStateOf(0)
+    var liveSyncRevision by mutableStateOf(0); private set
+    var channelSessionStartMs by mutableStateOf(System.currentTimeMillis()); private set
+
+    fun syncLive() {
+        paused = false
+        liveSyncRevision++
+    }
+
+    fun livePlaybackProgress(nowEpochMs: Long = System.currentTimeMillis()): EpgLiveProgress {
+        val prog = epgNowNext(channel, nowEpochMs).now
+        return EpgLiveProgress.calculate(prog, nowEpochMs, channelSessionStartMs)
+    }
     var moving by mutableStateOf<OpaqueId?>(null)
     var draft by mutableStateOf<PreviewData?>(null)
     var multi by mutableStateOf<MultiSession?>(null)
@@ -375,7 +387,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         commit(data.copy(categories = order))
     }
     fun select(id: OpaqueId) {
-        if (selected != id) technicalInfo = StreamTechnicalInfo()
+        if (selected != id) {
+            technicalInfo = StreamTechnicalInfo()
+            channelSessionStartMs = System.currentTimeMillis()
+        }
         selected = id
         paused = false
         if (page == "live") panel = true
