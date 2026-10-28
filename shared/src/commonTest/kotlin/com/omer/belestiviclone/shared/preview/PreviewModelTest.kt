@@ -148,7 +148,8 @@ class PreviewModelTest {
     }
     @Test fun defaultPreferencesContainV41Features() {
         val data = PreviewData()
-        assertEquals("Beleş TiVi Klasik", data.pref("theme"))
+        assertEquals("Klasik", data.pref("theme"))
+        assertEquals("Klasik", data.withPref("theme", "Beleş TiVi Klasik").pref("theme"))
         assertEquals("Kapalı", data.pref("sleepTimer"))
         assertEquals("Normal", data.pref("subtitleSize"))
         assertEquals("Beyaz", data.pref("subtitleColor"))

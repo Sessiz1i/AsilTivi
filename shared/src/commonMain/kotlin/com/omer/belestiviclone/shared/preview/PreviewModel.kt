@@ -67,7 +67,7 @@ data class PreviewData(
         "format" to "Orijinal",
         "audio" to "Türkçe",
         "subtitle" to "Kapalı",
-        "theme" to "Beleş TiVi Klasik",
+        "theme" to "Klasik",
         "sleepTimer" to "Kapalı",
         "subtitleSize" to "Normal",
         "subtitleColor" to "Beyaz",
@@ -84,7 +84,10 @@ data class PreviewData(
     val profileId: OpaqueId = OpaqueId(0x50524556, 0),
     val library: SourceLibrary? = null,
 ) {
-    fun pref(key: String) = preferences.getValue(key)
+    fun pref(key: String): String {
+        val raw = preferences.getValue(key)
+        return if (key == "theme" && (raw == "Beleş TiVi Klasik" || raw.isBlank())) "Klasik" else raw
+    }
     fun withPref(key: String, value: String) = copy(preferences = preferences + (key to value))
     fun filtered(category: String, query: String): List<PreviewChannel> {
         val base = when (category) {

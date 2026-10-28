@@ -204,4 +204,17 @@ class PreviewStateTest {
         yield()
         assertNull(s.sleepTimerRemainingSeconds)
     }
+    @Test fun channelChangeRevealsLivePanelWhenOnLivePage() = runBlocking {
+        val s = PreviewState(Store(), this)
+        s.load()
+        s.page = "live"
+        s.panel = false
+        val nextId = s.data.channels[1].id
+        s.select(nextId)
+        assertTrue(s.panel)
+
+        s.panel = false
+        s.stepChannel(1)
+        assertTrue(s.panel)
+    }
 }

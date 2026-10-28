@@ -205,6 +205,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val tvChannels = data.channels.filter { it.available && !it.isAudioOrRadio }
         val target = lastTvChannel?.takeIf { id -> tvChannels.any { it.id == id } } ?: tvChannels.firstOrNull()?.id
         if (target != null && target != selected) select(target)
+        panel = false
         notice = message("TV moduna dönüldü.", "Returned to TV mode.", "Zurück zum TV-Modus.")
     }
     fun toggleRadioMode() {
@@ -280,6 +281,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val next = if (current < 0) { if (delta > 0) 0 else candidates.lastIndex }
             else (current + delta + candidates.size) % candidates.size
         val id = candidates[next].id
+        if (page == "live") panel = true
         if (id != selected) select(id)
     }
     fun text(tr: String, en: String) = if (data.pref("language") == "English") en else tr
@@ -376,6 +378,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (selected != id) technicalInfo = StreamTechnicalInfo()
         selected = id
         paused = false
+        if (page == "live") panel = true
         if (playbackUri(channel) == null) notice = if (channel?.available == false)
             message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
             else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı."

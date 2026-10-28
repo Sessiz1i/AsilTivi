@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -40,6 +41,8 @@ fun LiveHeading(
     subtitle: String,
     image: @Composable (String, Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    nextSubtitle: String? = null,
+    titleColor: Color = Color(0xFFFFD600),
     showUi: Boolean = true,
     showLogo: Boolean = true,
     includeLogo: Boolean = true,
@@ -49,19 +52,30 @@ fun LiveHeading(
 ) {
     fun Modifier.observe(part: String): Modifier = if (onBounds == null) this else
         onGloballyPositioned { onBounds(part, it.boundsInWindow()) }
-    val surface = if (backdrop) Modifier.background(Color(0xB8000000), RoundedCornerShape(11.dp))
-        .padding(horizontal = 10.dp, vertical = 6.dp) else Modifier
+    val surface = if (backdrop) {
+        Modifier.background(
+            Brush.verticalGradient(
+                listOf(Color(0x99000000), Color(0x40000000), Color.Transparent)
+            ),
+            RoundedCornerShape(8.dp)
+        ).padding(horizontal = 10.dp, vertical = 6.dp)
+    } else Modifier
     Column(modifier.observe("heading").then(surface)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(24.dp).clipToBounds().alpha(if (showUi) 1f else 0f).observe(if (leadingChannelLogo) "leading-logo" else "tv")) {
                 image(if (leadingChannelLogo) logo else "ikon_tv", Modifier.fillMaxSize())
             }
-            Label(name, 22, Color(0xFFFFD600), Modifier.weight(1f, fill = false)
+            Label(name, 22, titleColor, Modifier.weight(1f, fill = false)
                 .alpha(if (showUi) 1f else 0f).observe("text"), bold = true, maxLines = 1)
             if (includeLogo) Box(Modifier.size(49.dp, 24.dp).clipToBounds().alpha(if (showLogo) 1f else 0f).observe("logo")) {
                 image(logo, Modifier.fillMaxSize())
             }
         }
-        Label(subtitle, 10, Color.LightGray, Modifier.alpha(if (showUi) 1f else 0f).observe("subtitle"))
+        if (subtitle.isNotEmpty()) {
+            Label(subtitle, 11, Color.White.copy(alpha = 0.92f), Modifier.alpha(if (showUi) 1f else 0f).observe("subtitle"), maxLines = 1)
+        }
+        if (!nextSubtitle.isNullOrEmpty()) {
+            Label(nextSubtitle, 10, Color(0xFFB0B9C6), Modifier.alpha(if (showUi) 1f else 0f).observe("next-subtitle"), maxLines = 1)
+        }
     }
 }

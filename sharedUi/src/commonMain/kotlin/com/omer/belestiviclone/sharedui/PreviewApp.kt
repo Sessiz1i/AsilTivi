@@ -262,12 +262,21 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
         }
+        LaunchedEffect(s.panel, s.selected, s.query, s.categoryMenu, s.moving, s.dialog, s.info) {
+            if (s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.categoryMenu && !s.info) {
+                kotlinx.coroutines.delay(5000L)
+                s.panel = false
+            }
+        }
+        val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
         Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { s.panel = true } })
         val boundsObserver = LocalBoundsObserver.current
         val currentEpg = remember(s.channel, nowEpochMs, s.epgRevision) { s.epgNowNext(s.channel, nowEpochMs) }
-        val headingSub = currentEpg.now?.let { "${s.profileName} · ${it.title} (${it.timeRangeLabel()})" } ?: "${s.profileName} · EPG bilgisi yok"
-        if (s.liveHeadingVisible) LiveHeading(s.channel?.name ?: "", s.channel?.logo ?: "ikon_tv", headingSub, image,
-            Modifier.liveHeadingPlacement(s.data.pref("format"), maxWidth.value, maxHeight.value).widthIn(max = maxWidth * .43f), includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
+        val headingNow = currentEpg.now?.let { "Şimdi: ${it.title} (${it.timeRangeLabel()})" } ?: "Şimdi: EPG bilgisi yok"
+        val headingNext = currentEpg.next?.let { "Sonra: ${it.title} (${it.timeRangeLabel()})" }
+        if (s.liveHeadingVisible) LiveHeading(s.channel?.name ?: "", s.channel?.logo ?: "ikon_tv", headingNow, image,
+            Modifier.liveHeadingPlacement(s.data.pref("format"), maxWidth.value, maxHeight.value).widthIn(max = maxWidth * .55f),
+            nextSubtitle = headingNext, titleColor = theme.headingTitleColor, includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
         if (s.panel) {
             Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconAction("Radyo", "ikon_audio", image, click = s::enterRadioMode)
@@ -296,7 +305,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 }
                 if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
-                LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+                LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(if (theme.categoryTabPill) 6.dp else (-8).dp)) {
                     item { CategoryTab("Ara", s, image, false) { s.searching = true } }
                     items(categories(s)) { cat -> CategoryTab(cat, s, image, false) { s.chooseCategory(cat) } }
                 }
@@ -465,6 +474,7 @@ private fun categorySymbol(cat: String) = when (cat) {
     else -> if (cat.startsWith("7/24")) "🎬" else "🌍"
 }
 @Composable private fun CategoryTab(cat: String, s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, click: () -> Unit) {
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     val shades = when (cat) {
         "ÇOKLU EKRAN" -> listOf(Color(0xFFDA6800), Color(0xFFF4A10B))
         "AYARLAR" -> listOf(Color(0xFF292A2A), Color(0xFF070707))
@@ -475,10 +485,20 @@ private fun categorySymbol(cat: String) = when (cat) {
         "7/24 Youtube" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
         else -> listOf(Color(0xFF2684A6), Color(0xFF18B59F))
     }
-    val shape = if (vertical) RoundedCornerShape(0.dp) else GenericShape { size, _ -> val slant = size.height * .466f; moveTo(slant, 0f); lineTo(size.width, 0f); lineTo(size.width - slant, size.height); lineTo(0f, size.height); close() }
+    val shape = if (vertical) RoundedCornerShape(0.dp)
+        else if (theme.categoryTabPill) RoundedCornerShape(16.dp)
+        else GenericShape { size, _ -> val slant = size.height * .466f; moveTo(slant, 0f); lineTo(size.width, 0f); lineTo(size.width - slant, size.height); lineTo(0f, size.height); close() }
     val tabBrush = Brush.linearGradient(if (shades.size == 1) shades + shades else shades)
-    // T2 onizleme.js: the two footer actions use CSS linear-gradient(110deg,...).
-    // CSS angles start at up; the gradient line projects through the box center.
+    val isSelected = s.category == cat
+    val selection = if (isSelected) Modifier.border(if (theme.categoryTabPill) 1.5.dp else 2.dp, theme.categoryTabSelectedStroke, shape) else Modifier
+
+    val pillBrush = when (theme.name) {
+        "Modern" -> Brush.linearGradient(listOf(Color(0xFF102138), Color(0xFF162D4A)))
+        "Altın" -> Brush.linearGradient(listOf(Color(0xFF282012), Color(0xFF382D18)))
+        "Sinema" -> Brush.linearGradient(listOf(Color(0xFF241114), Color(0xFF38191E)))
+        else -> null
+    }
+
     val background = if (vertical && cat in listOf("ÇOKLU EKRAN", "AYARLAR")) Modifier.drawWithCache {
         val radians = 110f * kotlin.math.PI.toFloat() / 180f
         val direction = Offset(kotlin.math.sin(radians), -kotlin.math.cos(radians))
@@ -486,13 +506,15 @@ private fun categorySymbol(cat: String) = when (cat) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val gradient = Brush.linearGradient(shades, start = center - direction * halfLength, end = center + direction * halfLength)
         onDrawBehind { drawRect(gradient) }
+    } else if (!vertical && theme.categoryTabPill && pillBrush != null) {
+        Modifier.background(pillBrush, shape)
     } else Modifier.background(tabBrush, shape)
+
     val language = LocalLanguage.current
     val label = presentationText(cat, language).let { if (language == "Türkçe") it.replace('i', 'İ').replace('ı', 'I').uppercase() else it.uppercase() }
-    // Overlap only transparent slanted corners; clip also keeps their hit regions separate.
-    val selection = if (s.category == cat) Modifier.border(2.dp, Color(0xFFF28B1B), shape) else Modifier
-    // Measure the label itself. The inset keeps content clear of both slanted edges.
-    Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = if (vertical) 9.dp else 14.dp, vertical = 3.dp), content = {
+    val horizontalPadding = if (vertical) 9.dp else if (theme.categoryTabPill) 12.dp else 14.dp
+
+    Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), content = {
         Box(if (vertical) Modifier.fillMaxWidth() else Modifier) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val symbol = categorySymbol(cat)
@@ -537,49 +559,75 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     val keySignal = LocalKeySignal.current
     val number = if (s.category == "Favoriler" && !s.searching) "${s.visibleData.favorites.indexOf(ch.id) + 1}. " else ""
     val isMoving = s.moving == ch.id
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
+    val isSelected = ch.id == s.selected || isMoving
+    val strokeColor = if (isMoving) Color(0xFFFFCF37) else theme.cardSelectedStroke
+    val strokeWidth = if (isSelected) theme.cardSelectedStrokeWidthDp.dp else 0.dp
+    val cardRadius = if (theme.isCardFlat) 0.dp else 8.dp
+    val cardTint = if (theme.isCardFlat) Color.Transparent else theme.cardBackground
+
     var drag by remember { mutableStateOf(0f) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(s.dialog, s.moving, windowFocused, s.searching) { if (windowFocused && s.dialog == null && !s.searching && s.target == ch.id) requester.requestFocus() }
-    // A selected channel must take focus from the previous card; modal return still uses target.
     LaunchedEffect(s.selected) {
         if (windowFocused && s.dialog == null && !s.searching && s.selected == ch.id) requester.requestFocus()
     }
-    Action(number + ch.name, (if (vertical) Modifier.fillMaxWidth().height(38.5.dp) else Modifier.width(69.dp).height(68.dp)).focusRequester(requester)
-        .then(if (isMoving) Modifier.pointerInput(ch.id, vertical) { detectDragGestures(onDragStart = { drag = 0f }, onDragEnd = { s.moveFinish() }, onDragCancel = { s.draft = null; s.moving = null }) { change, amount -> change.consume(); drag += if (vertical) amount.y else amount.x; if (abs(drag) > 45) { s.moveBy(if (drag > 0) 1 else -1); drag = 0f } } } else Modifier),
-        focusKey = "channel:${PreviewCodec.id(ch.id)}", selected = ch.id == s.selected || isMoving,
-        tint = Color.Transparent, radius = 0.dp, strokeWidth = if (isMoving) 2.dp else 0.dp, stroke = Color(0xFFFFCF37), focusColor = if (isMoving) Color(0xFFFFCF37) else if (vertical) Color(0xFFF28B1B) else Color.White, horizontalFocus = !vertical && !isMoving, channelFocus = !isMoving, padding = PaddingValues(0.dp),
+    Action(
+        number + ch.name,
+        (if (vertical) Modifier.fillMaxWidth().height(38.5.dp) else Modifier.width(69.dp).height(68.dp)).focusRequester(requester)
+            .then(if (isMoving) Modifier.pointerInput(ch.id, vertical) { detectDragGestures(onDragStart = { drag = 0f }, onDragEnd = { s.moveFinish() }, onDragCancel = { s.draft = null; s.moving = null }) { change, amount -> change.consume(); drag += if (vertical) amount.y else amount.x; if (abs(drag) > 45) { s.moveBy(if (drag > 0) 1 else -1); drag = 0f } } } else Modifier),
+        focusKey = "channel:${PreviewCodec.id(ch.id)}",
+        selected = isSelected,
+        tint = cardTint,
+        radius = cardRadius,
+        strokeWidth = strokeWidth,
+        stroke = strokeColor,
+        focusColor = if (isMoving) Color(0xFFFFCF37) else if (vertical) theme.accentColor else Color.White,
+        horizontalFocus = !vertical && !isMoving,
+        channelFocus = !isMoving,
+        padding = PaddingValues(0.dp),
         long = { s.target = ch.id; s.dialog = if (s.category == "Favoriler") "favorite" else "channel" },
         extraKey = { e ->
             val delta = channelArrowDelta(vertical, e.key)
             if (isMoving && e.type == KeyEventType.KeyDown && e.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) { s.moveBy(if (e.key in listOf(Key.DirectionUp, Key.DirectionLeft)) -1 else 1); true }
             else if (!isMoving && delta != null && s.panel && s.dialog == null) {
                 if (e.type == KeyEventType.KeyDown && !keySignal(e).repeat && s.normalLiveControls) s.stepChannel(delta)
-                true // Consume release/repeats too; focus follows selected without an extra OK.
+                true
             }
             else if (vertical && !isMoving && e.key == Key.DirectionLeft && e.type == KeyEventType.KeyDown) { s.categoryMenu = true; true } else false
-        }, content = {
-            val cardNowTitle = remember(ch, s.epgRevision) { s.epgNowNext(ch).now?.title }
-            if (vertical) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.width(2.5.dp).fillMaxHeight().background(if (ch.id == s.selected) Color(0xFFF28B1B) else Color.Transparent))
-                image(ch.logo, Modifier.size(30.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    BasicText(number + ch.name, style = TextStyle(color = Color(0xFFDEDEDE), fontSize = 10.sp, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!cardNowTitle.isNullOrBlank()) {
-                        BasicText(cardNowTitle, style = TextStyle(color = Color(0xFF94A2B7), fontSize = 8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        content = {
+            if (vertical) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(if (ch.id == s.selected) theme.accentColor else Color.Transparent))
+                    image(ch.logo, Modifier.size(30.dp))
+                    BasicText(
+                        number + ch.name,
+                        Modifier.weight(1f),
+                        style = TextStyle(color = if (ch.id == s.selected) Color.White else Color(0xFFDEDEDE), fontSize = 10.sp, fontWeight = if (ch.id == s.selected) FontWeight.Bold else FontWeight.Normal),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (ch.id in s.data.favorites) image("yildiz", Modifier.size(10.dp))
+                }
+            } else {
+                Box(Modifier.fillMaxSize()) {
+                    image(ch.logo, Modifier.align(Alignment.TopCenter).offset(y = 5.dp).size(52.dp, 40.dp))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 2.dp, vertical = 3.dp), contentAlignment = Alignment.Center) {
+                        BasicText(
+                            number + ch.name,
+                            style = TextStyle(color = if (ch.id == s.selected) Color.White else Color(0xFFE8E8E8), fontSize = 8.sp, fontWeight = if (ch.id == s.selected) FontWeight.Bold else FontWeight.Normal),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (ch.id in s.data.favorites) {
+                        image("yildiz", Modifier.align(Alignment.TopEnd).offset(x = (-8).dp, y = 5.dp).size(10.dp))
                     }
                 }
-                if (ch.id in s.data.favorites) image("yildiz", Modifier.size(10.dp))
-            } else Box(Modifier.fillMaxSize()) {
-                image(ch.logo, Modifier.align(Alignment.TopCenter).offset(y = 5.dp).size(52.dp, 40.dp))
-                Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 1.dp, vertical = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    BasicText(number + ch.name, style = TextStyle(color = Color.White, fontSize = 8.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!cardNowTitle.isNullOrBlank()) {
-                        BasicText(cardNowTitle, style = TextStyle(color = Color(0xFF94A2B7), fontSize = 7.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                if (ch.id in s.data.favorites) image("yildiz", Modifier.align(Alignment.TopEnd).offset(x = (-10).dp, y = 5.dp).size(10.dp))
             }
-        }) { if (isMoving) s.moveFinish() else { requester.requestFocus(); s.select(ch.id) } }
+        }
+    ) { if (isMoving) s.moveFinish() else { requester.requestFocus(); s.select(ch.id) } }
 }
 
 private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Yardım Ve Hakkında")
@@ -593,7 +641,7 @@ private val choices = mapOf(
     "format" to LiveFormatOptions,
     "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"),
     "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"),
-    "theme" to listOf("Beleş TiVi Klasik", "Modern"),
+    "theme" to listOf("Klasik", "Modern", "Altın", "Sinema"),
     "sleepTimer" to listOf("Kapalı", "15 dk", "30 dk", "45 dk", "60 dk", "90 dk", "120 dk"),
     "subtitleSize" to listOf("Küçük", "Normal", "Büyük", "Çok Büyük"),
     "subtitleColor" to listOf("Beyaz", "Sarı", "Yeşil", "Camgöbeği"),
@@ -677,9 +725,9 @@ private val settingIcons = mapOf(
                             SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "ikon_category", image) { s.dialog = "categories" }
                         }
                         1 -> {
-                            SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
+                            SettingsGroup("UYGULAMA TEMASI"); SettingCard(s, "theme", image)
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
                             Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL BİLGİSİ"); SettingCard(s, "position", image); SettingCard(s, "size", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("TEMA"); SettingCard(s, "theme", image)
                         }
                         2 -> {
                             SettingsGroup("ZAMANLAYICI"); SettingCard(s, "sleepTimer", image)
