@@ -24,7 +24,9 @@ class SettingsHeadingTest {
         assertEquals("SUBTITLE BACKGROUND OPACITY", translated(optionHeading("subtitleBgOpacity"), true))
         // Quality keeps its separate, mixed-case popup title.
         assertEquals("Video quality", translated(optionHeading("quality"), true))
-        for (section in 0..5) assertNotEquals(settingsSectionHeading(section), translated(settingsSectionHeading(section), true))
+        assertEquals("BELEŞ TİVİ +", settingsSectionHeading(5))
+        assertEquals("BELEŞ TİVİ PLUS", translated(settingsSectionHeading(5), true))
+        for (section in 0..6) assertNotEquals(settingsSectionHeading(section), translated(settingsSectionHeading(section), true))
     }
 
     @Test fun headingsDoNotChangePreferenceValuesOrUnknownTextFallback() {

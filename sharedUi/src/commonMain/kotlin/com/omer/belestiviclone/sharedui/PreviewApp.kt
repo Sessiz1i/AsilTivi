@@ -6,6 +6,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -840,8 +843,8 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     ) { if (isMoving) s.moveFinish() else { requester.requestFocus(); s.select(ch.id) } }
 }
 
-private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Yardım Ve Hakkında")
-private val sectionsEn = listOf("Channels And Lists", "Appearance", "Playback", "Application", "Backup And Transfer", "Help And About")
+private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Beleş TiVi +", "Yardım Ve Hakkında")
+private val sectionsEn = listOf("Channels And Lists", "Appearance", "Playback", "Application", "Backup And Transfer", "Beleş TiVi Plus", "Help And About")
 private val choices = mapOf(
     "list" to listOf("Yatay (Alt)", "Dikey (Sidebar)"),
     "position" to listOf("Sol", "Orta", "Sağ"),
@@ -873,7 +876,6 @@ private val titles = mapOf(
     "subtitleColor" to "Altyazı Rengi",
     "subtitleBgOpacity" to "Altyazı Arka Plan Opaklığı",
 )
-private val sectionIcons = listOf("ikon_kaynak", "ikon_gorunum", "ikon_oynatma", "ikon_app", "ikon_export", "ikon_hakkinda")
 private val settingIcons = mapOf(
     "list" to "ikon_list",
     "opacity" to "ikon_opacity",
@@ -890,22 +892,184 @@ private val settingIcons = mapOf(
     "subtitleColor" to "ikon_gorunum",
     "subtitleBgOpacity" to "ikon_opacity",
 )
+
+@Composable
+private fun SettingsTabIcon(
+    index: Int,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val defaultColor = if (isSelected) Color.White else Color(0xFFB0B0B0)
+    val plusColor = if (isSelected) Color(0xFFFFB300) else Color(0xFFFF9E0B)
+    val color = if (index == 5) plusColor else defaultColor
+    val strokeWidth = 1.6f
+
+    Canvas(modifier = modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+
+        when (index) {
+            0 -> { // KANALLAR VE LİSTELER: TV / Ekran
+                val screenW = w * 0.85f
+                val screenH = h * 0.58f
+                val left = (w - screenW) / 2f
+                val top = h * 0.12f
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(left, top),
+                    size = Size(screenW, screenH),
+                    cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                    style = Stroke(width = strokeWidth.dp.toPx())
+                )
+                val stemTop = top + screenH
+                val stemBottom = stemTop + h * 0.16f
+                drawLine(
+                    color = color,
+                    start = Offset(w / 2f, stemTop),
+                    end = Offset(w / 2f, stemBottom),
+                    strokeWidth = strokeWidth.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                val baseW = w * 0.45f
+                drawLine(
+                    color = color,
+                    start = Offset(w / 2f - baseW / 2f, stemBottom),
+                    end = Offset(w / 2f + baseW / 2f, stemBottom),
+                    strokeWidth = strokeWidth.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+            1 -> { // GÖRÜNÜM: Palet / Kadran
+                val center = Offset(w / 2f, h / 2f)
+                val radius = w * 0.42f
+                drawCircle(
+                    color = color,
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeWidth.dp.toPx())
+                )
+                val dotR = 1.5.dp.toPx()
+                drawCircle(color = color, radius = dotR, center = Offset(w * 0.35f, h * 0.38f))
+                drawCircle(color = color, radius = dotR, center = Offset(w * 0.65f, h * 0.38f))
+                drawCircle(color = color, radius = dotR, center = Offset(w * 0.50f, h * 0.65f))
+            }
+            2 -> { // OYNATMA: Oynat / Play Üçgeni
+                val path = Path().apply {
+                    val padX = w * 0.28f
+                    val padY = h * 0.22f
+                    moveTo(padX, padY)
+                    lineTo(w - padX + 2.dp.toPx(), h / 2f)
+                    lineTo(padX, h - padY)
+                    close()
+                }
+                drawPath(
+                    path = path,
+                    color = color,
+                    style = Stroke(width = strokeWidth.dp.toPx(), join = StrokeJoin.Round)
+                )
+            }
+            3 -> { // UYGULAMA: Ayar Sürgüleri / Equalizer
+                val lineStroke = strokeWidth.dp.toPx()
+                val knobR = 2.2.dp.toPx()
+                val y1 = h * 0.25f
+                drawLine(color = color, start = Offset(w * 0.15f, y1), end = Offset(w * 0.85f, y1), strokeWidth = lineStroke, cap = StrokeCap.Round)
+                drawCircle(color = color, radius = knobR, center = Offset(w * 0.40f, y1))
+
+                val y2 = h * 0.52f
+                drawLine(color = color, start = Offset(w * 0.15f, y2), end = Offset(w * 0.85f, y2), strokeWidth = lineStroke, cap = StrokeCap.Round)
+                drawCircle(color = color, radius = knobR, center = Offset(w * 0.68f, y2))
+
+                val y3 = h * 0.79f
+                drawLine(color = color, start = Offset(w * 0.15f, y3), end = Offset(w * 0.85f, y3), strokeWidth = lineStroke, cap = StrokeCap.Round)
+                drawCircle(color = color, radius = knobR, center = Offset(w * 0.32f, y3))
+            }
+            4 -> { // YEDEKLEME VE AKTARIM: Tepsi + Yukarı Ok
+                val stroke = strokeWidth.dp.toPx()
+                val trayPath = Path().apply {
+                    val yT = h * 0.62f
+                    val yB = h * 0.84f
+                    val xL = w * 0.20f
+                    val xR = w * 0.80f
+                    moveTo(xL, yT)
+                    lineTo(xL, yB)
+                    lineTo(xR, yB)
+                    lineTo(xR, yT)
+                }
+                drawPath(path = trayPath, color = color, style = Stroke(width = stroke, join = StrokeJoin.Round))
+                val midX = w / 2f
+                val arrowTop = h * 0.18f
+                val arrowBottom = h * 0.66f
+                drawLine(color = color, start = Offset(midX, arrowBottom), end = Offset(midX, arrowTop), strokeWidth = stroke, cap = StrokeCap.Round)
+                val headW = w * 0.22f
+                val headH = h * 0.20f
+                drawLine(color = color, start = Offset(midX - headW, arrowTop + headH), end = Offset(midX, arrowTop), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color = color, start = Offset(midX + headW, arrowTop + headH), end = Offset(midX, arrowTop), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            5 -> { // BELEŞ TİVİ +: 4 Köşeli Yıldız ✦
+                val cx = w / 2f
+                val cy = h / 2f
+                val outerR = w * 0.44f
+                val starPath = Path().apply {
+                    moveTo(cx, cy - outerR)
+                    quadraticTo(cx, cy, cx + outerR, cy)
+                    quadraticTo(cx, cy, cx, cy + outerR)
+                    quadraticTo(cx, cy, cx - outerR, cy)
+                    quadraticTo(cx, cy, cx, cy - outerR)
+                    close()
+                }
+                drawPath(path = starPath, color = color)
+            }
+            6 -> { // YARDIM VE HAKKINDA: ⓘ Bilgi
+                val center = Offset(w / 2f, h / 2f)
+                val radius = w * 0.42f
+                drawCircle(color = color, radius = radius, center = center, style = Stroke(width = strokeWidth.dp.toPx()))
+                drawCircle(color = color, radius = 1.3.dp.toPx(), center = Offset(w / 2f, h * 0.32f))
+                drawLine(
+                    color = color,
+                    start = Offset(w / 2f, h * 0.46f),
+                    end = Offset(w / 2f, h * 0.72f),
+                    strokeWidth = strokeWidth.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+}
+
 @Composable private fun Settings(s: PreviewState, image: @Composable (String, Modifier) -> Unit, appVersionName: String) {
     val contentScroll = rememberScrollState()
     BoxWithConstraints(Modifier.fillMaxSize().background(ink)) {
         val compact = maxWidth < 600.dp
         Row(Modifier.fillMaxSize()) {
-            if (!compact) Column(Modifier.width(144.dp).fillMaxHeight().background(Color(0xFF0F1F3A))) {
-                Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("×", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 13.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            if (!compact) Column(Modifier.width(148.dp).fillMaxHeight().background(Color(0xFF0F1F3A))) {
+                Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("✕", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     sections.forEachIndexed { i, title -> Action(title, Modifier.fillMaxWidth().height(47.dp), focusKey = "settings:section:$i", tint = Color.Transparent, selected = s.section == i, selectedTint = Color(0xFF1A2D4F), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 9.dp), content = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) { image(sectionIcons[i], Modifier.size(22.dp, 23.dp)); Label(s.text(title, sectionsEn[i]), 11, modifier = Modifier.weight(1f), bold = true, lineHeight = 14f, maxLines = 2) }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SettingsTabIcon(i, s.section == i)
+                            Label(
+                                s.text(title, sectionsEn[i]),
+                                11,
+                                color = if (i == 5) {
+                                    if (s.section == i) Color(0xFFFFD54F) else Color(0xFFFFB300)
+                                } else {
+                                    if (s.section == i) Color.White else Color(0xFFB0B0B0)
+                                },
+                                modifier = Modifier.weight(1f),
+                                bold = true,
+                                lineHeight = 14f,
+                                maxLines = 2
+                            )
+                        }
                     }) { s.dismiss(); s.cancelOpacity(); s.section = i } }
                 }
-                Column(Modifier.padding(13.dp)) { Label("Beleş Tivi Clone", 9, Color(0xFF62718A)); Label("← GERİ DÖN", 9, Color(0xFF62718A), Modifier.padding(horizontal = 6.dp, vertical = 8.dp)) }
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Label("Beleş TiVi · v$appVersionName", 9, Color(0xFF7A89A0), bold = true)
+                    Label("Kambak Yazılım © 2026", 8, Color(0xFF5A687D))
+                }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                if (compact) LazyRow(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(6) { i -> Action(sections[i], focusKey = "settings:section:$i", selected = s.section == i) { s.section = i } }; item { Action("×", click = s::back) } }
+                if (compact) LazyRow(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(sections.size) { i -> Action(sections[i], focusKey = "settings:section:$i", selected = s.section == i) { s.section = i } }; item { Action("✕", click = s::back) } }
                 if (s.dialog in sourceFormKinds || s.dialog == "categories") CompositionLocalProvider(LocalModalLayer provides true) {
                     if (s.dialog == "categories") CategoryManagement(s, image, Modifier.weight(1f)) else SourceForm(s, image, Modifier.weight(1f))
                 } else Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(horizontal = 16.dp, vertical = 38.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -913,10 +1077,10 @@ private val settingIcons = mapOf(
                     when (s.section) {
                         0 -> {
                             SettingsGroup("LİSTEM")
-                            SettingTile("Aktif Listem", "${s.activeSourceKindBadge} · ${s.activeCount} içerik", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
-                            SettingTile("Ek Liste", s.data.library?.extra?.name ?: "Ana kaynağa bağlı tek ek liste", "ikon_list", image) { s.sourceForm("supplement") }
-                            SettingTile("Listeyi Güncelle", "Son başarılı snapshot korunur", "ikon_canli", image) { s.refreshSource() }
-                            SettingTile("Varsayılana Dön", "Klonun trlist kaynağı; favoriler korunur", "ikon_tv", image) { s.dialog = "defaultSource" }
+                            SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
+                            SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "ikon_list", image) { s.sourceForm("supplement") }
+                            SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "ikon_canli", image) { s.refreshSource() }
+                            SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "ikon_tv", image) { s.dialog = "defaultSource" }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
                             SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
                             SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
@@ -971,20 +1135,69 @@ private val settingIcons = mapOf(
                             SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "ikon_import", image) { s.dialog = "import" }
                         }
                         5 -> {
+                            SettingsGroup("BELEŞ TİVİ +")
+                            SettingPlusCard(
+                                title = "Tüm Temalar Açık",
+                                subtitle = "Altın ve Sinema temaları ücretsiz kullanımda",
+                                badge = "AÇIK",
+                                click = { s.section = 1 }
+                            )
+                            SettingPlusCard(
+                                title = "Gelişmiş Çoklu Ekran",
+                                subtitle = "4 ekrana kadar eşzamanlı izleme",
+                                badge = "AKTİF",
+                                click = { s.dismiss(); s.categoryAction("multi") }
+                            )
+                            SettingPlusCard(
+                                title = "Sıfır Reklam, Kesintisiz Canlı TV",
+                                subtitle = "Tanıtım kutusu ve reklamlar yok, tam ekran akış",
+                                badge = "SINIRSIZ",
+                                click = { s.notice = "Beleş TiVi Clone'da tüm reklamlar kaldırılmıştır; kesintisiz yayın aktiftir." }
+                            )
+                            SettingPlusCard(
+                                title = "Telefondan Kolay Aktarım",
+                                subtitle = "Yerel ağ üzerinden M3U / Xtream / Stalker tek tıkla transfer",
+                                badge = "ÜCRETSİZ",
+                                click = { s.openWebTransfer() }
+                            )
+                            SettingPlusCard(
+                                title = "Özel Kaynak ve Ülke Listeleri",
+                                subtitle = "Xtream, Stalker, M3U ve KKTC/AZ/Dünya listeleri tam açık",
+                                badge = "TAM ERİŞİM",
+                                click = { s.section = 0 }
+                            )
+                        }
+                        6 -> {
                             SettingsGroup("UYGULAMA")
                             SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("AĞ VE YAYIN KONTROLÜ")
                             SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "ikon_canli", image) { s.openNetworkDiagnostics() }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK")
+                            Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK & İLETİŞİM")
                             SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
-                            SettingTile("Telegram", "Topluluk", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
+                            SettingTile("Telegram Kanalı", "Topluluk ve duyurular", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
                             Spacer(Modifier.height(20.dp)); SettingsGroup("DİĞER İŞLEMLER")
                             SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "ikon_cache", image) { s.dialog = "cache" }
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth().height(51.dp).background(Color(0xFF0F1F3A)).padding(horizontal = 25.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Box(Modifier.size(8.dp).background(Color(0xFF0CBA91))); Label(s.profileName, 10, bold = true); Label("${s.activeCount} içerik", 10, Color(0xFF94A1B5)); Spacer(Modifier.weight(1f)); Label(if (s.busy) "İşlem sürüyor…" else "Yerel kayıt", 10, Color(0xFF94A1B5))
+                Row(
+                    Modifier.fillMaxWidth().height(48.dp).background(Color(0xFF0A1424)).padding(horizontal = 22.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(8.dp).background(Color(0xFF0ABB91), RoundedCornerShape(2.dp)))
+                        Label("Beleş TiVi Clone v$appVersionName", 10, Color.White, bold = true)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Label("Aktif: ${s.profileName.ifBlank { "M3U / Yerel TR Listesi" }}", 10, Color(0xFF94A2B7), bold = true)
+                        Label("•", 10, Color(0xFF69798F))
+                        Label("Kanal Sayısı: ${s.activeCount}", 10, Color(0xFF94A2B7), bold = true)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Label("🕒", 10, Color(0xFF8A99AD))
+                        Label(if (s.busy) "İşlem sürüyor…" else "Son Güncelleme: Güncel", 10, Color(0xFF8A99AD))
+                    }
                 }
             }
         }
@@ -996,9 +1209,62 @@ private val settingIcons = mapOf(
             image(icon, Modifier.size(21.dp, 23.dp))
             Column(Modifier.weight(1f)) { Label(visibleTitle, 12, if (danger) Color(0xFFF44747) else Color.White, bold = true, lineHeight = 18f, maxLines = 1); if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF69798F), lineHeight = 16f, maxLines = 1) }
             if (toggle) Box(Modifier.defaultMinSize(minWidth = 55.dp).height(28.dp).background(if (value == "Açık") Color(0xFF0ABB91) else Color(0xFF68798F), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Label("• $value", 10, bold = true) }
-            else { if (value.isNotEmpty()) Label(value, 10, amber, bold = true); Label("›", 12, Color(0xFF60728E)) }
+            else { if (value.isNotEmpty()) Label(value, 10, amber, bold = true); Label("→", 13, Color(0xFF60728E)) }
         }
     }, click = click)
+}
+
+@Composable
+private fun SettingPlusCard(
+    title: String,
+    subtitle: String,
+    badge: String,
+    click: () -> Unit
+) {
+    Action(
+        title,
+        Modifier.fillMaxWidth().height(58.dp),
+        radius = 10.dp,
+        strokeWidth = 0.dp,
+        focusKey = "settings:plus:$title",
+        padding = PaddingValues(horizontal = 20.dp),
+        content = {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Canvas(Modifier.size(20.dp)) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val outerR = size.width * 0.44f
+                    val starPath = Path().apply {
+                        moveTo(cx, cy - outerR)
+                        quadraticTo(cx, cy, cx + outerR, cy)
+                        quadraticTo(cx, cy, cx, cy + outerR)
+                        quadraticTo(cx, cy, cx - outerR, cy)
+                        quadraticTo(cx, cy, cx, cy - outerR)
+                        close()
+                    }
+                    drawPath(path = starPath, color = Color(0xFFFFB300))
+                }
+                Column(Modifier.weight(1f)) {
+                    Label(title, 12, Color.White, bold = true, lineHeight = 18f, maxLines = 1)
+                    if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF8CA0BA), lineHeight = 16f, maxLines = 1)
+                }
+                Box(
+                    Modifier.background(Color(0xFF261D05), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Label(badge, 9, Color(0xFFFFD54F), bold = true)
+                }
+                Label("→", 13, Color(0xFF60728E))
+            }
+        },
+        click = click
+    )
 }
 @Composable private fun SettingCard(s: PreviewState, key: String, image: @Composable (String, Modifier) -> Unit) {
     if (key == "opacity") OpacityControl(s, image)
