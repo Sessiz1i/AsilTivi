@@ -18,17 +18,20 @@ class AppThemeTest {
         assertEquals("Klasik", classic.name)
         assertEquals(Color(0xFFFF6B00), classic.accentColor)
         assertEquals(Color(0xFFFFEB3B), classic.headingTitleColor)
+        assertEquals(Color(0xFFE53935), classic.seekbarColor)
         assertTrue(classic.isCardFlat)
         assertFalse(classic.categoryTabPill)
 
         val legacy = AppThemes.get("Beleş TiVi Klasik")
         assertEquals("Klasik", legacy.name)
         assertEquals(Color(0xFFFF6B00), legacy.accentColor)
+        assertEquals(Color(0xFFE53935), legacy.seekbarColor)
 
         val modern = AppThemes.get("Modern")
         assertEquals("Modern", modern.name)
         assertEquals(Color(0xFF00BCD4), modern.accentColor)
         assertEquals(Color(0xFF80DEEA), modern.headingTitleColor)
+        assertEquals(Color(0xFF00BCD4), modern.seekbarColor)
         assertFalse(modern.isCardFlat)
         assertTrue(modern.categoryTabPill)
 
@@ -36,6 +39,7 @@ class AppThemeTest {
         assertEquals("Altın", gold.name)
         assertEquals(Color(0xFFFFC107), gold.accentColor)
         assertEquals(Color(0xFFFFD54F), gold.headingTitleColor)
+        assertEquals(Color(0xFFFFC107), gold.seekbarColor)
         assertFalse(gold.isCardFlat)
         assertTrue(gold.categoryTabPill)
 
@@ -43,6 +47,7 @@ class AppThemeTest {
         assertEquals("Sinema", cinema.name)
         assertEquals(Color(0xFFE50914), cinema.accentColor)
         assertEquals(Color(0xFFFF5252), cinema.headingTitleColor)
+        assertEquals(Color(0xFFE50914), cinema.seekbarColor)
         assertFalse(cinema.isCardFlat)
         assertTrue(cinema.categoryTabPill)
     }

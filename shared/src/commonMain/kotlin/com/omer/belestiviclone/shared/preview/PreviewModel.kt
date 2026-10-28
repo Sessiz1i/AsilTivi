@@ -90,11 +90,17 @@ data class PreviewData(
     }
     fun withPref(key: String, value: String) = copy(preferences = preferences + (key to value))
     fun filtered(category: String, query: String): List<PreviewChannel> {
-        val base = when (category) {
-            "Favoriler" -> favorites.mapNotNull { id -> channels.find { it.id == id } }
-            "Son İzlenenler" -> history.mapNotNull { id -> channels.find { it.id == id } }
-            "Tümü" -> channels.filter { it.available }
-            else -> channels.filter { it.available && category in it.groups }
+        val base = when {
+            category.equals("Favoriler", ignoreCase = true) || category.equals("FAVORİ TV", ignoreCase = true) ->
+                favorites.mapNotNull { id -> channels.find { it.id == id } }
+            category.equals("Son İzlenenler", ignoreCase = true) ->
+                history.mapNotNull { id -> channels.find { it.id == id } }
+            category.equals("Tümü", ignoreCase = true) || category.equals("TÜMÜ", ignoreCase = true) ->
+                channels.filter { it.available }
+            category.equals("AZ", ignoreCase = true) || category.equals("AZERBAYCAN", ignoreCase = true) ->
+                channels.filter { it.available && (it.groups.any { g -> g.equals("AZ", true) || g.equals("AZERBAYCAN", true) } || it.category.equals("AZ", true) || it.category.equals("AZERBAYCAN", true)) }
+            else ->
+                channels.filter { it.available && (it.groups.any { g -> g.equals(category, true) } || it.category.equals(category, true)) }
         }
         return base.filter { it.id !in hidden && it.name.contains(query, ignoreCase = true) }
     }

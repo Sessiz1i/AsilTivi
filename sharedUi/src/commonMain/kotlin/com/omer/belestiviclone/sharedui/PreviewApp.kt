@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -295,28 +296,105 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 }
                 if (s.categoryMenu) LazyColumn(Modifier.offset(13.dp, top).width(122.dp).height(listHeight).background(Color.Black.copy(alpha = opacity)).padding(5.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true) { s.chooseCategory(cat) } }
+                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true) { handleChooseCategory(s, cat) } }
                     item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
                     item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
                 }
                 Row(Modifier.offset(13.dp, top + listHeight).width(panelWidth).height(30.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Action(s.category, Modifier.weight(1f), tint = Color(0xB3000000), radius = 0.dp, focusKey = "live:category") { s.categoryMenu = !s.categoryMenu }
+                    val currentCategoryLabel = when {
+                        s.category.equals("Favoriler", ignoreCase = true) || s.category.equals("FAVORİ TV", ignoreCase = true) -> "FAVORİ TV"
+                        s.category.equals("Tümü", ignoreCase = true) || s.category.equals("TÜMÜ", ignoreCase = true) -> "TÜMÜ"
+                        else -> s.category
+                    }
+                    Action(currentCategoryLabel, Modifier.weight(1f), tint = Color(0xB3000000), radius = 0.dp, focusKey = "live:category") { s.categoryMenu = !s.categoryMenu }
                     IconAction("Ara", "kategori_ara", image) { s.searching = true }
                 }
                 if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
                 LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(if (theme.categoryTabPill) 6.dp else (-8).dp)) {
                     item { CategoryTab("Ara", s, image, false) { s.searching = true } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, false) { s.chooseCategory(cat) } }
+                    items(categories(s)) { cat -> CategoryTab(cat, s, image, false) { handleChooseCategory(s, cat) } }
                 }
                 Channels(s, image, false, Modifier.fillMaxWidth().height(68.dp))
                 if (s.searching) Search(s)
             }
-            Row(Modifier.align(Alignment.BottomEnd).padding(bottom = if (vertical) 29.dp else panelHeight + 27.dp, end = 30.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                IconAction(if (s.paused) "Oynat" else "Duraklat", "ikon_duraklat", image) { s.paused = !s.paused }
-                IconAction(if (s.muted) "Ses aç" else "Sessiz", "ikon_ses", image) { s.muted = !s.muted }
-                IconAction("Yeniden dene", "ikon_canli", image) { s.retry++ }
-                if (s.category == "Son İzlenenler") IconAction("Listeyi Temizle", "ikon_temizle", image) { s.clearHistory() }
+            val epgNow = currentEpg.now
+            val (playerTimeText, playerProgressFraction) = if (epgNow != null && epgNow.endEpochMs > epgNow.startEpochMs) {
+                val elapsedMs = (nowEpochMs - epgNow.startEpochMs).coerceAtLeast(0L)
+                val totalMs = epgNow.endEpochMs - epgNow.startEpochMs
+                val fraction = (elapsedMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
+                val totalSec = elapsedMs / 1000L
+                val mins = (totalSec / 60) % 60
+                val secs = totalSec % 60
+                val hours = totalSec / 3600
+                val formatted = if (hours > 0) {
+                    "$hours:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
+                } else {
+                    "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
+                }
+                formatted to fraction
+            } else {
+                val secondOfHour = ((nowEpochMs / 1000L) % 3600L).coerceAtLeast(0L)
+                val mins = secondOfHour / 60L
+                val secs = secondOfHour % 60L
+                val fraction = secondOfHour.toFloat() / 3600f
+                "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}" to fraction
+            }
+
+            val barStartPadding = if (vertical) {
+                val pWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
+                val panelRightEdge = (if (s.categoryMenu) 135.dp else 13.dp) + pWidth
+                (panelRightEdge + 14.dp).coerceAtMost(maxWidth * 0.45f)
+            } else {
+                24.dp
+            }
+
+            Row(
+                Modifier
+                    .align(if (vertical) Alignment.BottomEnd else Alignment.BottomCenter)
+                    .padding(
+                        start = barStartPadding,
+                        end = 24.dp,
+                        bottom = if (vertical) 24.dp else panelHeight + 20.dp
+                    )
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .background(Color(0xCC090F1A), RoundedCornerShape(19.dp))
+                    .border(1.dp, Color(0x33446080), RoundedCornerShape(19.dp))
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Label(playerTimeText, 11, Color(0xFFE2E8F0), bold = true)
+
+                PlayerSeekBar(
+                    progress = playerProgressFraction,
+                    color = theme.seekbarColor,
+                    modifier = Modifier.weight(1f)
+                )
+
+                PlayerActionButton(
+                    label = "Canlı",
+                    iconContent = { Box(Modifier.size(7.dp).background(Color(0xFFE53935), CircleShape)) },
+                    click = {
+                        s.paused = false
+                        s.retry++
+                    }
+                )
+
+                val isMuted = s.muted
+                PlayerActionButton(
+                    label = if (isMuted) "Sessiz" else "Ses Açık",
+                    iconContent = { BasicText(if (isMuted) "🔇" else "🔊", style = TextStyle(fontSize = 11.sp)) },
+                    click = { s.muted = !s.muted }
+                )
+
+                val isPaused = s.paused
+                PlayerActionButton(
+                    label = if (isPaused) "Oynat" else "Duraklat",
+                    iconContent = { BasicText(if (isPaused) "▶" else "⏸", style = TextStyle(fontSize = 10.sp, color = Color.White)) },
+                    click = { s.paused = !s.paused }
+                )
             }
         }
         if (s.info) {
@@ -465,32 +543,145 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
 @Composable private fun IconAction(label: String, icon: String, image: @Composable (String, Modifier) -> Unit, width: Dp? = null, visibleLabel: String = label, click: () -> Unit) {
     Action(label, Modifier.height(29.dp).then(if (width != null) Modifier.width(width) else Modifier), tint = Color(0xB8000000), radius = 11.dp, stroke = Color(0xFF344454), content = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { image(icon, Modifier.size(13.dp, 14.dp)); Label(visibleLabel, 11, bold = true) } }, click = click)
 }
-private fun categorySymbol(cat: String) = when (cat) {
-    "Ara" -> "🔍"; "Favoriler" -> "⭐"; "Son İzlenenler" -> "🕒"; "Tümü" -> "🌐"
-    "Ulusal" -> "🇹🇷"; "Haber" -> "📰"; "Spor", "SPOR" -> "⚽"; "Çocuk" -> "🧸"
-    "Müzik" -> "🎵"; "Belgesel" -> "🌍"; "Dini" -> "🕌"; "Yerel" -> "📍"
-    "AZERBAYCAN" -> "🇦🇿"; "KKTC" -> "🇨🇾"; "Almanya / Avrupa" -> "🇩🇪"; "Dünya" -> "🌍"; "Ekonomi" -> "📈"; "Kurumlar" -> "🏛️"; "Diğer" -> "📺"
-    "ÇOKLU EKRAN", "AYARLAR" -> null
-    else -> if (cat.startsWith("7/24")) "🎬" else "🌍"
+private fun handleChooseCategory(s: PreviewState, cat: String) {
+    val targetCategory = when {
+        cat.equals("FAVORİ TV", ignoreCase = true) || cat.equals("Favoriler", ignoreCase = true) -> "Favoriler"
+        cat.equals("TÜMÜ", ignoreCase = true) || cat.equals("Tümü", ignoreCase = true) -> "Tümü"
+        else -> cat
+    }
+    s.chooseCategory(targetCategory)
 }
+
+@Composable
+private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Modifier) {
+    val clamped = progress.coerceIn(0f, 1f)
+    Box(
+        modifier = modifier
+            .height(20.dp)
+            .fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(Color.White.copy(alpha = 0.22f), RoundedCornerShape(1.5.dp))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(clamped)
+                .height(3.dp)
+                .background(color, RoundedCornerShape(1.5.dp))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth(clamped)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(8.dp)
+                        .background(Color.White, CircleShape)
+                        .border(0.5.dp, Color(0x66000000), CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerActionButton(label: String, iconContent: @Composable () -> Unit, modifier: Modifier = Modifier, click: () -> Unit) {
+    Action(
+        label = label,
+        modifier = modifier.height(26.dp),
+        tint = Color(0x2EFFFFFF),
+        radius = 13.dp,
+        stroke = Color(0x3DFFFFFF),
+        strokeWidth = 1.dp,
+        padding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                iconContent()
+                Label(label, 10, Color.White, bold = true)
+            }
+        },
+        click = click
+    )
+}
+
+private fun categorySymbol(cat: String) = when (cat.uppercase()) {
+    "ARA" -> "🔍"
+    "FAVORİ TV", "FAVORILER", "FAVORİLER" -> "🏆"
+    "TÜMÜ", "TUMU" -> "⊞"
+    "ULUSAL" -> "🇹🇷"
+    "HABER" -> "📰"
+    "SPOR" -> "⚽"
+    "ÇOCUK", "COCUK" -> "🪁"
+    "BELGESEL" -> "🌍"
+    "MÜZİK", "MUZIK" -> "🎵"
+    "DİNİ", "DINI" -> "🕌"
+    "YEREL" -> "📍"
+    "KKTC" -> "🇨🇾"
+    "AZ", "AZERBAYCAN" -> "🇦🇿"
+    "ALMANYA / AVRUPA" -> "🇩🇪"
+    "DÜNYA", "DUNYA" -> "🌐"
+    "EKONOMİ", "EKONOMI" -> "📈"
+    "KURUMLAR" -> "🏛️"
+    "DİĞER", "DIGER" -> "📺"
+    "ÇOKLU EKRAN", "AYARLAR" -> null
+    else -> if (cat.startsWith("7/24")) "🎬" else "📺"
+}
+
 @Composable private fun CategoryTab(cat: String, s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, click: () -> Unit) {
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
-    val shades = when (cat) {
+    val shades = when (cat.uppercase()) {
         "ÇOKLU EKRAN" -> listOf(Color(0xFFDA6800), Color(0xFFF4A10B))
         "AYARLAR" -> listOf(Color(0xFF292A2A), Color(0xFF070707))
-        "Ara" -> listOf(Color(0xFF247675)); "Favoriler" -> listOf(Color(0xFFE1B700)); "Son İzlenenler" -> listOf(Color(0xFF8751AF), Color(0xFF297EAD))
-        "Tümü" -> listOf(Color(0xFF30495C)); "Ulusal" -> listOf(Color(0xFFFAFAFA)); "Haber" -> listOf(Color(0xFF315D77)); "Spor", "SPOR" -> listOf(Color(0xFF1A9B67))
-        "Çocuk" -> listOf(Color(0xFF7A4FAC), Color(0xFF568AD1)); "Müzik" -> listOf(Color(0xFFDC4835), Color(0xFFE99A18)); "Belgesel" -> listOf(Color(0xFF455B65)); "Dini" -> listOf(Color(0xFF1BAE91))
-        "Yerel" -> listOf(Color(0xFF87918F)); "AZERBAYCAN" -> listOf(Color(0xFF96253F), Color(0xFFE14F60)); "KKTC" -> listOf(Color(0xFFC0392B), Color(0xFFE74C3C)); "Almanya / Avrupa" -> listOf(Color(0xFF2C3E50), Color(0xFFD35400)); "Dünya" -> listOf(Color(0xFF1565C0), Color(0xFF00ACC1))
-        "7/24 Youtube" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
+        "ARA" -> listOf(Color(0xFF247675))
+        "FAVORİ TV", "FAVORILER", "FAVORİLER" -> listOf(Color(0xFFB8860B), Color(0xFFE5A910))
+        "TÜMÜ", "TUMU" -> listOf(Color(0xFF30495C))
+        "ULUSAL" -> listOf(Color(0xFFFAFAFA))
+        "HABER" -> listOf(Color(0xFF315D77))
+        "SPOR" -> listOf(Color(0xFF1A9B67))
+        "ÇOCUK", "COCUK" -> listOf(Color(0xFF7A4FAC), Color(0xFF568AD1))
+        "BELGESEL" -> listOf(Color(0xFF455B65))
+        "MÜZİK", "MUZIK" -> listOf(Color(0xFFDC4835), Color(0xFFE99A18))
+        "DİNİ", "DINI" -> listOf(Color(0xFF1BAE91))
+        "YEREL" -> listOf(Color(0xFF87918F))
+        "KKTC" -> listOf(Color(0xFFC0392B), Color(0xFFE74C3C))
+        "AZ", "AZERBAYCAN" -> listOf(Color(0xFF007A87), Color(0xFF96253F))
+        "ALMANYA / AVRUPA" -> listOf(Color(0xFF2C3E50), Color(0xFFD35400))
+        "DÜNYA", "DUNYA" -> listOf(Color(0xFF1565C0), Color(0xFF00ACC1))
+        "7/24 YOUTUBE" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
         else -> listOf(Color(0xFF2684A6), Color(0xFF18B59F))
     }
     val shape = if (vertical) RoundedCornerShape(0.dp)
         else if (theme.categoryTabPill) RoundedCornerShape(16.dp)
         else GenericShape { size, _ -> val slant = size.height * .466f; moveTo(slant, 0f); lineTo(size.width, 0f); lineTo(size.width - slant, size.height); lineTo(0f, size.height); close() }
     val tabBrush = Brush.linearGradient(if (shades.size == 1) shades + shades else shades)
-    val isSelected = s.category == cat
-    val selection = if (isSelected) Modifier.border(if (theme.categoryTabPill) 1.5.dp else 2.dp, theme.categoryTabSelectedStroke, shape) else Modifier
+
+    val isFav = cat.equals("FAVORİ TV", ignoreCase = true) || cat.equals("Favoriler", ignoreCase = true)
+    val isUlusal = cat.equals("Ulusal", ignoreCase = true)
+    val isSelected = s.category == cat ||
+        (isFav && (s.category == "Favoriler" || s.category == "FAVORİ TV")) ||
+        (cat.equals("TÜMÜ", ignoreCase = true) && (s.category == "Tümü" || s.category == "TÜMÜ")) ||
+        (cat.equals("AZ", ignoreCase = true) && (s.category == "AZ" || s.category == "AZERBAYCAN")) ||
+        cat.equals(s.category, ignoreCase = true)
+
+    val favBorder = if (isFav && !theme.categoryTabPill) Color(0xFFFFD700) else Color.Transparent
+    val selection = if (isSelected) {
+        Modifier.border(if (theme.categoryTabPill) 1.5.dp else 2.dp, theme.categoryTabSelectedStroke, shape)
+    } else if (favBorder != Color.Transparent) {
+        Modifier.border(1.5.dp, favBorder, shape)
+    } else {
+        Modifier
+    }
 
     val pillBrush = when (theme.name) {
         "Modern" -> Brush.linearGradient(listOf(Color(0xFF102138), Color(0xFF162D4A)))
@@ -513,6 +704,13 @@ private fun categorySymbol(cat: String) = when (cat) {
     val language = LocalLanguage.current
     val label = presentationText(cat, language).let { if (language == "Türkçe") it.replace('i', 'İ').replace('ı', 'I').uppercase() else it.uppercase() }
     val horizontalPadding = if (vertical) 9.dp else if (theme.categoryTabPill) 12.dp else 14.dp
+    val textColor = if (isUlusal) {
+        Color(0xFFE00010)
+    } else if (isFav && !theme.categoryTabPill) {
+        Color(0xFFFFD700)
+    } else {
+        Color.White
+    }
 
     Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), content = {
         Box(if (vertical) Modifier.fillMaxWidth() else Modifier) {
@@ -520,12 +718,38 @@ private fun categorySymbol(cat: String) = when (cat) {
                 val symbol = categorySymbol(cat)
                 if (symbol != null) BasicText(symbol, Modifier.clearAndSetSemantics { }, style = TextStyle(fontSize = 12.sp))
                 else image(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", Modifier.size(12.dp, 13.dp))
-                Label(label, 10, if (cat == "Ulusal") Color(0xFFE00010) else Color.White, bold = true, maxLines = if (vertical) Int.MAX_VALUE else 1)
+                Label(label, 10, textColor, bold = true, maxLines = if (vertical) Int.MAX_VALUE else 1)
             }
         }
     }, click = click)
 }
-private fun categories(s: PreviewState) = listOf("Favoriler") + (if (s.data.pref("history") == "Açık") listOf("Son İzlenenler") else emptyList()) + listOf("Tümü") + s.data.categories.filter { it !in s.data.hiddenCategories && s.data.channels.any { ch -> ch.available && it in ch.groups } }
+
+private fun categories(s: PreviewState): List<String> {
+    val template = listOf("FAVORİ TV", "TÜMÜ", "Ulusal", "Haber", "Spor", "Çocuk", "Belgesel", "Müzik", "Dini", "Yerel", "KKTC", "AZ")
+    val available = s.data.categories.filter { it !in s.data.hiddenCategories && s.data.channels.any { ch -> ch.available && it in ch.groups } }
+    val result = mutableListOf<String>()
+    for (item in template) {
+        if (item == "FAVORİ TV" || item == "TÜMÜ") {
+            result.add(item)
+        } else {
+            val matched = available.any { it.equals(item, ignoreCase = true) || (item == "AZ" && it.equals("AZERBAYCAN", ignoreCase = true)) }
+            val channelMatched = s.data.channels.any { ch ->
+                ch.available && (ch.groups.any { g -> g.equals(item, ignoreCase = true) || (item == "AZ" && g.equals("AZERBAYCAN", ignoreCase = true)) } ||
+                    ch.category.equals(item, ignoreCase = true) || (item == "AZ" && ch.category.equals("AZERBAYCAN", ignoreCase = true)))
+            }
+            if (matched || channelMatched) {
+                result.add(item)
+            }
+        }
+    }
+    for (cat in available) {
+        val already = template.any { it.equals(cat, ignoreCase = true) || (it == "AZ" && cat.equals("AZERBAYCAN", ignoreCase = true)) }
+        if (!already && !cat.equals("Favoriler", true) && !cat.equals("Son İzlenenler", true) && !cat.equals("Tümü", true)) {
+            result.add(cat)
+        }
+    }
+    return result
+}
 @Composable private fun Search(s: PreviewState) {
     val focus = remember { FocusRequester() }
     val windowFocused = LocalWindowInfo.current.isWindowFocused

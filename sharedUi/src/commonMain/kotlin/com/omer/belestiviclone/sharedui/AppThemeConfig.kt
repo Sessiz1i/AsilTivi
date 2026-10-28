@@ -18,7 +18,8 @@ data class ThemeConfig(
     val categoryTabPill: Boolean = false,
     val categoryTabBg: Color? = null,
     val categoryTabSelectedStroke: Color,
-    val backgroundTint: Color = Color.Black
+    val backgroundTint: Color = Color.Black,
+    val seekbarColor: Color = Color(0xFFE53935)
 )
 
 object AppThemes {
@@ -40,7 +41,8 @@ object AppThemes {
                 categoryTabPill = true,
                 categoryTabBg = Color(0xFF0F1F38),
                 categoryTabSelectedStroke = Color(0xFF00BCD4),
-                backgroundTint = Color(0xFF0B1422)
+                backgroundTint = Color(0xFF0B1422),
+                seekbarColor = Color(0xFF00BCD4)
             )
             "Altın" -> ThemeConfig(
                 name = "Altın",
@@ -55,7 +57,8 @@ object AppThemes {
                 categoryTabPill = true,
                 categoryTabBg = Color(0xFF231C10),
                 categoryTabSelectedStroke = Color(0xFFFFC107),
-                backgroundTint = Color(0xFF18150E)
+                backgroundTint = Color(0xFF18150E),
+                seekbarColor = Color(0xFFFFC107)
             )
             "Sinema" -> ThemeConfig(
                 name = "Sinema",
@@ -70,7 +73,8 @@ object AppThemes {
                 categoryTabPill = true,
                 categoryTabBg = Color(0xFF200E11),
                 categoryTabSelectedStroke = Color(0xFFE50914),
-                backgroundTint = Color(0xFF160D0F)
+                backgroundTint = Color(0xFF160D0F),
+                seekbarColor = Color(0xFFE50914)
             )
             else -> ThemeConfig( // "Klasik"
                 name = "Klasik",
@@ -85,7 +89,8 @@ object AppThemes {
                 categoryTabPill = false,
                 categoryTabBg = null,
                 categoryTabSelectedStroke = Color(0xFFFF6B00),
-                backgroundTint = Color.Black
+                backgroundTint = Color.Black,
+                seekbarColor = Color(0xFFE53935)
             )
         }
     }
