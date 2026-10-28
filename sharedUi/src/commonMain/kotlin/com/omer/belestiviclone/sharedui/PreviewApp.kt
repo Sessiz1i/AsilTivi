@@ -406,6 +406,24 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     .width((435.dp * factor).coerceAtMost(maxWidth - 32.dp))
             )
         }
+        var zapVisible by remember { mutableStateOf(false) }
+        LaunchedEffect(s.zapCardRevision) {
+            if (s.zapCardRevision > 0) {
+                zapVisible = true
+                kotlinx.coroutines.delay(ZapCardDurationMs)
+                zapVisible = false
+            }
+        }
+        LaunchedEffect(s.panel) { if (s.panel) zapVisible = false }
+        if (zapVisible && !s.panel && s.page == "live" && s.dialog == null && s.multi == null && !s.info && s.moving == null) {
+            val zapNow = remember(s.zapCardRevision, s.selected) { System.currentTimeMillis() }
+            val zapModel = remember(s.zapCardRevision, s.selected, s.epgRevision, s.technicalInfo) {
+                zapCardModel(s.channel, s.channelNumber, s.epgNowNext(s.channel, zapNow), s.technicalInfo, zapNow)
+            }
+            val zapWidth = if (maxWidth < 600.dp) maxWidth - 24.dp else (maxWidth * .5f).coerceAtMost(640.dp)
+            ZapCard(zapModel, theme, image, Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp)
+                .onGloballyPositioned { boundsObserver("zap-card", it.boundsInWindow()) }.width(zapWidth))
+        }
         if (s.moving != null) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 25.dp).background(Color(0xFF243F66), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp)); Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
         }
@@ -804,7 +822,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
             val delta = channelArrowDelta(vertical, e.key)
             if (isMoving && e.type == KeyEventType.KeyDown && e.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) { s.moveBy(if (e.key in listOf(Key.DirectionUp, Key.DirectionLeft)) -1 else 1); true }
             else if (!isMoving && delta != null && s.panel && s.dialog == null) {
-                if (e.type == KeyEventType.KeyDown && !keySignal(e).repeat && s.normalLiveControls) s.stepChannel(delta)
+                if (e.type == KeyEventType.KeyDown && !keySignal(e).repeat && s.normalLiveControls) s.stepChannel(delta, keepPanel = true)
                 true
             }
             else if (vertical && !isMoving && e.key == Key.DirectionLeft && e.type == KeyEventType.KeyDown) { s.categoryMenu = true; true } else false

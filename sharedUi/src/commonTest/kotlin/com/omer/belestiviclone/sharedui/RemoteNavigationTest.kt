@@ -18,7 +18,7 @@ class RemoteNavigationTest {
         s.stepChannel(1); assertEquals(ids[1], s.selected)
         s.stepChannel(1); assertEquals(ids[2], s.selected)
         s.stepChannel(-1); assertEquals(ids[1], s.selected)
-        assertTrue(s.panel); assertTrue(s.liveHeadingVisible)
+        assertFalse(s.panel); assertFalse(s.liveHeadingVisible); assertEquals(4, s.zapCardRevision)
         assertEquals(store.value, s.data); assertEquals(0, store.writes); assertEquals(0, s.retry)
     }
     @Test fun absentEmptyAndSingleCandidateNeverInventOrRestartAChannel() = runBlocking {

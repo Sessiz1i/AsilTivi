@@ -285,7 +285,14 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val next = LiveFormatOptions[(index + 1) % LiveFormatOptions.size]
         pref("format", next)
     }
-    fun stepChannel(delta: Int) {
+    /** Kanal değişim kartı (zapping/OSD) tetikleyicisi; her artış kartı 3 sn gösterir/süresini sıfırlar. */
+    var zapCardRevision by mutableStateOf(0); private set
+    fun showZapCard() { if (page == "live" && !isRadioMode && multi == null) zapCardRevision++ }
+    /**
+     * Kanal adımı. [keepPanel] true ise (panel içindeki liste ok tuşları) panel açık kalır ve kart çıkmaz;
+     * aksi halde (kumanda CH+/CH-, pencere düzeyi yön tuşları) panel kapanır ve kanal değişim kartı gösterilir.
+     */
+    fun stepChannel(delta: Int, keepPanel: Boolean = false) {
         if (!normalLiveControls || delta !in listOf(-1, 1)) return
         val candidates = if (isRadioMode) radioChannels else visibleData.filtered(category, query)
         if (candidates.isEmpty()) return
@@ -293,8 +300,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val next = if (current < 0) { if (delta > 0) 0 else candidates.lastIndex }
             else (current + delta + candidates.size) % candidates.size
         val id = candidates[next].id
-        if (page == "live") panel = true
-        if (id != selected) select(id)
+        if (id != selected) changeChannel(id, keepPanel)
     }
     fun text(tr: String, en: String) = if (data.pref("language") == "English") en else tr
     suspend fun load() {
@@ -386,14 +392,19 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val order = data.categories.toMutableList(); order.removeAt(from); order.add(to, category)
         commit(data.copy(categories = order))
     }
-    fun select(id: OpaqueId) {
+    /** Kullanıcı kanal seçimi (liste tıklaması vb.): canlı TV'de panel kapanır ve kanal değişim kartı gösterilir. */
+    fun select(id: OpaqueId) = changeChannel(id, keepPanel = false)
+    private fun changeChannel(id: OpaqueId, keepPanel: Boolean) {
         if (selected != id) {
             technicalInfo = StreamTechnicalInfo()
             channelSessionStartMs = System.currentTimeMillis()
         }
         selected = id
         paused = false
-        if (page == "live") panel = true
+        if (page == "live" && !isRadioMode && !keepPanel) {
+            panel = false
+            showZapCard()
+        }
         if (playbackUri(channel) == null) notice = if (channel?.available == false)
             message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")
             else if (isPublic) "Bu kaydın oynatma tanımı desteklenmiyor." else "Yayın bağlantısı bulunamadı."
@@ -639,8 +650,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
                 query = ""
                 dismiss()
                 page = "live"
-                panel = true
                 data.filtered(preset.groupTitle, "").firstOrNull()?.let { select(it.id) }
+                panel = true
                 notice = "${preset.flag} ${preset.name} kategorisi açıldı."
             }
         } else {
@@ -648,8 +659,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             query = ""
             dismiss()
             page = "live"
-            panel = true
             data.filtered(preset.groupTitle, "").firstOrNull()?.let { select(it.id) }
+            panel = true
             notice = "${preset.flag} ${preset.name} kategorisi açıldı."
         }
     }

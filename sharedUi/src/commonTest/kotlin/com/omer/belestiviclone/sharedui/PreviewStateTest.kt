@@ -204,18 +204,21 @@ class PreviewStateTest {
         yield()
         assertNull(s.sleepTimerRemainingSeconds)
     }
-    @Test fun channelChangeRevealsLivePanelWhenOnLivePage() = runBlocking {
+    @Test fun channelChangeShowsZapCardWithoutOpeningPanelOnLivePage() = runBlocking {
         val s = PreviewState(Store(), this)
         s.load()
         s.page = "live"
         s.panel = false
         val nextId = s.data.channels[1].id
+        val rev = s.zapCardRevision
         s.select(nextId)
-        assertTrue(s.panel)
+        assertFalse(s.panel)
+        assertEquals(rev + 1, s.zapCardRevision)
 
         s.panel = false
         s.stepChannel(1)
-        assertTrue(s.panel)
+        assertFalse(s.panel)
+        assertEquals(rev + 2, s.zapCardRevision)
     }
     @Test fun syncLiveResumesPlaybackAndIncrementsRevision() = runBlocking {
         val s = PreviewState(Store(), this)
