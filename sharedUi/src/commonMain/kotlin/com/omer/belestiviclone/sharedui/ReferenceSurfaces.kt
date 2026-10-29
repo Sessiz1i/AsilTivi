@@ -326,7 +326,7 @@ internal fun MultiChannelPicker(s: PreviewState, image: @Composable (String, Mod
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                image("kategori_ara", Modifier.size(14.dp))
+                TopBarActionIcon("kategori_ara", color = Color(0xFF94A2B7), modifier = Modifier.size(14.dp))
                 androidx.compose.foundation.text.BasicTextField(
                     value = s.multiPickerQuery,
                     onValueChange = { s.multiPickerQuery = it },

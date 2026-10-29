@@ -354,12 +354,13 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             nextSubtitle = headingNext, titleColor = theme.headingTitleColor, includeLogo = false, backdrop = true, leadingChannelLogo = true, onBounds = { part, rect -> boundsObserver("heading:$part", rect) })
         if (s.panel) {
             Row(Modifier.align(Alignment.TopEnd).padding(top = 21.dp, end = 18.dp).onGloballyPositioned { boundsObserver("top-actions", it.boundsInWindow()) }.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconAction("Radyo", "ikon_audio", image, click = s::enterRadioMode)
-                IconAction("Çoklu Ekran", "ikon_coklu", image) { s.dialog = "warning" }
-                IconAction("Görüntü", "ikon_format", image, click = s::openFormatMenu)
-                IconAction("Bilgi", "ikon_saat", image, click = s::toggleInfo)
-                IconAction("Ayarlar", "ikon_ayar", image, click = s::settings)
-                IconAction("Çıkış", "ikon_cikis", image) { s.dialog = "exit" }
+                val isMono = theme.categoryTabPill
+                IconAction("Radyo", "ikon_audio", image, isMonochrome = isMono, click = s::enterRadioMode)
+                IconAction("Çoklu Ekran", "ikon_coklu", image, isMonochrome = isMono) { s.dialog = "warning" }
+                IconAction("Görüntü", "ikon_format", image, isMonochrome = isMono, click = s::openFormatMenu)
+                IconAction("Bilgi", "ikon_saat", image, isMonochrome = isMono, click = s::toggleInfo)
+                IconAction("Ayarlar", "ikon_ayar", image, isMonochrome = isMono, click = s::settings)
+                IconAction("Çıkış", "ikon_cikis", image, isMonochrome = isMono) { s.dialog = "exit" }
             }
             if (vertical) {
                 val panelWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
@@ -387,7 +388,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                         else -> CategoryNormalizer.normalizeDisplayLabel(s.category)
                     }
                     Action(currentCategoryLabel, Modifier.weight(1f), tint = Color(0xB3000000), radius = 0.dp, focusKey = "live:category") { s.categoryMenu = !s.categoryMenu }
-                    IconAction("Ara", "kategori_ara", image) { s.searching = true }
+                    IconAction("Ara", "kategori_ara", image, isMonochrome = theme.categoryTabPill) { s.searching = true }
                 }
                 if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
@@ -453,7 +454,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     tint = if (liveBtnHighlight) Color(0x3DFFC107) else Color(0x2EFFFFFF),
                     stroke = if (liveBtnHighlight) Color(0x99FFC107) else Color(0x3DFFFFFF),
                     iconContent = {
-                        if (!liveBtnHighlight) {
+                        if (liveBtnHighlight) {
+                            PlayerPlayPauseIcon(isPaused = true, color = Color(0xFFFFD54F), modifier = Modifier.size(9.dp))
+                        } else {
                             Box(Modifier.size(7.dp).background(Color(0xFFE53935), CircleShape))
                         }
                     },
@@ -463,7 +466,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 val isMuted = s.muted
                 PlayerActionButton(
                     label = if (isMuted) "Sessiz" else "Ses Açık",
-                    iconContent = { BasicText(if (isMuted) "🔇" else "🔊", style = TextStyle(fontSize = 11.sp)) },
+                    iconContent = {
+                        PlayerAudioIcon(isMuted = isMuted, color = Color.White, modifier = Modifier.size(12.dp))
+                    },
                     click = { s.muted = !s.muted }
                 )
 
@@ -473,9 +478,10 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     tint = if (isPaused) Color(0x3D2E7D32) else Color(0x2EFFFFFF),
                     stroke = if (isPaused) Color(0x994CAF50) else Color(0x3DFFFFFF),
                     iconContent = {
-                        BasicText(
-                            if (isPaused) "▶" else "⏸",
-                            style = TextStyle(fontSize = 10.sp, color = if (isPaused) Color(0xFF66BB6A) else Color.White)
+                        PlayerPlayPauseIcon(
+                            isPaused = isPaused,
+                            color = if (isPaused) Color(0xFF66BB6A) else Color.White,
+                            modifier = Modifier.size(11.dp)
                         )
                     },
                     click = { s.togglePause() }
@@ -670,8 +676,34 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
     }
 }
 
-@Composable private fun IconAction(label: String, icon: String, image: @Composable (String, Modifier) -> Unit, width: Dp? = null, visibleLabel: String = label, click: () -> Unit) {
-    Action(label, Modifier.height(29.dp).then(if (width != null) Modifier.width(width) else Modifier), tint = Color(0xB8000000), radius = 11.dp, stroke = Color(0xFF344454), content = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { image(icon, Modifier.size(13.dp, 14.dp)); Label(visibleLabel, 11, bold = true) } }, click = click)
+@Composable private fun IconAction(
+    label: String,
+    icon: String,
+    image: @Composable (String, Modifier) -> Unit,
+    width: Dp? = null,
+    visibleLabel: String = label,
+    isMonochrome: Boolean = false,
+    iconColor: Color = Color.White,
+    click: () -> Unit
+) {
+    Action(
+        label,
+        Modifier.height(29.dp).then(if (width != null) Modifier.width(width) else Modifier),
+        tint = Color(0xB8000000),
+        radius = 11.dp,
+        stroke = Color(0xFF344454),
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (isMonochrome) {
+                    TopBarActionIcon(icon, color = iconColor, modifier = Modifier.size(13.dp, 14.dp))
+                } else {
+                    image(icon, Modifier.size(13.dp, 14.dp))
+                }
+                Label(visibleLabel, 11, bold = true)
+            }
+        },
+        click = click
+    )
 }
 private fun handleChooseCategory(s: PreviewState, cat: String, focusFirstCard: Boolean = false) {
     val targetCategory = when {
@@ -1568,26 +1600,27 @@ private fun SettingsTabIcon(
                         when (s.section) {
                             0 -> {
                                 SettingsGroup("LİSTEM")
-                                SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
-                                SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "ikon_list", image) { s.sourceForm("supplement") }
-                                SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "ikon_canli", image) { s.refreshSource() }
-                                SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "ikon_tv", image) { s.dialog = "defaultSource" }
+                                SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "activesources", image, s.profileName, iconKey = "activesources") { s.sourceForm("activeSources") }
+                                SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "supplement", image, iconKey = "supplement") { s.sourceForm("supplement") }
+                                SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "refresh", image, iconKey = "refresh") { s.refreshSource() }
+                                SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "defaultsource", image, iconKey = "defaultsource") { s.dialog = "defaultSource" }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
-                                SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
-                                SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
-                                SettingTile("Stalker / MAC", "Portal adresi ve kayıtlı MAC ile bağlan", "ikon_sunucu", image) { s.sourceForm("stalker") }
-                                SettingTile("Dosyadan Yükle", "M3U dosyası seç", "ikon_dosya", image) { s.dialog = "file" }
+                                SettingTile("M3U URL", "Özel liste adresi ile bağlan", "m3u", image, iconKey = "m3u") { s.sourceForm("m3u") }
+                                SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "xtream", image, iconKey = "xtream") { s.sourceForm("xtream") }
+                                SettingTile("Stalker / MAC", "Portal adresi ve kayıtlı MAC ile bağlan", "stalker", image, iconKey = "stalker") { s.sourceForm("stalker") }
+                                SettingTile("Dosyadan Yükle", "M3U dosyası seç", "file", image, iconKey = "file") { s.dialog = "file" }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("ÜLKE LİSTELERİ")
-                                SettingTile("Ülke Listeleri", s.countryListsSubtitle, "kategori_dunya", image) { s.sourceForm("countries") }
+                                SettingTile("Ülke Listeleri", s.countryListsSubtitle, "countries", image, iconKey = "countries") { s.sourceForm("countries") }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("EPG (PROGRAM REHBERİ)")
                                 SettingTile(
                                     "XMLTV EPG URL",
                                     s.data.pref("epgUrl").ifBlank { "Yerleşik örnek EPG (epg_sample.xml) aktif" },
-                                    "ikon_saat",
-                                    image
+                                    "epg",
+                                    image,
+                                    iconKey = "epg"
                                 ) { s.sourceForm("epg") }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL DÜZENİ")
-                                SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "ikon_category", image) { s.dialog = "categories" }
+                                SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "categories", image, iconKey = "categories") { s.dialog = "categories" }
                             }
                             1 -> {
                                 SettingsGroup("UYGULAMA TEMASI"); SettingCard(s, "theme", image)
@@ -1611,20 +1644,20 @@ private fun SettingsTabIcon(
                                 SettingsGroup("DİL")
                                 SettingCard(s, "language", image)
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("BAŞLATMA & DAVRANIŞ")
-                                SettingTile("Favorilerden Başlat", "Açılışta doğrudan favori kanallardan birini aç", "kategori_favoriler", image, s.data.pref("startupFavorites"), true) { s.pref("startupFavorites", if (s.data.pref("startupFavorites") == "Açık") "Kapalı" else "Açık") }
-                                SettingTile("Açılışta Son İzlenen Kanala Git", "Uygulama açılış tercihi", "ikon_startup", image, s.data.pref("startup"), true) { s.pref("startup", if (s.data.pref("startup") == "Açık") "Kapalı" else "Açık") }
-                                SettingTile("Arka Planda Sesi Sürdür", "Uygulama arka plandayken ses çalmaya devam eder", "ikon_ses", image, s.data.pref("backgroundAudio"), true) { s.pref("backgroundAudio", if (s.data.pref("backgroundAudio") == "Açık") "Kapalı" else "Açık") }
-                                SettingTile("Resim İçinde Resim (PiP)", "Home veya arka plana geçişte otomatik PiP", "ikon_coklu", image, s.data.pref("autoPip"), true) { s.pref("autoPip", if (s.data.pref("autoPip") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Favorilerden Başlat", "Açılışta doğrudan favori kanallardan birini aç", "startupfavorites", image, s.data.pref("startupFavorites"), toggle = true, iconKey = "startupfavorites") { s.pref("startupFavorites", if (s.data.pref("startupFavorites") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Açılışta Son İzlenen Kanala Git", "Uygulama açılış tercihi", "startup", image, s.data.pref("startup"), toggle = true, iconKey = "startup") { s.pref("startup", if (s.data.pref("startup") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Arka Planda Sesi Sürdür", "Uygulama arka plandayken ses çalmaya devam eder", "backgroundaudio", image, s.data.pref("backgroundAudio"), toggle = true, iconKey = "backgroundaudio") { s.pref("backgroundAudio", if (s.data.pref("backgroundAudio") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Resim İçinde Resim (PiP)", "Home veya arka plana geçişte otomatik PiP", "autopip", image, s.data.pref("autoPip"), toggle = true, iconKey = "autopip") { s.pref("autoPip", if (s.data.pref("autoPip") == "Açık") "Kapalı" else "Açık") }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("GEÇMİŞ")
-                                SettingTile("İzleme Geçmişi", "Son izlenen kanalları göster", "kategori_gecmis", image, s.data.pref("history"), true) { s.pref("history", if (s.data.pref("history") == "Açık") "Kapalı" else "Açık") }
-                                SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "ikon_cop", image, danger = true) { s.dialog = "clear" }
+                                SettingTile("İzleme Geçmişi", "Son izlenen kanalları göster", "history", image, s.data.pref("history"), toggle = true, iconKey = "history") { s.pref("history", if (s.data.pref("history") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "clear", image, danger = true, iconKey = "clear") { s.dialog = "clear" }
                             }
                             4 -> {
                                 SettingsGroup("TELEFONDAN AKTAR")
-                                SettingTile("Telefondan Aktar", "Yerel ağ üzerinden M3U / Xtream / Stalker gönder", "ikon_export", image) { s.openWebTransfer() }
+                                SettingTile("Telefondan Aktar", "Yerel ağ üzerinden M3U / Xtream / Stalker gönder", "webtransfer", image, iconKey = "webtransfer") { s.openWebTransfer() }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("FAVORİLER")
-                                SettingTile("Favorileri Dışa Aktar", "Favori listesini yedekle", "ikon_export", image) { s.dialog = "export" }
-                                SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "ikon_import", image) { s.dialog = "import" }
+                                SettingTile("Favorileri Dışa Aktar", "Favori listesini yedekle", "export", image, iconKey = "export") { s.dialog = "export" }
+                                SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "import", image, iconKey = "import") { s.dialog = "import" }
                             }
                             5 -> {
                                 SettingsGroup("BELEŞ TİVİ +")
@@ -1661,14 +1694,14 @@ private fun SettingsTabIcon(
                             }
                             6 -> {
                                 SettingsGroup("UYGULAMA")
-                                SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
+                                SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "about", image, iconKey = "about") { }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("AĞ VE YAYIN KONTROLÜ")
-                                SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "ikon_canli", image) { s.openNetworkDiagnostics() }
+                                SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "network", image, iconKey = "network") { s.openNetworkDiagnostics() }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK & İLETİŞİM")
-                                SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
-                                SettingTile("Telegram Kanalı", "Topluluk ve duyurular", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
+                                SettingTile("Destek", "Yardım ve iletişim", "support", image, iconKey = "support") { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
+                                SettingTile("Telegram Kanalı", "Topluluk ve duyurular", "telegram", image, iconKey = "telegram") { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("DİĞER İŞLEMLER")
-                                SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "ikon_cache", image) { s.dialog = "cache" }
+                                SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "cache", image, iconKey = "cache") { s.dialog = "cache" }
                             }
                         }
                     }
@@ -1687,7 +1720,7 @@ private fun SettingsTabIcon(
                             Label("Kanal Sayısı: ${s.activeCount}", 10, Color(0xFF94A2B7), bold = true)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Label("🕒", 10, Color(0xFF8A99AD))
+                            TopBarActionIcon("ikon_saat", color = Color(0xFF8A99AD), modifier = Modifier.size(11.dp))
                             Label(if (s.busy) "İşlem sürüyor…" else "Son Güncelleme: Güncel", 10, Color(0xFF8A99AD))
                         }
                     }
@@ -1696,7 +1729,18 @@ private fun SettingsTabIcon(
         }
     }
 }
-@Composable private fun SettingTile(title: String, subtitle: String, icon: String, image: @Composable (String, Modifier) -> Unit, value: String = "", toggle: Boolean = false, danger: Boolean = false, visibleTitle: String = title, click: () -> Unit) {
+@Composable private fun SettingTile(
+    title: String,
+    subtitle: String,
+    icon: String,
+    image: @Composable (String, Modifier) -> Unit,
+    value: String = "",
+    toggle: Boolean = false,
+    danger: Boolean = false,
+    visibleTitle: String = title,
+    iconKey: String = "",
+    click: () -> Unit
+) {
     val themeFocusStroke = LocalSettingsFocusStroke.current ?: amber
     val themeAccent = LocalSettingsThemeAccent.current ?: amber
     val cardBg = remember(themeFocusStroke) {
@@ -1707,9 +1751,14 @@ private fun SettingsTabIcon(
             else -> Color(0xFF13233D)
         }
     }
+    val effectiveKey = if (iconKey.isNotBlank()) iconKey else icon
     Action(title, Modifier.fillMaxWidth().height(58.dp), radius = 10.dp, strokeWidth = 0.dp, tint = cardBg, focusKey = "settings:$title", padding = PaddingValues(horizontal = 20.dp), content = {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            image(icon, Modifier.size(21.dp, 23.dp))
+            SettingsRowIcon(
+                key = effectiveKey,
+                color = if (danger) Color(0xFFF44747) else themeAccent,
+                modifier = Modifier.size(20.dp)
+            )
             Column(Modifier.weight(1f)) { Label(visibleTitle, 12, if (danger) Color(0xFFF44747) else Color.White, bold = true, lineHeight = 18f, maxLines = 1); if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF69798F), lineHeight = 16f, maxLines = 1) }
             if (toggle) Box(Modifier.defaultMinSize(minWidth = 55.dp).height(28.dp).background(if (value == "Açık") Color(0xFF0ABB91) else Color(0xFF68798F), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Label("• $value", 10, bold = true) }
             else { if (value.isNotEmpty()) Label(value, 10, themeAccent, bold = true); Label("→", 13, Color(0xFF60728E)) }
@@ -1782,7 +1831,7 @@ private fun SettingPlusCard(
 }
 @Composable private fun SettingCard(s: PreviewState, key: String, image: @Composable (String, Modifier) -> Unit) {
     if (key == "opacity") OpacityControl(s, image)
-    else SettingTile(titles.getValue(key), "", settingIcons.getValue(key), image, s.data.pref(key), visibleTitle = when (key) { "position" -> "Konum"; "size" -> "Boyut"; "subtitleSize" -> "Boyut"; "subtitleColor" -> "Renk"; "subtitleBgOpacity" -> "Arka Plan Opaklığı"; "sleepTimer" -> "Süre"; else -> titles.getValue(key) }) { s.dialog = key }
+    else SettingTile(titles.getValue(key), "", key, image, s.data.pref(key), iconKey = key, visibleTitle = when (key) { "position" -> "Konum"; "size" -> "Boyut"; "subtitleSize" -> "Boyut"; "subtitleColor" -> "Renk"; "subtitleBgOpacity" -> "Arka Plan Opaklığı"; "sleepTimer" -> "Süre"; else -> titles.getValue(key) }) { s.dialog = key }
 }
 
 @Composable

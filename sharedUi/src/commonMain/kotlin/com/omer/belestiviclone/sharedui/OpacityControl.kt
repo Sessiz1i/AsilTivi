@@ -24,7 +24,9 @@ internal fun OpacityControl(s: PreviewState, image: @Composable (String, Modifie
     val value = s.opacityValue
     Column(Modifier.fillMaxWidth().height(68.dp).background(theme.settingsCardBg, RoundedCornerShape(10.dp)).padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            image("ikon_opacity", Modifier.size(21.dp, 23.dp)); Label("Şeffaflık", 12, modifier = Modifier.weight(1f), bold = true); Label("%$value", 10, theme.settingsAccent, bold = true)
+            SettingsRowIcon("opacity", color = theme.settingsAccent, modifier = Modifier.size(20.dp))
+            Label("Şeffaflık", 12, modifier = Modifier.weight(1f), bold = true)
+            Label("%$value", 10, theme.settingsAccent, bold = true)
         }
         BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(29.dp)) {
             val requester = remember { FocusRequester() }

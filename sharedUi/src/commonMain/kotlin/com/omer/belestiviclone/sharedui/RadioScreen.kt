@@ -79,6 +79,7 @@ fun RadioScreen(
         return
     }
 
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     val boundsObserver = LocalBoundsObserver.current
     var nowEpochMs by remember { mutableStateOf(System.currentTimeMillis()) }
 
@@ -236,7 +237,8 @@ fun RadioScreen(
                     focusKey = "radio:action:dim",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Label("☾ Ekranı karart", 11, bold = true)
+                            TopBarActionIcon("dim", color = Color.White, modifier = Modifier.size(13.dp, 14.dp))
+                            Label("Ekranı karart", 11, bold = true)
                         }
                     },
                     click = s::dimRadioScreen
@@ -249,7 +251,11 @@ fun RadioScreen(
                     focusKey = "radio:action:tv",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            image("ikon_tv", Modifier.size(13.dp, 14.dp))
+                            if (theme.categoryTabPill) {
+                                TopBarActionIcon("ikon_tv", color = Color.White, modifier = Modifier.size(13.dp, 14.dp))
+                            } else {
+                                image("ikon_tv", Modifier.size(13.dp, 14.dp))
+                            }
                             Label("TV Modu", 11, bold = true)
                         }
                     },
@@ -263,7 +269,11 @@ fun RadioScreen(
                     focusKey = "radio:action:settings",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            image("ikon_ayar", Modifier.size(13.dp, 14.dp))
+                            if (theme.categoryTabPill) {
+                                TopBarActionIcon("ikon_ayar", color = Color.White, modifier = Modifier.size(13.dp, 14.dp))
+                            } else {
+                                image("ikon_ayar", Modifier.size(13.dp, 14.dp))
+                            }
                             Label("Ayarlar", 11, bold = true)
                         }
                     },
@@ -277,7 +287,11 @@ fun RadioScreen(
                     focusKey = "radio:action:exit",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            image("ikon_cikis", Modifier.size(13.dp, 14.dp))
+                            if (theme.categoryTabPill) {
+                                TopBarActionIcon("ikon_cikis", color = Color.White, modifier = Modifier.size(13.dp, 14.dp))
+                            } else {
+                                image("ikon_cikis", Modifier.size(13.dp, 14.dp))
+                            }
                             Label("Çıkış", 11, bold = true)
                         }
                     },
@@ -382,7 +396,7 @@ fun RadioScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        image("ikon_audio", Modifier.size(16.dp))
+                        TopBarActionIcon("ikon_audio", color = Color(0xFFFFD600), modifier = Modifier.size(16.dp))
                         Label("RADYO İSTASYONLARI (${s.radioChannels.size})", 12, Color(0xFFFFD600), bold = true)
                     }
 
@@ -395,7 +409,7 @@ fun RadioScreen(
                             stroke = Color(0xFF344454),
                             content = {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    image(if (s.paused) "ikon_canli" else "ikon_duraklat", Modifier.size(12.dp))
+                                    PlayerPlayPauseIcon(isPaused = s.paused, color = Color.White, modifier = Modifier.size(11.dp))
                                     Label(if (s.paused) "Oynat" else "Duraklat", 10, bold = true)
                                 }
                             }
@@ -408,7 +422,7 @@ fun RadioScreen(
                             stroke = Color(0xFF344454),
                             content = {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    image("ikon_ses", Modifier.size(12.dp))
+                                    PlayerAudioIcon(isMuted = s.muted, color = Color.White, modifier = Modifier.size(12.dp))
                                     Label(if (s.muted) "Sesi Aç" else "Sessiz", 10, bold = true)
                                 }
                             }
@@ -421,7 +435,7 @@ fun RadioScreen(
                             stroke = Color(0xFF344454),
                             content = {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    image("ikon_canli", Modifier.size(12.dp))
+                                    PlayerRetryIcon(color = Color.White, modifier = Modifier.size(11.dp))
                                     Label("Yenile", 10, bold = true)
                                 }
                             }

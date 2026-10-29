@@ -1,4 +1,4 @@
-﻿package com.omer.belestiviclone.sharedui
+package com.omer.belestiviclone.sharedui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,7 +57,7 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
                 padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                 content = {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        image("ikon_export", Modifier.size(24.dp))
+                        SettingsRowIcon("webtransfer", color = Color(0xFFE67E22), modifier = Modifier.size(22.dp))
                         Column(Modifier.weight(1f)) {
                             Label("Telefondan Aktar", 12, Color.White, bold = true)
                             Label("Uzun adresleri kumandayla yazmak yerine telefon kamerasıyla QR okutarak gönder", 9, Color(0xFF94A2B7))
@@ -282,7 +282,7 @@ private fun ActiveAndSavedSourcesSection(s: PreviewState, image: @Composable (St
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            image("ikon_tv", Modifier.size(22.dp))
+            SettingsRowIcon("activesources", color = Color(0xFFE67E22), modifier = Modifier.size(22.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Label(s.profileName, 12, Color.White, bold = true, maxLines = 1)
@@ -336,7 +336,7 @@ private fun ActiveAndSavedSourcesSection(s: PreviewState, image: @Composable (St
         }
         Action(name, Modifier.fillMaxWidth().height(60.dp), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 16.dp), content = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                image(iconName, Modifier.size(21.dp, 23.dp))
+                SettingsRowIcon(iconName, color = if (isActive) Color(0xFF0ABB91) else Color(0xFF94A2B7), modifier = Modifier.size(20.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Label(name, 12, bold = true, maxLines = 1)
