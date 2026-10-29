@@ -1,4 +1,4 @@
-package com.omer.belestiviclone.shared.preview
+﻿package com.omer.belestiviclone.shared.preview
 
 import com.omer.belestiviclone.shared.catalog.*
 
@@ -19,7 +19,7 @@ data class SavedSource(
 
     fun maskedAddress(): String = when (kind) {
         SourceKind.FILE -> "Uygulamaya alınmış dosya kopyası"
-        SourceKind.DEFAULT -> "Yerleşik Türkiye Kanal Listesi (trlist.m3u)"
+        SourceKind.DEFAULT -> "Yerleşik Türkiye Kanal Listesi (TiviListe.m3u)"
         SourceKind.COUNTRY -> "Ülke Paketi · ${address.substringAfterLast('/')}"
         else -> address
             .replace(Regex("//[^/@]*@"), "//***@")
@@ -282,3 +282,4 @@ object LibraryCodec {
         return base.copy(sources = PreviewCodec.unpack(f[1]), channels = channels(f[7]), library = SourceLibrary(records, active, CatalogSnapshot(sources, ch, member, cat)))
     }
 }
+

@@ -1,4 +1,4 @@
-package com.omer.belestiviclone.sharedui
+﻿package com.omer.belestiviclone.sharedui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -290,7 +290,7 @@ private fun ActiveAndSavedSourcesSection(s: PreviewState, image: @Composable (St
                         Label(s.activeSourceKindBadge, 8, Color.White, bold = true)
                     }
                 }
-                val mainAddr = s.data.library?.main?.maskedAddress() ?: "Yerleşik Türkiye Kanal Listesi (trlist.m3u)"
+                val mainAddr = s.data.library?.main?.maskedAddress() ?: "Yerleşik Türkiye Kanal Listesi (TiviListe.m3u)"
                 Label("$mainAddr · ${s.activeCount} aktif içerik", 9, Color(0xFF94A2B7), maxLines = 1)
             }
         }
@@ -351,3 +351,4 @@ private fun ActiveAndSavedSourcesSection(s: PreviewState, image: @Composable (St
         }) { s.editing = i; s.dialog = "sourceMenu" }
     }
 }
+

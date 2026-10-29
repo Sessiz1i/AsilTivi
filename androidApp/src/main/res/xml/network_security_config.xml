@@ -3,29 +3,21 @@
     <base-config cleartextTrafficPermitted="false" />
     <!-- Exact public-list HTTP hosts plus the observed Star redirect; no trust overrides. -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">104.238.23.221</domain>
-        <domain includeSubdomains="false">161.118.166.5</domain>
-        <domain includeSubdomains="false">208.79.153.167</domain>
-        <domain includeSubdomains="false">37.247.98.7</domain>
-        <domain includeSubdomains="false">46.20.3.201</domain>
-        <domain includeSubdomains="false">46.20.3.220</domain>
-        <domain includeSubdomains="false">46.20.3.230</domain>
-        <domain includeSubdomains="false">46.20.7.125</domain>
-        <domain includeSubdomains="false">87.121.104.29</domain>
+        <domain includeSubdomains="false">1.rtmp.org</domain>
+        <domain includeSubdomains="false">139.162.182.79</domain>
+        <domain includeSubdomains="false">145.239.37.125</domain>
+        <domain includeSubdomains="false">176.65.153.12</domain>
+        <domain includeSubdomains="false">canli.tvden.com.tr</domain>
+        <domain includeSubdomains="false">cdn-ktvtv.yayin.com.tr</domain>
         <domain includeSubdomains="false">dogusdyg-star.lg.mncdn.com</domain>
         <domain includeSubdomains="false">dygvideo.dygdigital.com</domain>
-        <domain includeSubdomains="false">icecast.netmedya.net</domain>
-        <domain includeSubdomains="false">live.cdn-vizi.workers.dev</domain>
-        <domain includeSubdomains="false">live.yt-hls.workers.dev</domain>
-        <domain includeSubdomains="false">live4.radyotvonline.com</domain>
+        <domain includeSubdomains="false">ensonhaber-live.ercdn.net</domain>
+        <domain includeSubdomains="false">ip252.ozelip.com</domain>
+        <domain includeSubdomains="false">live.euromediacenter.com</domain>
         <domain includeSubdomains="false">m.live.net.sa</domain>
-        <domain includeSubdomains="false">ntvrdwmp.radyotvonline.com</domain>
-        <domain includeSubdomains="false">radyopause.ozelip.com.tr</domain>
-        <domain includeSubdomains="false">radyotrio.radyotvonline.net</domain>
-        <domain includeSubdomains="false">schwarzer-1903.com</domain>
-        <domain includeSubdomains="false">shoutcast.radyogrup.com</domain>
-        <domain includeSubdomains="false">stream.radyoodtu.com.tr</domain>
-        <domain includeSubdomains="false">turkmedya.radyotvonline.com</domain>
-        <domain includeSubdomains="false">tv.smartglwiz.workers.dev</domain>
+        <domain includeSubdomains="false">mmn.mypsx.net</domain>
+        <domain includeSubdomains="false">nrttn172.kesintisizyayin.com</domain>
+        <domain includeSubdomains="false">old.kuzeykibris.tv</domain>
+        <domain includeSubdomains="false">rmtftbjlne.turknet.ercdn.net</domain>
     </domain-config>
 </network-security-config>

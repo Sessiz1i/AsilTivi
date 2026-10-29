@@ -1,4 +1,4 @@
-package com.omer.belestiviclone.shared.preview
+﻿package com.omer.belestiviclone.shared.preview
 
 import com.omer.belestiviclone.shared.catalog.*
 
@@ -6,7 +6,7 @@ data class M3uResult(val rawRecords: Int, val rows: List<ChannelContribution>, v
 
 /** One bounded public source. Credentials and complete playback definitions never enter logs. */
 object PublicM3u {
-    const val url = "https://raw.githubusercontent.com/impresents/my-iptv-list/refs/heads/main/trlist.m3u"
+    const val url = "https://raw.githubusercontent.com/impresents/my-iptv-list/refs/heads/main/TiviListe.m3u"
     val source = SourceId(OpaqueId(0x411535243, 1))
     val profile = OpaqueId(0x411505246, 1)
     fun extractEpgUrl(text: String): String? {
@@ -69,3 +69,4 @@ object PublicM3u {
         }
     }
 }
+

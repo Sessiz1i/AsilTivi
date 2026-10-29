@@ -1,4 +1,4 @@
-package com.omer.belestiviclone.shared.preview
+﻿package com.omer.belestiviclone.shared.preview
 
 import android.content.Context
 import java.net.HttpURLConnection
@@ -7,7 +7,7 @@ import kotlinx.coroutines.*
 
 class AndroidSourceLoader(private val context: Context) : SourceLoader {
     override suspend fun defaultText(): String = withContext(Dispatchers.IO) {
-        context.assets.open("trlist.m3u").use { it.boundedText(4 * 1024 * 1024) }
+        context.assets.open("TiviListe.m3u").use { it.boundedText(4 * 1024 * 1024) }
     }
     override suspend fun fetch(address: String): String = fetch(address, emptyMap())
     override suspend fun fetch(address: String, headers: Map<String, String>): String = withContext(Dispatchers.IO) {
@@ -50,3 +50,4 @@ fun java.io.InputStream.boundedText(limit: Int): String {
     val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
     return decoder.decode(java.nio.ByteBuffer.wrap(output.toByteArray())).toString()
 }
+

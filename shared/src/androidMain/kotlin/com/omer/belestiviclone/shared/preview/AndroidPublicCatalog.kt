@@ -1,4 +1,4 @@
-package com.omer.belestiviclone.shared.preview
+﻿package com.omer.belestiviclone.shared.preview
 
 import android.content.Context
 import android.util.AtomicFile
@@ -10,11 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Opaque random IDs allocated once, stored atomically with the last successful catalog. No migration. */
-class AndroidPublicCatalog(private val context: Context, private val cacheName: String = "public-trlist-catalog-v1") {
+class AndroidPublicCatalog(private val context: Context, private val cacheName: String = "public-tiviliste-catalog-v1") {
     suspend fun load(): List<PreviewChannel> = withContext(Dispatchers.IO) {
         val file = AtomicFile(File(context.filesDir, cacheName))
         if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()) return@withContext decode(file.readFully().toString(Charsets.UTF_8)).also { logBinding("cache", it) }
-        val text = context.assets.open("trlist.m3u").bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val text = context.assets.open("TiviListe.m3u").bufferedReader(Charsets.UTF_8).use { it.readText() }
         val parsed = PublicM3u.parse(text) { raw -> runCatching { URI(PublicM3u.url).resolve(raw).toASCIIString() }.getOrNull() }
         require(parsed.rows.isNotEmpty()) { "Empty public catalog" }
         fun opaque() = UUID.randomUUID().let { OpaqueId(it.mostSignificantBits, it.leastSignificantBits) }
@@ -48,3 +48,4 @@ class AndroidPublicCatalog(private val context: Context, private val cacheName: 
             headers.chunked(2).map { Header(it[0], it[1]) }, unknownRequiredDirectives = PreviewCodec.unpack(fields[7])), groups = groups, providerId = fields[4], tvgName = fields.getOrElse(8) { "" }, isRadio = isRadio)
     }
 }
+

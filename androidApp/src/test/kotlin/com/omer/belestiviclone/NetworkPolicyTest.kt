@@ -1,4 +1,4 @@
-package com.omer.belestiviclone
+﻿package com.omer.belestiviclone
 
 import java.io.File
 import java.net.URI
@@ -16,7 +16,7 @@ class NetworkPolicyTest {
             assertEquals("false", element.getAttribute("includeSubdomains"))
             element.textContent
         }.toSet()
-        val catalogue = File("src/main/assets/trlist.m3u").readLines().filter { it.trim().startsWith("http://") }
+        val catalogue = File("src/main/assets/TiviListe.m3u").readLines().filter { it.trim().startsWith("http://") }
             .map { URI(it.trim()).host }.toSet()
         assertEquals(catalogue + "dogusdyg-star.lg.mncdn.com", allowed)
         assertEquals(0, doc.getElementsByTagName("trust-anchors").length)
@@ -24,3 +24,4 @@ class NetworkPolicyTest {
         assertTrue(File("src/main/AndroidManifest.xml").readText().contains("android:networkSecurityConfig=\"@xml/network_security_config\""))
     }
 }
+

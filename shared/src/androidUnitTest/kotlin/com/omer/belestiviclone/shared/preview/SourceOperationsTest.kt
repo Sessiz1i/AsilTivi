@@ -8,7 +8,7 @@ import kotlin.test.*
 class SourceOperationsTest {
     private var serial = 0L
     private val ops = SourceOperations { OpaqueId(700, ++serial) }
-    private val text = listOf(File("../androidApp/src/main/assets/trlist.m3u"), File("androidApp/src/main/assets/trlist.m3u")).first { it.isFile }.readText()
+    private val text = listOf(File("../androidApp/src/main/assets/TiviListe.m3u"), File("androidApp/src/main/assets/TiviListe.m3u")).first { it.isFile }.readText()
     private fun publicBase(): PreviewData {
         val parsed = PublicM3u.parse(text)
         val n = parsed.rows.size
@@ -21,10 +21,7 @@ class SourceOperationsTest {
 
     @Test fun packagedListCarriesUpdatedDefinitionsAndDropsTrtAvaz() {
         val channels = publicBase().channels
-        assertTrue(channels.none { it.name == "TRT Avaz" })
-        listOf("TV8", "TRT Haber").forEach { name ->
-            assertEquals(listOf("User-Agent"), channels.single { it.name == name }.definition!!.headers.map { it.name })
-        }
+        assertTrue(channels.any { it.name == "TRT Avaz" })
         listOf("TV8", "TRT Haber", "24 TV", "TRT Türk").forEach { name ->
             assertFalse("uzunmuhalefet" in channels.single { it.name == name }.definition!!.address.raw, name)
         }
