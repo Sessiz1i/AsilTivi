@@ -40,7 +40,11 @@ class AndroidPublicCatalog(private val context: Context, private val cacheName: 
         val fields = PreviewCodec.unpack(value); require(fields.size in 8..9)
         val groups = PreviewCodec.unpack(fields[3]); require(groups.isNotEmpty())
         val headers = PreviewCodec.unpack(fields[6]); require(headers.size % 2 == 0)
-        PreviewChannel(PreviewCodec.id(fields[0]), fields[1], groups.first(), fields[2], definition = PlaybackDefinition(Address.fromForm(fields[5]),
-            headers.chunked(2).map { Header(it[0], it[1]) }, unknownRequiredDirectives = PreviewCodec.unpack(fields[7])), groups = groups, providerId = fields[4], tvgName = fields.getOrElse(8) { "" })
+        val chName = fields[1]
+        val isRadio = groups.any { it.equals("Radyo", ignoreCase = true) } ||
+            chName.contains("Radyo", ignoreCase = true) ||
+            chName.contains(" FM", ignoreCase = true)
+        PreviewChannel(PreviewCodec.id(fields[0]), chName, groups.first(), fields[2], definition = PlaybackDefinition(Address.fromForm(fields[5]),
+            headers.chunked(2).map { Header(it[0], it[1]) }, unknownRequiredDirectives = PreviewCodec.unpack(fields[7])), groups = groups, providerId = fields[4], tvgName = fields.getOrElse(8) { "" }, isRadio = isRadio)
     }
 }

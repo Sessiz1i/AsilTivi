@@ -151,6 +151,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
 
     fun inputChannelDigit(digit: Int, autoCommitAfterDelay: Boolean = true) {
+        if (isRadioMode && radioScreenDimmed) {
+            wakeRadioScreen()
+            return
+        }
         if (digit !in 0..9 || !normalLiveControls) return
         numberInputBuffer = if (numberInputBuffer.length >= 4) digit.toString() else numberInputBuffer + digit
         numberInputJob?.cancel()
@@ -188,17 +192,124 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var multiRevision by mutableStateOf(0)
     var multiPickerCategory by mutableStateOf("Tümü")
     var multiPickerQuery by mutableStateOf("")
-    val multiPickerCategories: List<String> get() =
-        listOf("Favoriler") +
-            (if (data.pref("history") == "Açık") listOf("Son İzlenenler") else emptyList()) +
-            listOf("Tümü") +
-            data.categories.filter { it !in data.hiddenCategories && data.channels.any { ch -> ch.available && it in ch.groups } }
+    val multiPickerCategories: List<String> get() {
+        val template = listOf(
+            "Ulusal",
+            "Haber",
+            "Spor",
+            "Çocuk",
+            "Belgesel",
+            "Müzik",
+            "Dini",
+            "Yerel",
+            "KKTC",
+            "AZERBAYCAN",
+            "DÜNYA",
+            "7/24 DİZİ/FİLM",
+        )
+        val tvChannels = data.channels.filter { it.available && !it.isAudioOrRadio }
+        val normalizedAvailable = CategoryNormalizer.deduplicateCategories(data.categories, normalizeAliases = true)
+            .filter { cat ->
+                !CategoryNormalizer.matches(cat, "RADYO") &&
+                    !isCategoryHidden(cat) &&
+                    tvChannels.any { ch ->
+                        ch.groups.any { g -> CategoryNormalizer.matches(g, cat) } || CategoryNormalizer.matches(ch.category, cat)
+                    }
+            }
+        val result = mutableListOf("Favoriler")
+        if (data.pref("history") == "Açık" && data.history.any { id -> tvChannels.any { it.id == id } }) {
+            result += "Son İzlenenler"
+        }
+        result += "Tümü"
+        for (item in template) {
+            if (!isCategoryHidden(item)) {
+                val hasTvChannel = tvChannels.any { ch ->
+                    ch.groups.any { g -> CategoryNormalizer.matches(g, item) } || CategoryNormalizer.matches(ch.category, item)
+                }
+                if (hasTvChannel) {
+                    result += item
+                }
+            }
+        }
+        for (cat in normalizedAvailable) {
+            val already = result.any { CategoryNormalizer.matches(cat, it) } ||
+                template.any { CategoryNormalizer.matches(cat, it) }
+            if (!already && !cat.equals("Favoriler", true) && !cat.equals("Son İzlenenler", true) && !cat.equals("Tümü", true)) {
+                result += CategoryNormalizer.normalizeDisplayLabel(cat)
+            }
+        }
+        return result
+    }
     val multiPickerChannels: List<PreviewChannel> get() =
-        data.filtered(multiPickerCategory, multiPickerQuery).filter { it.available }
+        data.filtered(multiPickerCategory, multiPickerQuery).filter { it.available && !it.isAudioOrRadio }
     val savedMultiLayouts: List<SavedMultiLayout> get() =
         MultiLayoutCodec.decodeList(data.preferences["savedMultiLayouts"])
     val lastMultiLayout: SavedMultiLayout? get() =
         MultiLayoutCodec.decodeSingle(data.preferences["lastMultiLayout"].orEmpty())
+    val multiSlotMenuTitle: String?
+        get() {
+            val m = multi ?: return null
+            val chId = m.slots.getOrNull(m.selected) ?: return null
+            val ch = data.channels.find { it.id == chId } ?: return null
+            return "${m.selected + 1}. pencere · ${ch.name}"
+        }
+    fun activateMultiSlot(slotIndex: Int? = null) {
+        val m = multi ?: return
+        val idx = slotIndex?.takeIf { it in 0 until m.count } ?: m.selected
+        m.selected = idx
+        multiRevision++
+        val chId = m.slots.getOrNull(idx)
+        val ch = chId?.let { id -> data.channels.find { it.id == id } }
+        if (ch != null) {
+            dialog = "slotMenu"
+        } else {
+            openMultiChannelPicker(idx)
+        }
+    }
+    fun executeMultiSlotMenuAction(action: String) {
+        val m = multi ?: return
+        when (action) {
+            "Kanal Değiştir" -> openMultiChannelPicker(m.selected)
+            "Tam Ekran" -> fullScreenMultiSlot(m.selected)
+            "Tekrar Dene" -> retryMultiSlot(m.selected)
+            "Görüntü Oranını Değiştir" -> cycleMultiSlotFormat(m.selected)
+            "Bu Yayını Kapat" -> clearMultiSlot(m.selected)
+            "Ekran Düzenini Değiştir" -> dialog = "layout"
+            "Bu Düzeni Kaydet" -> openSaveMultiLayoutDialog()
+        }
+    }
+    fun fullScreenMultiSlot(slotIndex: Int? = null) {
+        val m = multi ?: return
+        val idx = slotIndex?.takeIf { it in 0 until m.count } ?: m.selected
+        val targetId = m.slots.getOrNull(idx) ?: return
+        val ch = data.channels.find { it.id == targetId } ?: return
+        multi = null
+        dialog = null
+        page = "live"
+        select(targetId)
+        showBottomToast("✅ 📺 ${ch.name} tam ekranda", ToastTone.Success)
+    }
+    fun retryMultiSlot(slotIndex: Int? = null) {
+        val m = multi ?: return
+        val idx = slotIndex?.takeIf { it in 0 until m.count } ?: m.selected
+        m.retries[idx]++
+        multiRevision++
+        dismiss()
+    }
+    fun cycleMultiSlotFormat(slotIndex: Int? = null) {
+        val m = multi ?: return
+        val idx = slotIndex?.takeIf { it in 0 until m.count } ?: m.selected
+        val nextFormat = m.cycleFormat(idx)
+        multiRevision++
+        dismiss()
+        showBottomToast("✅ ${idx + 1}. pencere: $nextFormat", ToastTone.Success)
+    }
+    fun clearMultiSlot(slotIndex: Int? = null) {
+        val m = multi ?: return
+        val idx = slotIndex?.takeIf { it in 0 until m.count } ?: m.selected
+        m.selected = idx
+        assignMultiChannel(null)
+    }
     fun openMultiChannelPicker(slotIndex: Int? = null) {
         val m = multi ?: return
         if (slotIndex != null && slotIndex in 0 until m.count) {
@@ -215,6 +326,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun assignMultiChannel(channelId: OpaqueId?) {
         val m = multi ?: return
+        if (channelId != null) {
+            val ch = data.channels.find { it.id == channelId }
+            if (ch?.isAudioOrRadio == true) return
+        }
         if (m.selected in 0 until m.count) {
             m.slots[m.selected] = channelId
             multiRevision++
@@ -233,7 +348,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     fun startMulti(count: Int) = startMulti(MultiLayoutMode.fromCount(count))
     fun startMulti(mode: MultiLayoutMode) {
         leaveLiveLayers()
-        if (multi == null) multi = MultiSession(selected)
+        val entryChannel = lastTvChannel ?: selected
+        if (multi == null) multi = MultiSession(entryChannel)
         multi!!.applyMode(mode)
         multiRevision++
         page = "multi"
@@ -266,7 +382,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun loadSavedMultiLayout(saved: SavedMultiLayout) {
         leaveLiveLayers()
-        if (multi == null) multi = MultiSession(selected)
+        val entryChannel = lastTvChannel ?: selected
+        if (multi == null) multi = MultiSession(entryChannel)
         multi!!.applySaved(saved)
         multiRevision++
         page = "multi"
@@ -303,13 +420,25 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         else "Türkiye + ${codes.joinToString(", ")} dahil edildi"
     }
     var isRadioMode by mutableStateOf(false); private set
+    var radioScreenDimmed by mutableStateOf(false); private set
     var lastTvChannel by mutableStateOf<OpaqueId?>(null); private set
     var lastRadioChannel by mutableStateOf<OpaqueId?>(null); private set
     val radioChannels get() = data.channels.filter { it.available && it.isAudioOrRadio }.ifEmpty { PreviewFixture.radioChannels }
+    fun dimRadioScreen() {
+        if (!isRadioMode) return
+        radioScreenDimmed = true
+        panel = false
+    }
+    fun wakeRadioScreen(): Boolean {
+        if (!radioScreenDimmed) return false
+        radioScreenDimmed = false
+        return true
+    }
     fun enterRadioMode() {
         if (isRadioMode) return
         lastTvChannel = selected
         isRadioMode = true
+        radioScreenDimmed = false
         panel = true
         val target = lastRadioChannel?.takeIf { id -> radioChannels.any { it.id == id } } ?: radioChannels.firstOrNull()?.id
         if (target != null && target != selected) select(target)
@@ -319,6 +448,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (!isRadioMode) return
         lastRadioChannel = selected
         isRadioMode = false
+        radioScreenDimmed = false
         val tvChannels = data.channels.filter { it.available && !it.isAudioOrRadio }
         val target = lastTvChannel?.takeIf { id -> tvChannels.any { it.id == id } } ?: tvChannels.firstOrNull()?.id
         if (target != null && target != selected) select(target)
@@ -375,7 +505,13 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         query.isEmpty() && moving == null && draft == null && multi == null && !busy
     val canRevealLiveControls get() = normalLiveControls && !panel
     val liveHeadingVisible get() = page == "live" && panel && dialog != "format"
-    fun revealLiveControls() { if (canRevealLiveControls) panel = true }
+    fun revealLiveControls() {
+        if (isRadioMode && radioScreenDimmed) {
+            wakeRadioScreen()
+            return
+        }
+        if (canRevealLiveControls) panel = true
+    }
     fun openFormatMenu() {
         if (busy) return
         if (dialog == "format") {
@@ -418,6 +554,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
      * aksi halde (kumanda CH+/CH-, pencere düzeyi yön tuşları) panel kapanır ve kanal değişim kartı gösterilir.
      */
     fun stepChannel(delta: Int, keepPanel: Boolean = false) {
+        if (isRadioMode && radioScreenDimmed) {
+            wakeRadioScreen()
+            return
+        }
         if (!normalLiveControls || delta !in listOf(-1, 1)) return
         val candidates = if (isRadioMode) radioChannels else visibleData.filtered(category, query)
         if (candidates.isEmpty()) return
@@ -434,6 +574,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         catch (_: Exception) { sessionOnly = true; storage = "Yalnız bu oturumda"; notice = "Yerel kayıt açılamadı. Değişiklikler yalnız bu oturumda tutulacak." }
         demo = data
         isRadioMode = false
+        radioScreenDimmed = false
         selected = data.startup(data.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
         if (data.channels.find { it.id == selected }?.isAudioOrRadio == false) {
             lastTvChannel = selected
@@ -469,6 +610,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (isPublic) publicData = data else demo = data
         val next = if (public) publicData ?: return else demo
         isRadioMode = false
+        radioScreenDimmed = false
         data = next; category = if (public) "Tümü" else "Favoriler"
         selected = next.startup(next.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
         if (next.channels.find { it.id == selected }?.isAudioOrRadio == false) {
@@ -593,6 +735,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         val targetCh = data.channels.find { it.id == id }
         if (targetCh != null && !targetCh.isAudioOrRadio) {
             lastTvChannel = id
+            if (isRadioMode) {
+                isRadioMode = false
+                radioScreenDimmed = false
+            }
         }
         paused = false
         isBehindLiveEdge = false
@@ -650,16 +796,26 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (sourceJob != null && !committingSource) { cancelSource(); return }
         if (busy) { notice = "Kayıt yazılıyor…"; return }
         when {
+            page == "live" && isRadioMode && radioScreenDimmed -> radioScreenDimmed = false
             dialog != null -> dismiss()
             opacityDraft != null -> cancelOpacity()
             moving != null -> { draft = null; moving = null }
             searching -> { searching = false; query = "" }
             categoryMenu -> categoryMenu = false
             page == "settings" -> { page = origin; panel = false; if (returnAfterClear) clearReturn() }
-            page == "multi" -> { selected = multi?.returnChannel() ?: selected; multi = null; page = "live" }
+            page == "multi" -> {
+                val restoreId = multi?.entry ?: multi?.returnChannel() ?: selected
+                multi = null
+                page = "live"
+                selected = restoreId
+                val ch = data.channels.find { it.id == restoreId }
+                if (ch != null && !ch.isAudioOrRadio) lastTvChannel = restoreId
+                panel = false
+                showZapCard()
+            }
             page == "live" && info -> info = false
             page == "live" && isRadioMode && panel -> panel = false
-            page == "live" && isRadioMode -> exitRadioMode()
+            page == "live" && isRadioMode -> dialog = "exit"
             page == "live" && panel -> panel = false
             page == "live" -> dialog = "exit"
         }
@@ -1082,6 +1238,16 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
 
 const val NumberInputTimeoutMs = 2500L
 const val BottomToastDurationMs = 2500L
+
+val MultiSlotMenuItems = listOf(
+    "Kanal Değiştir",
+    "Tam Ekran",
+    "Tekrar Dene",
+    "Görüntü Oranını Değiştir",
+    "Bu Yayını Kapat",
+    "Ekran Düzenini Değiştir",
+    "Bu Düzeni Kaydet",
+)
 
 enum class ToastTone {
     Success,

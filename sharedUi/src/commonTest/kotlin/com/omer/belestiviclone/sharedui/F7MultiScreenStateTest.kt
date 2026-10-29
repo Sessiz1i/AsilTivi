@@ -125,4 +125,172 @@ class F7MultiScreenStateTest {
         yield()
         assertTrue(reloadedState.savedMultiLayouts.isEmpty())
     }
+
+    @Test
+    fun slotMenuOpensOnFilledSlotAndExecutesAllSevenRows() = runBlocking {
+        val store = FakeStore()
+        val state = PreviewState(store, this)
+        state.load()
+
+        assertEquals(
+            listOf(
+                "Kanal Değiştir",
+                "Tam Ekran",
+                "Tekrar Dene",
+                "Görüntü Oranını Değiştir",
+                "Bu Yayını Kapat",
+                "Ekran Düzenini Değiştir",
+                "Bu Düzeni Kaydet",
+            ),
+            MultiSlotMenuItems
+        )
+
+        val trt1 = PreviewFixture.channels.first { it.name == "TRT 1" }
+        val atv = PreviewFixture.channels.first { it.name == "ATV" }
+        state.select(trt1.id)
+        state.startMulti(MultiLayoutMode.TWO_SIDE_BY_SIDE)
+
+        // Slot 0 dolu (TRT 1) -> activateMultiSlot "slotMenu" açmalı
+        state.activateMultiSlot(0)
+        assertEquals("slotMenu", state.dialog)
+        assertEquals("1. pencere · TRT 1", state.multiSlotMenuTitle)
+
+        // Slot 1 boş -> activateMultiSlot "assign" (Kanal Seçici) açmalı
+        state.activateMultiSlot(1)
+        assertEquals("assign", state.dialog)
+
+        // Slot 1'e ATV ata ve tekrar activateMultiSlot çağır -> "2. pencere · ATV"
+        state.assignMultiChannel(atv.id)
+        yield()
+        state.activateMultiSlot(1)
+        assertEquals("slotMenu", state.dialog)
+        assertEquals("2. pencere · ATV", state.multiSlotMenuTitle)
+
+        // 1. Kanal Değiştir
+        state.executeMultiSlotMenuAction("Kanal Değiştir")
+        assertEquals("assign", state.dialog)
+
+        // 3. Tekrar Dene
+        state.activateMultiSlot(1)
+        val beforeRetry = state.multi!!.retries[1]
+        state.executeMultiSlotMenuAction("Tekrar Dene")
+        assertNull(state.dialog)
+        assertEquals(beforeRetry + 1, state.multi!!.retries[1])
+
+        // 4. Görüntü Oranını Değiştir
+        state.activateMultiSlot(1)
+        assertEquals("Otomatik (Orijinal)", state.multi!!.slotFormat(1))
+        state.executeMultiSlotMenuAction("Görüntü Oranını Değiştir")
+        assertNull(state.dialog)
+        assertEquals("Ekrana yay", state.multi!!.slotFormat(1))
+        assertEquals("✅ 2. pencere: Ekrana yay", state.bottomToastMessage)
+
+        // 6. Ekran Düzenini Değiştir
+        state.activateMultiSlot(1)
+        state.executeMultiSlotMenuAction("Ekran Düzenini Değiştir")
+        assertEquals("layout", state.dialog)
+
+        // 7. Bu Düzeni Kaydet
+        state.activateMultiSlot(1)
+        state.executeMultiSlotMenuAction("Bu Düzeni Kaydet")
+        assertEquals("saveMultiLayout", state.dialog)
+
+        // 5. Bu Yayını Kapat
+        state.activateMultiSlot(1)
+        state.executeMultiSlotMenuAction("Bu Yayını Kapat")
+        yield()
+        assertNull(state.dialog)
+        assertNull(state.multi!!.slots[1])
+
+        // 2. Tam Ekran (Slot 0: TRT 1 veya Slot 1'e tekrar ATV atayıp Tam Ekran)
+        state.openMultiChannelPicker(1)
+        state.assignMultiChannel(atv.id)
+        yield()
+        state.activateMultiSlot(1)
+        val zapBefore = state.zapCardRevision
+        state.executeMultiSlotMenuAction("Tam Ekran")
+        assertEquals("live", state.page)
+        assertNull(state.multi)
+        assertNull(state.dialog)
+        assertEquals(atv.id, state.selected)
+        assertTrue(state.zapCardRevision > zapBefore)
+        assertEquals("✅ 📺 ATV tam ekranda", state.bottomToastMessage)
+        assertEquals(ToastTone.Success, state.bottomToastTone)
+    }
+
+    @Test
+    fun backFromMultiScreenRestoresPreviousSingleScreenChannel() = runBlocking {
+        val store = FakeStore()
+        val state = PreviewState(store, this)
+        state.load()
+
+        val trt1 = PreviewFixture.channels.first { it.name == "TRT 1" }
+        val showTv = PreviewFixture.channels.first { it.name == "Show TV" }
+        val ntv = PreviewFixture.channels.first { it.name == "NTV" }
+
+        // Çoklu ekrana girmeden önce izlenen kanal: Show TV
+        state.select(showTv.id)
+        assertEquals(showTv.id, state.selected)
+
+        state.startMulti(MultiLayoutMode.TWO_SIDE_BY_SIDE)
+        // 2. slota NTV ata ve odağı 2. slota bırak
+        state.openMultiChannelPicker(1)
+        state.assignMultiChannel(ntv.id)
+        yield()
+        assertEquals(1, state.multi?.selected)
+        // 1. slotu bile değiştirsek (TRT 1)
+        state.openMultiChannelPicker(0)
+        state.assignMultiChannel(trt1.id)
+        yield()
+        state.multi!!.selected = 1
+
+        // BACK ile çoklu ekrandan çıkıldığında önceki kanal (Show TV) korunmalı
+        state.back()
+        assertEquals("live", state.page)
+        assertNull(state.multi)
+        assertEquals(showTv.id, state.selected)
+    }
+
+    @Test
+    fun multiPickerExcludesRadioChannelsAndNormalizesCategories() = runBlocking {
+        val tv1 = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1", groups = listOf("Ulusal"))
+        val tvWorld = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 2), "TRT Türk", "Ulusal - Yurt Dışı", "logo_trt1", groups = listOf("Ulusal - Yurt Dışı"))
+        val tvEconomy = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 3), "Bloomberg HT", "Ekonomi", "logo_ntv", groups = listOf("Ekonomi"))
+        val tvSpor1 = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 4), "TRT Spor", "SPOR", "logo_trt1", groups = listOf("SPOR"))
+        val tvSpor2 = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 5), "A Spor", "Spor", "logo_ahaber", groups = listOf("Spor"))
+        val radio1 = PreviewChannel(com.omer.belestiviclone.shared.catalog.OpaqueId(1, 10), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo"))
+
+        val store = FakeStore().also {
+            it.value = PreviewData(
+                channels = listOf(tv1, tvWorld, tvEconomy, tvSpor1, tvSpor2, radio1),
+                favorites = listOf(tv1.id, radio1.id),
+                history = listOf(radio1.id, tv1.id),
+                categories = listOf("Ulusal - Yurt Dışı", "Ekonomi", "SPOR", "Spor", "Ulusal", "Radyo")
+            )
+        }
+        val state = PreviewState(store, this)
+        state.load()
+        state.startMulti(MultiLayoutMode.TWO_SIDE_BY_SIDE)
+
+        val cats = state.multiPickerCategories
+        // Radyo ve ham M3U kategorileri görünmemeli, normalize kategoriler olmalı
+        assertFalse(cats.any { it.equals("Radyo", ignoreCase = true) })
+        assertFalse("Ulusal - Yurt Dışı" in cats)
+        assertFalse("Ekonomi" in cats)
+        assertEquals(1, cats.count { it.equals("Spor", ignoreCase = true) })
+        assertTrue("Ulusal" in cats)
+        assertTrue("Haber" in cats)
+        assertTrue("DÜNYA" in cats)
+
+        // Hiçbir sekmede (Tümü, Favoriler, Son İzlenenler dahil) radyo istasyonu çıkmamalı
+        for (cat in listOf("Tümü", "Favoriler", "Son İzlenenler", "Ulusal", "Haber", "DÜNYA")) {
+            state.chooseMultiPickerCategory(cat)
+            assertTrue(state.multiPickerChannels.none { it.isAudioOrRadio }, "Radyo kanal seçicide görünmemeli: $cat")
+        }
+
+        // Radyo kanalı doğrudan atanmaya çalışılsa bile reddedilmeli
+        state.multi!!.selected = 1
+        state.assignMultiChannel(radio1.id)
+        assertNull(state.multi!!.slots[1])
+    }
 }

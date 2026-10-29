@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
     private var previewState: PreviewState? = null
     private val navigationPress = NavigationPress()
     private var focusTarget = "none"
+    private var wakingRadioDimOnKeyUp = false
     private val navigationKeys = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
@@ -89,6 +90,19 @@ class MainActivity : ComponentActivity() {
     private fun handleNavigationKey(event: KeyEvent): Boolean {
         observeKey(event, "window")
         val s = previewState
+        if (s != null && s.loaded && s.page == "live" && s.isRadioMode && (s.radioScreenDimmed || wakingRadioDimOnKeyUp)) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (s.radioScreenDimmed) {
+                    s.wakeRadioScreen()
+                    wakingRadioDimOnKeyUp = true
+                }
+                return true
+            }
+            if (event.action == KeyEvent.ACTION_UP) {
+                wakingRadioDimOnKeyUp = false
+                return true
+            }
+        }
         if (s != null && s.loaded && s.page == "live" && event.action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
             if (event.keyCode in listOf(KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE)) {
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) s.toggleInfo()
@@ -729,11 +743,47 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
             subtitleColor = preferences.subtitleColor,
             subtitleBgOpacity = preferences.subtitleBgOpacity,
         )
-        val text = player.error ?: when (player.status) { PlaybackStatus.LOADING -> "${channel?.name.orEmpty()} yükleniyor…"; PlaybackStatus.ENDED -> "${channel?.name.orEmpty()} bitti · Yeniden dene"; else -> "" }
-        if (text.isNotEmpty()) {
-            BasicText(text, Modifier.align(Alignment.Center).padding(16.dp), style = TextStyle(color = Color.White, fontSize = 20.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center))
+        val err = player.error
+        if (isMultiScreen && err != null) {
+            Column(
+                Modifier.align(Alignment.Center).padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                BasicText(
+                    "Yayın açılamadı",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+                BasicText(
+                    "OK: Tekrar dene veya kanal değiştir",
+                    style = TextStyle(
+                        color = Color(0xFFD0D7DE),
+                        fontSize = 11.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+                BasicText(
+                    err,
+                    style = TextStyle(
+                        color = Color(0xFF94A2B7),
+                        fontSize = 10.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+            }
+        } else {
+            val text = err ?: when (player.status) { PlaybackStatus.LOADING -> "${channel?.name.orEmpty()} yükleniyor…"; PlaybackStatus.ENDED -> "${channel?.name.orEmpty()} bitti · Yeniden dene"; else -> "" }
+            if (text.isNotEmpty()) {
+                BasicText(text, Modifier.align(Alignment.Center).padding(16.dp), style = TextStyle(color = Color.White, fontSize = 20.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center))
+            }
         }
     }
 }

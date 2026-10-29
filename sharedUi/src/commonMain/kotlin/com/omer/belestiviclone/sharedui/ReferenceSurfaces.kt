@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.omer.belestiviclone.shared.preview.CategoryNormalizer
 import com.omer.belestiviclone.shared.preview.MultiLayoutMode
 import com.omer.belestiviclone.shared.preview.PreviewCodec
 import com.omer.belestiviclone.shared.preview.SavedMultiLayout
@@ -184,6 +185,76 @@ internal fun LayoutChooser(s: PreviewState, image: @Composable (String, Modifier
 }
 
 @Composable
+internal fun MultiSlotMenuModal(s: PreviewState) {
+    val first = remember { FocusRequester() }
+    val m = s.multi ?: return
+    val title = s.multiSlotMenuTitle ?: "${m.selected + 1}. pencere"
+    ReferenceOverlay(s, title) {
+        Column(
+            Modifier.align(Alignment.Center)
+                .width(420.dp.coerceAtMost(maxWidth - 32.dp))
+                .heightIn(max = maxHeight - 16.dp)
+                .background(Color(0xFF12233B), RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0xFF283D5C), RoundedCornerShape(14.dp))
+                .pointerInput(Unit) { detectTapGestures { } }
+                .padding(horizontal = 22.dp, vertical = 18.dp)
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Label(title, 16, Color.White, bold = true, lineHeight = 20f)
+            Spacer(Modifier.height(2.dp))
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                MultiSlotMenuItems.forEachIndexed { idx, item ->
+                    var isRowFocused by remember { mutableStateOf(false) }
+                    Action(
+                        label = item,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                            .onFocusChanged { isRowFocused = it.isFocused }
+                            .then(if (idx == 0) Modifier.focusRequester(first) else Modifier),
+                        tint = if (isRowFocused) Color(0xFF3E352B) else Color(0xFF192E4D),
+                        radius = 8.dp,
+                        stroke = if (isRowFocused) Color(0xFFF1C40F) else Color(0xFF2B4263),
+                        strokeWidth = 1.dp,
+                        focusColor = Color(0xFFF1C40F),
+                        padding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                        content = {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Label(item, 12, Color.White, bold = true)
+                                if (item == "Görüntü Oranını Değiştir") {
+                                    Label(m.slotFormat(m.selected), 9, Color(0xFFFFD735), bold = true)
+                                }
+                            }
+                        }
+                    ) { s.executeMultiSlotMenuAction(item) }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                Action(
+                    label = "Kapat",
+                    modifier = Modifier.height(32.dp),
+                    tint = Color.Transparent,
+                    strokeWidth = 0.dp,
+                    focusColor = Color(0xFFF1C40F),
+                    padding = PaddingValues(horizontal = 12.dp),
+                    content = { Label("Kapat", 12, Color(0xFFE67E22), bold = true) },
+                    click = s::dismiss
+                )
+            }
+        }
+        LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    }
+}
+
+@Composable
 internal fun MultiChannelPicker(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
     val first = remember { FocusRequester() }
     val m = s.multi ?: return
@@ -323,7 +394,7 @@ internal fun MultiChannelPicker(s: PreviewState, image: @Composable (String, Mod
                                     image(ch.logo, Modifier.size(28.dp))
                                     Column(Modifier.weight(1f)) {
                                         Label(ch.name, 12, Color.White, bold = true, maxLines = 1)
-                                        Label(ch.category, 9, Color(0xFF86C9EF), maxLines = 1)
+                                        Label(CategoryNormalizer.normalizeDisplayLabel(ch.category), 9, Color(0xFF86C9EF), maxLines = 1)
                                     }
                                     if (isAssignedHere) {
                                         Label("AKTİF", 9, Color(0xFFFFD735), bold = true)

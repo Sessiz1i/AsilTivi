@@ -77,9 +77,9 @@ class SourceTransactionTest {
         assertEquals(id, reopened.data.startup(id))
     }
     @Test fun multiSettingsReturnPreservesAssignmentsAndBackUsesSelectedOrEntry() = runBlocking {
-        val state = PreviewState(Store(), this); state.load(); state.page = "live"; state.startMulti(2)
+        val state = PreviewState(Store(), this); state.load(); state.page = "live"; val entry = state.selected; state.startMulti(2)
         val session = state.multi!!; session.slots[1] = OpaqueId(44, 2); session.selected = 1
         state.settings(); state.back(); assertEquals("multi", state.page); assertSame(session, state.multi)
-        state.back(); settle(state); assertNull(state.multi); assertEquals(OpaqueId(44, 2), state.selected); assertEquals("Orijinal", state.data.pref("format"))
+        state.back(); settle(state); assertNull(state.multi); assertEquals(entry, state.selected); assertEquals("Orijinal", state.data.pref("format"))
     }
 }

@@ -4,6 +4,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -18,12 +20,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,12 +42,43 @@ import com.omer.belestiviclone.shared.preview.PreviewCodec
 private val amber = Color(0xFFE67E22)
 private val card = Color(0xFF13233D)
 
+private val radioTips = listOf(
+    "Beleş TiVi'ye hoş geldin. Keyifli dinlemeler!",
+    "Ekranı karart, müziğin tadını çıkar.",
+    "Sevdiğin istasyonu basılı tutarak favorilerine ekleyebilirsin.",
+)
+
 @Composable
 fun RadioScreen(
     s: PreviewState,
     image: @Composable (String, Modifier) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (s.radioScreenDimmed) {
+        val dimFocusRequester = remember { FocusRequester() }
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .focusRequester(dimFocusRequester)
+                .focusable()
+                .onPreviewKeyEvent { e ->
+                    if (e.type == KeyEventType.KeyDown) {
+                        s.wakeRadioScreen()
+                    }
+                    true
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        s.wakeRadioScreen()
+                    }
+                }
+                .semantics { contentDescription = "Ekran karartıldı" }
+        )
+        LaunchedEffect(Unit) { runCatching { dimFocusRequester.requestFocus() } }
+        return
+    }
+
     val boundsObserver = LocalBoundsObserver.current
     var nowEpochMs by remember { mutableStateOf(System.currentTimeMillis()) }
 
@@ -51,6 +91,10 @@ fun RadioScreen(
 
     val timeLabel = remember(nowEpochMs / 60_000) { formatTime(nowEpochMs) }
     val dateLabel = remember(nowEpochMs / 60_000) { formatDate(nowEpochMs) }
+    val tipText = remember(nowEpochMs / 6_000) {
+        val idx = ((nowEpochMs / 6_000) % radioTips.size).toInt().coerceAtLeast(0)
+        radioTips[idx]
+    }
     val currentStation = s.channel
 
     Box(
@@ -62,7 +106,7 @@ fun RadioScreen(
                 }
             }
     ) {
-        // 1. Orijinal Beleş TiVi 4.1 Retro Radyo Arka Planı
+        // 1. Orijinal Beleş TiVi 4.1 Retro Radyo Arka Planı (BELEŞ ▶ RADYO neon tabelası ve ahşap radyo)
         image("bg_retro_radio", Modifier.fillMaxSize())
 
         // Hafif koyu degrade katman: Metin ve kartların net okunması için
@@ -73,7 +117,7 @@ fun RadioScreen(
                     Brush.verticalGradient(
                         listOf(
                             Color(0x99000000),
-                            Color(0x44000000),
+                            Color(0x33000000),
                             Color(0xAA000000)
                         )
                     )
@@ -92,7 +136,7 @@ fun RadioScreen(
             Label(dateLabel, 11, Color(0xFFD0D7DE), bold = false)
         }
 
-        // 3. Sol Üst Başlık (Panel açıkken)
+        // 3. Sol Üst Başlık ve Üst Sağ Araç Çubuğu (Panel açıkken)
         if (s.panel) {
             Row(
                 modifier = Modifier
@@ -116,20 +160,35 @@ fun RadioScreen(
                 }
             }
 
-            // Üst Sağ Butonlar (TV Modu, Çoklu Ekran, Görüntü, Bilgi, Ayarlar, Çıkış)
+            // Üst Sağ Butonlar (☾ Ekranı karart · 📺 TV Modu · ⚙ Ayarlar · ✕ Çıkış)
             Row(
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 64.dp, end = 20.dp)
                     .onGloballyPositioned { boundsObserver("radio-top-actions", it.boundsInWindow()) }
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(rememberScrollState())
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Action(
+                    label = "☾ Ekranı karart",
+                    tint = Color(0xB8000000),
+                    radius = 11.dp,
+                    stroke = Color(0xFF344454),
+                    focusKey = "radio:action:dim",
+                    content = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Label("☾ Ekranı karart", 11, bold = true)
+                        }
+                    },
+                    click = s::dimRadioScreen
+                )
                 Action(
                     label = "TV Modu",
                     tint = Color(0xB8000000),
                     radius = 11.dp,
                     stroke = Color(0xFF344454),
+                    focusKey = "radio:action:tv",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             image("ikon_tv", Modifier.size(13.dp, 14.dp))
@@ -143,6 +202,7 @@ fun RadioScreen(
                     tint = Color(0xB8000000),
                     radius = 11.dp,
                     stroke = Color(0xFF344454),
+                    focusKey = "radio:action:settings",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             image("ikon_ayar", Modifier.size(13.dp, 14.dp))
@@ -156,6 +216,7 @@ fun RadioScreen(
                     tint = Color(0xB8000000),
                     radius = 11.dp,
                     stroke = Color(0xFF344454),
+                    focusKey = "radio:action:exit",
                     content = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             image("ikon_cikis", Modifier.size(13.dp, 14.dp))
@@ -167,17 +228,13 @@ fun RadioScreen(
             }
         }
 
-        // 4. Orta Canlı Radyo Bilgi Kartı (Referans ekran_radyo_cikis.png ve ekran_tvmod.png)
+        // 4. Alt-Orta Canlı Radyo Bilgi Kartı (BELEŞ ▶ RADYO neon tabelasıyla çakışmaz)
         Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .padding(bottom = if (s.panel) 55.dp else 0.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (s.panel) 142.dp else 34.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Retro Radyo Üzerinde BELEŞ RADYO Logosu
-            image("logo_radio", Modifier.size(140.dp, 110.dp))
-
             // Şık Cam/Glass İstasyon Kartı
             Row(
                 modifier = Modifier
@@ -233,7 +290,7 @@ fun RadioScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Label(
-                            if (s.paused) "Yayın duraklatıldı. Oynatmak için dokunun." else "Günün temposuna kısa bir müzik molası.",
+                            if (s.paused) "Yayın duraklatıldı. Oynatmak için dokunun." else tipText,
                             11,
                             Color(0xFFB0BEC5)
                         )

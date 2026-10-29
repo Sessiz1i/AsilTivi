@@ -95,7 +95,7 @@ class RadioStateTest {
     }
 
     @Test
-    fun backInRadioModeFirstClosesPanelThenExitsToTvMode() = runBlocking {
+    fun backInRadioModeFirstClosesPanelThenOpensExitConfirmationDialog() = runBlocking {
         val tv1 = PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1")
         val radio1 = PreviewChannel(OpaqueId(1, 10), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo"))
 
@@ -112,15 +112,60 @@ class RadioStateTest {
         s.back()
         assertTrue(s.isRadioMode)
         assertFalse(s.panel)
+        assertNull(s.dialog)
 
-        // İkinci back: TV moduna geri döner
+        // İkinci back (overlay kapalıyken): Çıkış onay diyaloğu açılır (v4.1 A52 / B28 davranışı)
         s.back()
+        assertTrue(s.isRadioMode)
+        assertEquals("exit", s.dialog)
+
+        // Üçüncü back: Çıkış diyaloğunu kapatır, radyo modunda kalır
+        s.back()
+        assertNull(s.dialog)
+        assertTrue(s.isRadioMode)
+
+        // Üst bardaki TV Modu butonu (exitRadioMode) ise doğrudan Canlı TV moduna döndürür
+        s.exitRadioMode()
         assertFalse(s.isRadioMode)
         assertEquals(tv1.id, s.selected)
+    }
 
-        // Üçüncü back: TV modunda çıkış onay diyaloğu açılır
+    @Test
+    fun radioScreenDimmingAndWakeUpByTouchOrKeyConsumesAction() = runBlocking {
+        val tv1 = PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1")
+        val radio1 = PreviewChannel(OpaqueId(1, 10), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo"))
+        val radio2 = PreviewChannel(OpaqueId(1, 11), "Kral FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo"))
+
+        val data = PreviewData(channels = listOf(tv1, radio1, radio2))
+        val s = PreviewState(DummyStore(data), this)
+        s.load()
+        s.enterRadioMode()
+        assertFalse(s.radioScreenDimmed)
+
+        // "☾ Ekranı karart" basıldığında ekran kararır ve overlay kapanır
+        s.dimRadioScreen()
+        assertTrue(s.radioScreenDimmed)
+        assertFalse(s.panel)
+
+        // Karartılmışken BACK basıldığında karartma kapanır, çıkış diyaloğu AÇILMAZ
         s.back()
-        assertEquals("exit", s.dialog)
+        assertFalse(s.radioScreenDimmed)
+        assertNull(s.dialog)
+        assertTrue(s.isRadioMode)
+
+        // Tekrar karart ve yön tuşu (stepChannel) ile uyandır -> istasyon değişmez, sadece karartma kalkar
+        s.dimRadioScreen()
+        assertTrue(s.radioScreenDimmed)
+        s.stepChannel(1)
+        assertFalse(s.radioScreenDimmed)
+        assertEquals(radio1.id, s.selected)
+
+        // Tekrar karart ve OK (revealLiveControls) ile uyandır -> sadece karartma kalkar
+        s.dimRadioScreen()
+        assertTrue(s.radioScreenDimmed)
+        s.revealLiveControls()
+        assertFalse(s.radioScreenDimmed)
+        assertFalse(s.panel)
     }
 
     @Test

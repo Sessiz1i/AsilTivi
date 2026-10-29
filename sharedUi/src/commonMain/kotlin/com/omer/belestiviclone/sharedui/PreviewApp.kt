@@ -183,14 +183,14 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
             "multi" -> Multi(s, image, video)
             else -> Live(s, image, video)
         }
-        if (s.notice.isNotEmpty()) {
+        if (s.notice.isNotEmpty() && !(s.isRadioMode && s.radioScreenDimmed)) {
             val current = s.notice
             LaunchedEffect(current) { kotlinx.coroutines.delay(5500); if (s.notice == current) s.notice = "" }
             Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).widthIn(max = 540.dp).background(Color(0xEE20354C), RoundedCornerShape(12.dp)).padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }) { Label(s.notice, 14) }
         }
         if (s.dialog != null) CompositionLocalProvider(LocalModalLayer provides true) { Modal(s, image) }
         val toastMsg = s.bottomToastMessage
-        if (!toastMsg.isNullOrEmpty()) {
+        if (!toastMsg.isNullOrEmpty() && !(s.isRadioMode && s.radioScreenDimmed)) {
             val currentRev = s.bottomToastRevision
             LaunchedEffect(currentRev) {
                 kotlinx.coroutines.delay(BottomToastDurationMs)
@@ -1710,6 +1710,7 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
     if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }
     if (kind == "layout") { LayoutChooser(s, image); return }
+    if (kind == "slotMenu") { MultiSlotMenuModal(s); return }
     if (kind == "assign") { MultiChannelPicker(s, image); return }
     if (kind == "savedLayouts") { SavedLayoutsModal(s, image); return }
     if (kind == "saveMultiLayout") { SaveMultiLayoutDialog(s, image); return }
@@ -1801,8 +1802,8 @@ private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                         ch,
                         false,
                         s.muted || !isFocusedSlot,
-                        s.retry,
-                        if (m.fit[index]) "Sığdır (Fit)" else "Orijinal (Panel)",
+                        s.retry + m.retries[index],
+                        m.slotFormat(index),
                         multiPrefs,
                         {},
                         Modifier.fillMaxSize().padding(borderWidth)
@@ -1825,23 +1826,23 @@ private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                         s.multiRevision++
                     }
                 },
-                long = {
-                    if (ch != null) {
-                        m.fit[index] = !m.fit[index]
-                        s.multiRevision++
-                        s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal"
-                    }
-                },
-                double = {
-                    if (ch != null) {
-                        m.fit[index] = !m.fit[index]
-                        s.multiRevision++
-                        s.notice = if (m.fit[index]) "Ekrana Sığdır" else "Orijinal"
-                    }
+                keyClick = {
+                    m.selected = index
+                    s.activateMultiSlot(index)
                 },
                 content = {
-                    if (ch != null && playbackUri(ch) != null) {
+                    if (ch != null) {
                         Box(Modifier.fillMaxSize()) {
+                            if (playbackUri(ch) == null) {
+                                Column(
+                                    Modifier.align(Alignment.Center).padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Label("Yayın açılamadı", 13, Color.White, bold = true)
+                                    Label("OK: Tekrar dene veya kanal değiştir", 10, Color(0xFFD0D7DE), bold = true)
+                                }
+                            }
                             Row(
                                 Modifier.align(Alignment.BottomStart)
                                     .padding(10.dp)
@@ -1859,15 +1860,14 @@ private fun Multi(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                         }
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (ch != null) image(ch.logo, Modifier.size(32.dp)) else Label("+", 24, if (isFocusedSlot) Color(0xFFFFD600) else Color(0xFF626669), bold = true)
-                            Label(ch?.name ?: "Kanal Ekle (Ekran ${index + 1})", 13, if (isFocusedSlot) Color(0xFFFFD600) else Color.White, bold = true)
-                            if (ch != null) Label("Yayın kullanılamıyor · Değiştirmek için dokunun", 10, Color.LightGray)
-                            else Label("Kategori ve arama ile kanal seçin", 9, Color(0xFF8A9AB0))
+                            Label("+", 24, if (isFocusedSlot) Color(0xFFFFD600) else Color(0xFF626669), bold = true)
+                            Label("Kanal Ekle (Ekran ${index + 1})", 13, if (isFocusedSlot) Color(0xFFFFD600) else Color.White, bold = true)
+                            Label("Kategori ve arama ile kanal seçin", 9, Color(0xFF8A9AB0))
                         }
                     }
                 }
             ) {
-                if (m.selected == index) s.openMultiChannelPicker(index)
+                if (m.selected == index) s.activateMultiSlot(index)
                 else {
                     m.selected = index
                     s.multiRevision++

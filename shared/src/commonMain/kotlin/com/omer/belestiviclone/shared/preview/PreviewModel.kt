@@ -196,6 +196,8 @@ object MultiLayoutCodec {
 class MultiSession(val entry: OpaqueId?) {
     val slots = MutableList<OpaqueId?>(4) { null }.also { it[0] = entry }
     val fit = MutableList(4) { true }
+    val formats = MutableList(4) { LiveFormatOptions.first() }
+    val retries = MutableList(4) { 0 }
     var mode: MultiLayoutMode = MultiLayoutMode.TWO_SIDE_BY_SIDE; private set
     val count: Int get() = mode.slotCount
     var selected = 0
@@ -208,9 +210,25 @@ class MultiSession(val entry: OpaqueId?) {
         mode = saved.mode
         for (i in 0 until 4) {
             slots[i] = saved.slots.getOrNull(i)
-            fit[i] = saved.fit.getOrNull(i) ?: true
+            val isFit = saved.fit.getOrNull(i) ?: true
+            fit[i] = isFit
+            formats[i] = if (isFit) LiveFormatOptions.first() else "Ekrana yay"
         }
         if (selected >= count) selected = 0
+    }
+    fun slotFormat(index: Int): String {
+        val fmt = formats.getOrElse(index) { LiveFormatOptions.first() }
+        if (fmt != LiveFormatOptions.first()) return fmt
+        return if (fit.getOrElse(index) { true }) LiveFormatOptions.first() else "Ekrana yay"
+    }
+    fun cycleFormat(index: Int): String {
+        if (index !in 0..3) return LiveFormatOptions.first()
+        val current = slotFormat(index)
+        val curIdx = LiveFormatOptions.indexOfFirst { isVideoFormatSelected(current, it) }.coerceAtLeast(0)
+        val next = LiveFormatOptions[(curIdx + 1) % LiveFormatOptions.size]
+        formats[index] = next
+        fit[index] = (next == LiveFormatOptions.first())
+        return next
     }
     fun toSaved(name: String): SavedMultiLayout =
         SavedMultiLayout(name = name.trim().ifEmpty { "Çoklu Ekran" }, mode = mode, slots = slots.toList(), fit = fit.toList())
@@ -305,8 +323,8 @@ object CategoryNormalizer {
         return when (up) {
             "FAVORİLER", "FAVORILER", "FAVORİ TV", "FAVORI TV" -> "FAVORİ TV"
             "TÜMÜ", "TUMU" -> "TÜMÜ"
-            "ULUSAL" -> "ULUSAL"
-            "HABER" -> "HABER"
+            "ULUSAL", "EĞLENCE", "EGLENCE", "KURUMLAR", "DİĞER", "DIGER" -> "ULUSAL"
+            "HABER", "EKONOMİ", "EKONOMI" -> "HABER"
             "SPOR" -> "SPOR"
             "ÇOCUK", "COCUK" -> "ÇOCUK"
             "BELGESEL" -> "BELGESEL"
@@ -315,8 +333,8 @@ object CategoryNormalizer {
             "YEREL" -> "YEREL"
             "KKTC", "KIBRIS", "K.K.T.C", "K.K.T.C.", "KUZEY KIBRIS" -> "KKTC"
             "AZ", "AZERBAYCAN", "AZERBAIJAN", "AZƏRBAYCAN" -> "AZERBAYCAN"
-            "DÜNYA", "DUNYA", "WORLD", "ULUSLARARASI" -> "DÜNYA"
-            "7/24 DİZİ/FİLM", "7/24 DIZI/FILM", "7/24 DİZİ", "7/24 FİLM", "DİZİ/FİLM", "FİLM/DİZİ" -> "7/24 DİZİ/FİLM"
+            "DÜNYA", "DUNYA", "WORLD", "ULUSLARARASI", "ULUSAL - YURT DIŞI", "ULUSAL - YURT DISI", "YURT DIŞI", "YURT DISI" -> "DÜNYA"
+            "7/24 DİZİ/FİLM", "7/24 DIZI/FILM", "7/24 DİZİ", "7/24 FİLM", "DİZİ/FİLM", "FİLM/DİZİ", "7/24 YOUTUBE" -> "7/24 DİZİ/FİLM"
             "RADYO", "RADIO" -> "RADYO"
             else -> up
         }
@@ -368,16 +386,7 @@ object CategoryNormalizer {
             if (trimmed.isEmpty()) continue
             val key = if (normalizeAliases) canonicalKey(trimmed) else toTurkishUpper(trimmed)
             if (seenKeys.add(key)) {
-                val label = if (normalizeAliases) {
-                    when (key) {
-                        "SPOR" -> "SPOR"
-                        "KKTC" -> "KKTC"
-                        "AZERBAYCAN" -> "AZERBAYCAN"
-                        "DÜNYA" -> "DÜNYA"
-                        "7/24 DİZİ/FİLM" -> "7/24 DİZİ/FİLM"
-                        else -> trimmed
-                    }
-                } else trimmed
+                val label = if (normalizeAliases) normalizeDisplayLabel(trimmed) else trimmed
                 result.add(label)
             }
         }
