@@ -42,7 +42,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     private var demo = PreviewData()
     private var publicData: PreviewData? = null
     val isPublic get() = data.profileId == PublicM3u.profile
-    val profileName get() = data.library?.main?.name ?: if (isPublic) "trlist" else "Örnek profil"
+    val profileName: String
+        get() {
+            val raw = data.library?.main?.name
+            return when {
+                raw.isNullOrBlank() -> if (isPublic) "TiviListesi" else "Örnek profil"
+                raw == "trlist" || raw == "trlist.m3u" -> "TiviListesi"
+                else -> raw
+            }
+        }
     var data by mutableStateOf(PreviewData()); private set
     var loaded by mutableStateOf(false); private set
     var storage by mutableStateOf("Kanallar yükleniyor…"); private set
@@ -506,7 +514,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
     }
     val visibleData get() = draft ?: data
-    val channel get() = data.channels.find { it.id == selected }
+    val channel: PreviewChannel? get() = data.channels.find { it.id == selected } ?: PreviewFixture.radioChannels.find { it.id == selected }
     val channelNumber: Int get() {
         val list = visibleData.filtered(category, query)
         val inFiltered = list.indexOfFirst { it.id == selected }
@@ -737,8 +745,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             showBottomToast("Kanal gizlendi: ${ch.name}", ToastTone.Warning)
         }
     }
-    /** Kullanıcı kanal seçimi (liste tıklaması vb.): canlı TV'de panel kapanır ve kanal değişim kartı gösterilir. */
+    /** Kumanda numarası veya doğrudan seçim: canlı TV'de panel kapanır ve kanal değişim kartı gösterilir. */
     fun select(id: OpaqueId) = changeChannel(id, keepPanel = false)
+    /** Alt veya yan kanal listesinden seçim: menü ve sol üst EPG başlığı açık kalır, altta ZapCard çıkmaz. */
+    fun selectFromList(id: OpaqueId) = changeChannel(id, keepPanel = true)
     private fun changeChannel(id: OpaqueId, keepPanel: Boolean) {
         if (selected != id) {
             technicalInfo = StreamTechnicalInfo()
@@ -756,9 +766,14 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         paused = false
         isBehindLiveEdge = false
         seekOffsetSeconds = 0L
-        if (page == "live" && !isRadioMode && !keepPanel) {
-            panel = false
-            showZapCard()
+        if (page == "live" && !isRadioMode) {
+            if (keepPanel) {
+                panel = true
+                touchPanelInteraction()
+            } else {
+                panel = false
+                showZapCard()
+            }
         }
         if (playbackUri(channel) == null) notice = if (channel?.available == false)
             message("Kanal etkin kaynaklarda erişilemiyor. Favori ve sırası korundu.", "Channel unavailable in active sources. Favorite and order preserved.", "Kanal in aktiven Quellen nicht verfügbar. Favorit und Reihenfolge beibehalten.")

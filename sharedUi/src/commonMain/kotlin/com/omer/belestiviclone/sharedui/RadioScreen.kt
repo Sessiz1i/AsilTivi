@@ -102,7 +102,10 @@ fun RadioScreen(
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures {
-                    s.panel = !s.panel
+                    if (!s.panel) {
+                        s.panel = true
+                    }
+                    s.touchPanelInteraction()
                 }
             }
     ) {
@@ -430,6 +433,12 @@ fun RadioScreen(
                 val listState = rememberLazyListState()
                 val radioList = s.radioChannels
 
+                LaunchedEffect(listState.isScrollInProgress) {
+                    if (listState.isScrollInProgress) {
+                        s.touchPanelInteraction()
+                    }
+                }
+
                 LaunchedEffect(s.selected) {
                     val index = radioList.indexOfFirst { it.id == s.selected }
                     if (index >= 0) {
@@ -452,7 +461,10 @@ fun RadioScreen(
                             station = station,
                             isSelected = isSelected,
                             image = image,
-                            onClick = { s.select(station.id) }
+                            onClick = {
+                                s.touchPanelInteraction()
+                                s.select(station.id)
+                            }
                         )
                     }
                 }

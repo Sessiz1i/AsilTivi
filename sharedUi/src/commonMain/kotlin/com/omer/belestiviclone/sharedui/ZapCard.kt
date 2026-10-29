@@ -80,23 +80,23 @@ fun zapCardAlignment(positionPref: String): Alignment = when (positionPref.trim(
 
 /** Ayarlar > Görünüm > Kanal Bilgisi Boyutu ("Küçük", "Normal", "Büyük") çarpanını hesaplar. */
 fun zapCardScale(sizePref: String): Float = when (sizePref.trim()) {
-    "Küçük" -> 0.76f
-    "Büyük" -> 1.25f
-    else -> 1.0f
+    "Küçük" -> 0.52f
+    "Büyük" -> 1.0f
+    else -> 0.76f
 }
 
 /** Ölçeklenmiş tasarım birimlerinde (855dp genişlik tabanlı) ZapCard genişliğini hesaplar. */
-fun zapCardWidthDp(sizePref: String, maxWidthDp: Float): Float {
+fun zapCardWidthDp(sizePref: String, maxWidthDp: Float = 855f): Float {
     val scale = zapCardScale(sizePref)
     if (maxWidthDp < 600f) {
-        return ((maxWidthDp - 24f) * scale).coerceIn(200f, (maxWidthDp - 16f).coerceAtLeast(200f))
+        return ((maxWidthDp - 24f) * scale).coerceIn(180f, (maxWidthDp - 16f).coerceAtLeast(180f))
     }
     val base = when (sizePref.trim()) {
-        "Küçük" -> 300f
-        "Büyük" -> 510f
-        else -> 405f
+        "Küçük" -> 195f
+        "Büyük" -> 405f
+        else -> 300f
     }
-    return base.coerceAtMost((maxWidthDp - 32f).coerceAtLeast(260f))
+    return base.coerceAtMost((maxWidthDp - 32f).coerceAtLeast(180f))
 }
 
 @Composable
@@ -107,7 +107,7 @@ internal fun ZapCard(
     modifier: Modifier = Modifier,
     scale: Float = 1f,
 ) {
-    val s = scale.coerceIn(0.65f, 1.45f)
+    val s = scale.coerceIn(0.50f, 1.30f)
     val shape = RoundedCornerShape((15f * s).dp)
     val accent = zapAccent(theme)
     Row(
@@ -118,41 +118,38 @@ internal fun ZapCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy((14f * s).dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((3f * s).dp)) {
-            Box(Modifier.size((84f * s).dp, (60f * s).dp), contentAlignment = Alignment.Center) {
-                image(model.logo, Modifier.fillMaxSize())
-            }
-            Label("${model.channelNumber}", (10f * s).toInt().coerceAtLeast(8), Color(0xFF9AA4AE), bold = true)
+        Box(Modifier.size((84f * s).dp, (60f * s).dp), contentAlignment = Alignment.Center) {
+            image(model.logo, Modifier.fillMaxSize())
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy((6f * s).dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((8f * s).dp)) {
-                Label(model.channelName, (20f * s).toInt().coerceAtLeast(13), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+                Label(model.channelName, (20f * s).toInt().coerceAtLeast(10), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
                 if (model.qualityBadge != null) {
                     Box(Modifier.background(ZapBadge, RoundedCornerShape((3f * s).dp)).padding(horizontal = (7f * s).dp, vertical = (3f * s).dp)) {
-                        Label(model.qualityBadge, (11f * s).toInt().coerceAtLeast(8), Color.White, bold = true, maxLines = 1)
+                        Label(model.qualityBadge, (11f * s).toInt().coerceAtLeast(7), Color.White, bold = true, maxLines = 1)
                     }
                 }
             }
             if (model.hasEpg) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
-                    Label("Şimdi:", (13f * s).toInt().coerceAtLeast(9), accent, bold = true)
-                    Label(model.nowTitle, (13f * s).toInt().coerceAtLeast(9), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
-                    Label(model.nowRange, (12f * s).toInt().coerceAtLeast(9), Color(0xFFCFD8DC), bold = true, maxLines = 1)
+                    Label("Şimdi:", (13f * s).toInt().coerceAtLeast(7), accent, bold = true)
+                    Label(model.nowTitle, (13f * s).toInt().coerceAtLeast(7), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+                    Label(model.nowRange, (12f * s).toInt().coerceAtLeast(7), Color(0xFFCFD8DC), bold = true, maxLines = 1)
                 }
                 Box(Modifier.fillMaxWidth().height((4f * s).dp).background(Color(0xFF3A3F45), RoundedCornerShape((2f * s).dp))) {
                     Box(Modifier.fillMaxWidth(model.progress.coerceIn(0f, 1f)).fillMaxHeight().background(accent, RoundedCornerShape((2f * s).dp)))
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
-                    Label("Sonra:", (13f * s).toInt().coerceAtLeast(9), ZapNextBlue, bold = true)
-                    Label(model.nextTitle, (13f * s).toInt().coerceAtLeast(9), Color(0xFFB0B8C0), Modifier.weight(1f), maxLines = 1)
+                    Label("Sonra:", (13f * s).toInt().coerceAtLeast(7), ZapNextBlue, bold = true)
+                    Label(model.nextTitle, (13f * s).toInt().coerceAtLeast(7), Color(0xFFB0B8C0), Modifier.weight(1f), maxLines = 1)
                     ZapClockIcon(Modifier.size((20f * s).dp))
-                    Label(model.clock, (20f * s).toInt().coerceAtLeast(13), accent, bold = true)
+                    Label(model.clock, (20f * s).toInt().coerceAtLeast(10), accent, bold = true)
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
-                    Label(ZapCardNoEpgText, (13f * s).toInt().coerceAtLeast(9), Color(0xFF9AA4AE), Modifier.weight(1f), maxLines = 1)
+                    Label(ZapCardNoEpgText, (13f * s).toInt().coerceAtLeast(7), Color(0xFF9AA4AE), Modifier.weight(1f), maxLines = 1)
                     ZapClockIcon(Modifier.size((20f * s).dp))
-                    Label(model.clock, (20f * s).toInt().coerceAtLeast(13), accent, bold = true)
+                    Label(model.clock, (20f * s).toInt().coerceAtLeast(10), accent, bold = true)
                 }
             }
         }

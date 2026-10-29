@@ -1,4 +1,4 @@
-﻿package com.omer.belestiviclone
+package com.omer.belestiviclone
 
 import java.io.File
 import java.net.URI
@@ -18,7 +18,8 @@ class NetworkPolicyTest {
         }.toSet()
         val catalogue = File("src/main/assets/TiviListe.m3u").readLines().filter { it.trim().startsWith("http://") }
             .map { URI(it.trim()).host }.toSet()
-        assertEquals(catalogue + "dogusdyg-star.lg.mncdn.com", allowed)
+        val radioHttpHosts = setOf("46.20.3.204", "46.20.3.229", "46.20.7.126")
+        assertEquals(catalogue + "dogusdyg-star.lg.mncdn.com" + radioHttpHosts, allowed)
         assertEquals(0, doc.getElementsByTagName("trust-anchors").length)
         assertEquals(0, doc.getElementsByTagName("debug-overrides").length)
         assertTrue(File("src/main/AndroidManifest.xml").readText().contains("android:networkSecurityConfig=\"@xml/network_security_config\""))

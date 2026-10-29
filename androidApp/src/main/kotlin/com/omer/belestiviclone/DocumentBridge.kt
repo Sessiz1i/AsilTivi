@@ -7,12 +7,14 @@ import androidx.compose.ui.platform.LocalContext
 import android.provider.OpenableColumns
 import com.omer.belestiviclone.shared.preview.*
 import com.omer.belestiviclone.sharedui.PreviewState
+import com.omer.belestiviclone.sharedui.ToastTone
 import kotlinx.coroutines.*
 
 /** SAF grants are used only to read the selected document once. The parsed copy lives in Room. */
 @Composable
 internal fun DocumentBridge(state: PreviewState) {
     val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val scope = rememberCoroutineScope()
     var pending by remember { mutableStateOf<String?>(null) }
     var profile by remember { mutableStateOf(state.data.profileId) }
@@ -21,10 +23,15 @@ internal fun DocumentBridge(state: PreviewState) {
         (if (kind == "file") state.dialog == kind else state.dialog == null)
     fun failed() { state.notice = state.message("Dosya okunamadı/yazılamadı; uygulama verileri korundu.", "File read/write failed; app data preserved.", "Datei konnte nicht gelesen/geschrieben werden; Daten beibehalten.") }
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        state.exitRequested = false
         val kind = pending
         if (kind != null && valid(kind)) {
-            if (uri == null) { pending = null; state.documentCanceled() }
-            else scope.launch {
+            if (uri == null) {
+                pending = null
+                state.documentCanceled()
+                if (state.page != "settings") state.page = "settings"
+            } else scope.launch {
                 try {
                     val result = withContext(Dispatchers.IO) {
                         val text = requireNotNull(context.contentResolver.openInputStream(uri)).use { it.boundedText(if (kind == "import") FavoriteBackup.maxBytes else 4 * 1024 * 1024) }
@@ -39,9 +46,14 @@ internal fun DocumentBridge(state: PreviewState) {
         } else pending = null
     }
     val create = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        state.exitRequested = false
         if (valid("export")) {
-            if (uri == null) { pending = null; state.documentCanceled() }
-            else scope.launch {
+            if (uri == null) {
+                pending = null
+                state.documentCanceled()
+                if (state.page != "settings") state.page = "settings"
+            } else scope.launch {
                 try {
                     val bytes = exportText.encodeToByteArray()
                     withContext(Dispatchers.IO) { requireNotNull(context.contentResolver.openOutputStream(uri, "wt")).use { it.write(bytes); it.flush() } }
@@ -71,6 +83,11 @@ internal fun DocumentBridge(state: PreviewState) {
                 exportText = FavoriteBackup.encode(state.data)
                 create.launch("beles-clone-favoriler-${System.currentTimeMillis()}.json")
             } else open.launch(if (request == "file") arrayOf("*/*") else arrayOf("application/json", "text/plain", "application/octet-stream"))
-        } catch (_: Exception) { pending = null; failed() }
+        } catch (_: Exception) {
+            pending = null
+            state.documentLaunched()
+            state.showBottomToast("Dosya seçici açılamadı", ToastTone.Warning)
+            failed()
+        }
     }
 }

@@ -159,6 +159,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun enforceLandscapeOrientation() {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    }
+
+    override fun onResume() {
+        super.onResume()
+        enforceLandscapeOrientation()
+        immersive()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The public Window callback preserves Android/Compose dispatch for every unowned event.
@@ -169,17 +179,14 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         immersive()
-        // TV keeps its landscape viewport across SAF activities; phones keep sensor/responsive orientation.
-        if (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        }
+        enforceLandscapeOrientation()
         val databaseName = "belestivi_preview_v1.db"
         val store = AndroidPreviewStore(applicationContext, databaseName = databaseName)
         val catalog = AndroidPublicCatalog(applicationContext, "public-trlist-catalog-v1")
         val publicStore = AndroidPreviewStore(applicationContext, key = 2, databaseName = databaseName) {
             val channels = catalog.load()
             PreviewData(favorites = emptyList(), history = emptyList(), categories = CategoryNormalizer.deduplicateCategories(channels.flatMap { it.groups }.distinct()),
-                preferences = store.load().preferences, sources = listOf("Özel M3U · trlist · 8 Ekim 2026"), channels = channels, profileId = PublicM3u.profile)
+                preferences = store.load().preferences, sources = listOf("Özel M3U · TiviListesi"), channels = channels, profileId = PublicM3u.profile)
         }
         setContent {
             val scope = rememberCoroutineScope()

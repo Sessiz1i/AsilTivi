@@ -13,6 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BTDebug">
         <activity android:name=".MainActivity" android:exported="true"
+            android:screenOrientation="sensorLandscape"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout">
             <intent-filter>

@@ -198,4 +198,33 @@ class RadioStateTest {
         assertFalse(coldStartSession.isRadioMode)
         assertEquals(tv2.id, coldStartSession.selected)
     }
+
+    @Test
+    fun defaultRadioFixtureHasValidPlaybackDefinitionsAndPlaybackUriWorksInRadioMode() = runBlocking {
+        assertEquals(12, PreviewFixture.radioChannels.size)
+        for (station in PreviewFixture.radioChannels) {
+            assertTrue(station.isRadio)
+            assertTrue(station.isAudioOrRadio)
+            assertNotNull(station.definition, "${station.name} oynatma tanımı boş olmamalı")
+            assertNotNull(playbackUri(station), "${station.name} playbackUri null olmamalı")
+            assertTrue(station.logo.startsWith("https://") || station.logo.startsWith("http://"), "${station.name} gerçek logo URL'sine sahip olmalı")
+        }
+
+        // Yalnızca TV kanalı içeren bir katalogda Radyo moduna geçildiğinde PreviewFixture.radioChannels devreye girer
+        // ve s.channel null dönmez, "Bu kaydın oynatma tanımı desteklenmiyor." hatası oluşmaz.
+        val tvOnlyData = PreviewData(
+            channels = listOf(PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1", definition = com.omer.belestiviclone.shared.catalog.PlaybackDefinition(com.omer.belestiviclone.shared.catalog.Address.fromForm("https://tv-trt1.medya.trt.com.tr/master.m3u8")))),
+            profileId = PublicM3u.profile
+        )
+        val s = PreviewState(DummyStore(tvOnlyData), this)
+        s.load()
+        assertEquals("TiviListesi", s.profileName)
+
+        s.enterRadioMode()
+        assertTrue(s.isRadioMode)
+        assertNotNull(s.channel, "Radyo modunda s.channel PreviewFixture.radioChannels üzerinden çözümlenmeli")
+        assertEquals("TRT FM", s.channel?.name)
+        assertNotNull(playbackUri(s.channel), "Seçili radyo istasyonunun playbackUri değeri geçerli olmalı")
+        assertFalse(s.notice.contains("desteklenmiyor"), "Radyo istasyonu seçildiğinde desteklenmiyor uyarısı çıkmamalı")
+    }
 }

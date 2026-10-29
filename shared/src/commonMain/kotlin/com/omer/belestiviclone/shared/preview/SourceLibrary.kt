@@ -1,4 +1,4 @@
-﻿package com.omer.belestiviclone.shared.preview
+package com.omer.belestiviclone.shared.preview
 
 import com.omer.belestiviclone.shared.catalog.*
 
@@ -55,7 +55,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         } }
         val memberships = rows.map { row -> MembershipRecord(MembershipId(allocate()), ChannelId(channels.first { it.definition == row.definition }.id), default, categories.first { it.label == row.category }.id) }
         val snapshot = CatalogSnapshot(listOf(SourceRecord(default, SourceRole.MAIN, true)), channels.mapIndexed { i, ch -> ChannelRecord(ChannelId(ch.id), ch.definition!!, i.toLong()) }, memberships, categories)
-        return SourceLibrary(listOf(SavedSource(default, "trlist", SourceKind.DEFAULT, PublicM3u.url, rows)), default, snapshot)
+        return SourceLibrary(listOf(SavedSource(default, "TiviListesi", SourceKind.DEFAULT, PublicM3u.url, rows)), default, snapshot)
     }
     fun validate(library: SourceLibrary, name: String, address: String, editing: SourceId? = null, extra: Boolean = false) {
         if (name.trim().isEmpty() || name.trim().length > 120) throw SourceProblem("name")
@@ -96,7 +96,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
     }
     fun default(data: PreviewData, text: String): PreviewData {
         val library = bootstrap(data)
-        val source = parsed(PublicM3u.source, "trlist", SourceKind.DEFAULT, PublicM3u.url, text)
+        val source = parsed(PublicM3u.source, "TiviListesi", SourceKind.DEFAULT, PublicM3u.url, text)
         return rebuild(data, library.copy(records = library.records.filter { it.id != source.id } + source, active = source.id))
     }
     fun saveXtream(
@@ -269,7 +269,9 @@ object LibraryCodec {
         val records = PreviewCodec.unpack(f[2]).map { row ->
             val r = PreviewCodec.unpack(row); require(r.size == 9)
             val source = sid(r[0])
-            SavedSource(source, r[1], SourceKind.valueOf(r[2]), r[3], PreviewCodec.unpack(r[8]).map { raw ->
+            val kind = SourceKind.valueOf(r[2])
+            val normalizedName = if (kind == SourceKind.DEFAULT && (r[1] == "trlist" || r[1] == "trlist.m3u")) "TiviListesi" else r[1]
+            SavedSource(source, normalizedName, kind, r[3], PreviewCodec.unpack(r[8]).map { raw ->
                 val v = PreviewCodec.unpack(raw); require(v.size in 6..7)
                 ChannelContribution(source, v[0].toLong(), definition(v[1]), CategoryLabel.fromRaw(v[2]), v[3], v[4], v[5], v.getOrElse(6) { "" })
             }, r[4].ifEmpty { null }?.let(::sid), r[5].toBooleanStrict(), r[6].toInt(), r[7].toInt())

@@ -1,5 +1,6 @@
 package com.omer.belestiviclone.shared.preview
 
+import com.omer.belestiviclone.shared.catalog.Address
 import com.omer.belestiviclone.shared.catalog.OpaqueId
 import com.omer.belestiviclone.shared.catalog.PlaybackDefinition
 import com.omer.belestiviclone.shared.catalog.ComparisonV1
@@ -10,6 +11,7 @@ data class PreviewChannel(val id: OpaqueId, val name: String, val category: Stri
     val isAudioOrRadio: Boolean get() = isRadio || groups.any { it.equals("Radyo", ignoreCase = true) } || category.equals("Radyo", ignoreCase = true)
 }
 object PreviewFixture {
+    private fun def(url: String) = PlaybackDefinition(Address.fromForm(url))
     val channels = listOf(
         PreviewChannel(OpaqueId(0x50524556, 1), "Örnek video", "Örnek", "ikon_tv", true),
         PreviewChannel(OpaqueId(0x50524556, 2), "TRT 1", "Ulusal", "logo_trt1"),
@@ -25,9 +27,114 @@ object PreviewFixture {
         PreviewChannel(OpaqueId(0x50524556, 12), "TRT 4K", "Ulusal", "logo_trt4k"),
     )
     val radioChannels = listOf(
-        PreviewChannel(OpaqueId(0x50524556, 101), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
-        PreviewChannel(OpaqueId(0x50524556, 102), "Kral FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
-        PreviewChannel(OpaqueId(0x50524556, 103), "Power FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo")),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 101),
+            name = "TRT FM",
+            category = "Radyo",
+            logo = "https://www.trt.net.tr/_nuxt/img/trt-fm-radyo-kanali.f4fa31f.png",
+            definition = def("https://tv-trtfm.medya.trt.com.tr/master.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 102),
+            name = "Kral FM",
+            category = "Radyo",
+            logo = "https://www.canliradyodinle.fm/wp-content/uploads/kral-fm-dinle.jpg",
+            definition = def("https://dygedge.radyotvonline.net/kralfm/playlist.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 103),
+            name = "Power FM",
+            category = "Radyo",
+            logo = "https://upload.wikimedia.org/wikipedia/tr/6/6c/Power_FM_logo.png",
+            definition = def("https://live.powerapp.com.tr/powerfm/mpeg/icecast.audio"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 104),
+            name = "TRT Radyo 1",
+            category = "Radyo",
+            logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-1-radyo-kanali.1dc612f.png",
+            definition = def("https://tv-trtradyo1.medya.trt.com.tr/master.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 105),
+            name = "TRT Radyo 3",
+            category = "Radyo",
+            logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-3-radyo-kanali.101a3cf.png",
+            definition = def("https://tv-trtradyo3.medya.trt.com.tr/master.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 106),
+            name = "TRT Nağme",
+            category = "Radyo",
+            logo = "https://www.trt.net.tr/_nuxt/img/trt-nagme-radyo-kanali.287afc0.png",
+            definition = def("https://tv-trtnagme.medya.trt.com.tr/master.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 107),
+            name = "TRT Türkü",
+            category = "Radyo",
+            logo = "https://www.trt.net.tr/_nuxt/img/trt-turku-radyo-kanali.7cd2153.png",
+            definition = def("https://tv-trtturku.medya.trt.com.tr/master.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 108),
+            name = "Kral Pop Radyo",
+            category = "Radyo",
+            logo = "https://raw.githubusercontent.com/GitLatte/m3ueditor/refs/heads/site/images/kanal-gorselleri/turkiye/kral-pop-tr.png",
+            definition = def("https://dygedge.radyotvonline.net/kralpop/playlist.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 109),
+            name = "Power Türk",
+            category = "Radyo",
+            logo = "https://www.phonostar.de/images/auto_created/Power_Tuerk2184x184.png",
+            definition = def("https://live.powerapp.com.tr/powerturk/mpeg/icecast.audio"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 110),
+            name = "Alem FM",
+            category = "Radyo",
+            logo = "https://media.giphy.com/avatars/alemfm/JBnuJVfQAhJ4.png",
+            definition = def("https://turkmedya.radyotvonline.net/turkmedya/alemfm.stream/playlist.m3u8"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 111),
+            name = "Best FM",
+            category = "Radyo",
+            logo = "https://www.canliradyodinle.fm/wp-content/uploads/best-fm-dinle-100x100.png",
+            definition = def("http://46.20.7.126/bestfmmp3"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
+        PreviewChannel(
+            id = OpaqueId(0x50524556, 112),
+            name = "Show Radyo",
+            category = "Radyo",
+            logo = "https://www.canliradyodinle.fm/wp-content/uploads/show-radyo.jpg",
+            definition = def("http://46.20.3.229/showradyo"),
+            isRadio = true,
+            groups = listOf("Radyo")
+        ),
     )
     val categories = listOf("Örnek", "Ulusal", "Haber", "Spor", "Çocuk", "Müzik", "Belgesel")
     const val videoUri = "https://storage.googleapis.com/exoplayer-test-media-1/mp4/android-screens-10s.mp4"

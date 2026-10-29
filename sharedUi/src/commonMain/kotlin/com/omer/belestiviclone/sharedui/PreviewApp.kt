@@ -65,6 +65,7 @@ private val LocalKeySignal = staticCompositionLocalOf<(KeyEvent) -> KeyPressSign
 private val LocalFocusObserver = staticCompositionLocalOf<(String) -> Unit> { {} }
 private val LocalNavigationObserver = staticCompositionLocalOf<(KeyEvent) -> Unit> { {} }
 internal val LocalBoundsObserver = staticCompositionLocalOf<(String, Rect) -> Unit> { { _, _ -> } }
+internal val LocalPanelInteraction = staticCompositionLocalOf<() -> Unit> { {} }
 private val colors = listOf(Color(0xFFB68B08), Color(0xFF007D9E), Color(0xFF5A6C80), Color(0xFFB1AFA7), Color(0xFFAF4546), Color(0xFF37875B), Color(0xFF466BAB))
 @Composable
 internal fun Label(value: String, size: Int = 12, color: Color = Color.White, modifier: Modifier = Modifier, bold: Boolean = false, lineHeight: Float = size * 1.333f, letterSpacing: Float = 0f, maxLines: Int = Int.MAX_VALUE, textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Unspecified, decoration: androidx.compose.ui.text.style.TextDecoration? = null) {
@@ -84,6 +85,7 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
     val keySignal = LocalKeySignal.current
     val focusObserver = LocalFocusObserver.current
     val navigationObserver = LocalNavigationObserver.current
+    val panelInteraction = LocalPanelInteraction.current
     val accessibilityLabel = presentationText(label, LocalLanguage.current)
     val themeFocusStroke = LocalSettingsFocusStroke.current
     val themeFocusFill = LocalSettingsFocusFill.current
@@ -94,6 +96,7 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
         onDispose { returns?.active?.remove(requester); if (returns?.focused == requester) returns.focused = null }
     }
     fun invoke(action: () -> Unit) {
+        panelInteraction()
         if (returns?.capture == true) returns.restore = returnFocusKey?.let { returns.registry.requester(it) { FocusRequester() } } ?: requester
         action()
     }
@@ -101,11 +104,12 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
         .focusRequester(requester).focusProperties { canFocus = canInteract }.semantics { contentDescription = accessibilityLabel }
         .onFocusChanged {
             focused = it.isFocused
-            if (it.isFocused) { returns?.focused = requester; focusObserver(focusKey ?: "action:${label.hashCode()}"); onFocused?.invoke() }
+            if (it.isFocused) { panelInteraction(); returns?.focused = requester; focusObserver(focusKey ?: "action:${label.hashCode()}"); onFocused?.invoke() }
             else { gate.reset(); if (returns?.focused == requester) { returns.focused = null; focusObserver("none") } }
         }
         .onPreviewKeyEvent { e ->
             navigationObserver(e)
+            if (e.type == KeyEventType.KeyDown) panelInteraction()
             if (extraKey?.invoke(e) == true) true
             else if (canInteract && e.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) {
                 val now = clock.elapsedNow().inWholeMilliseconds
@@ -174,7 +178,7 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
         }
     }
     LaunchedEffect(s) { s.load() }
-    CompositionLocalProvider(LocalFocusReturn provides returns, LocalEnglish provides (s.data.pref("language") == "English"), LocalLanguage provides s.data.pref("language"), LocalKeySignal provides platformKeySignal, LocalFocusObserver provides onFocusTarget, LocalNavigationObserver provides onNavigationKey, LocalBoundsObserver provides onLayoutBounds) {
+    CompositionLocalProvider(LocalFocusReturn provides returns, LocalEnglish provides (s.data.pref("language") == "English"), LocalLanguage provides s.data.pref("language"), LocalKeySignal provides platformKeySignal, LocalFocusObserver provides onFocusTarget, LocalNavigationObserver provides onNavigationKey, LocalBoundsObserver provides onLayoutBounds, LocalPanelInteraction provides s::touchPanelInteraction) {
     Box(Modifier.fillMaxSize().onGloballyPositioned { onLayoutBounds("window-root", it.boundsInWindow()) }.background(Color.Black).safeDrawingPadding()) {
     BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { onLayoutBounds("safe-root", it.boundsInWindow()) }) {
     val density = LocalDensity.current
@@ -182,10 +186,13 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
     CompositionLocalProvider(LocalDensity provides Density(density.density * scale, density.fontScale)) {
     Box(Modifier.fillMaxSize()) {
         if (!s.loaded) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Label(s.storage) }
-        else when (s.page) {
-            "settings" -> Settings(s, image, appVersionName)
-            "multi" -> Multi(s, image, video)
-            else -> Live(s, image, video)
+        else if (s.page == "multi") {
+            Multi(s, image, video)
+        } else {
+            Live(s, image, video)
+            if (s.page == "settings") {
+                Settings(s, image, appVersionName)
+            }
         }
         if (s.notice.isNotEmpty() && !(s.isRadioMode && s.radioScreenDimmed)) {
             val current = s.notice
@@ -297,6 +304,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         }
         val playbackPrefs = PlaybackPreferences(s.data.pref("quality"), s.data.pref("audio"), s.data.pref("subtitle"), s.data.pref("subtitleSize"), s.data.pref("subtitleColor"), s.data.pref("subtitleBgOpacity"), s.data.pref("backgroundAudio"))
         video(s.channel, s.paused, s.muted, s.retry, s.data.pref("format"), playbackPrefs, { qualityInfo = it }, Modifier.fillMaxSize())
+        if (s.page != "live") {
+            return@BoxWithConstraints
+        }
         if (s.isRadioMode) {
             RadioScreen(s, image, Modifier.fillMaxSize())
             return@BoxWithConstraints
@@ -317,7 +327,24 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             }
         }
         val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
-        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { s.panel = true } })
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (s.info || s.dialog == "format") {
+                            s.info = false
+                            if (s.dialog == "format") s.dialog = null
+                            s.touchPanelInteraction()
+                        } else {
+                            if (!s.panel) {
+                                s.panel = true
+                            }
+                            s.touchPanelInteraction()
+                        }
+                    }
+                }
+        )
         val boundsObserver = LocalBoundsObserver.current
         val currentEpg = remember(s.channel, nowEpochMs, s.epgRevision) { s.epgNowNext(s.channel, nowEpochMs) }
         val headingNow = currentEpg.now?.let { "Şimdi: ${it.title} (${it.timeRangeLabel()})" } ?: "Şimdi: EPG bilgisi yok"
@@ -341,11 +368,17 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 Column(Modifier.onGloballyPositioned { boundsObserver("vertical-panel", it.boundsInWindow()) }.offset(x = if (s.categoryMenu) 135.dp else 13.dp, y = top).width(panelWidth).height(listHeight).background(Color.Black.copy(alpha = opacity))) {
                     Channels(s, image, true, Modifier.fillMaxSize())
                 }
-                if (s.categoryMenu) LazyColumn(Modifier.offset(13.dp, top).width(122.dp).height(listHeight).background(Color.Black.copy(alpha = opacity)).padding(5.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
-                    item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
-                    item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                if (s.categoryMenu) {
+                    val catListState = rememberLazyListState()
+                    LaunchedEffect(catListState.isScrollInProgress) {
+                        if (catListState.isScrollInProgress) s.touchPanelInteraction()
+                    }
+                    LazyColumn(Modifier.offset(13.dp, top).width(122.dp).height(listHeight).background(Color.Black.copy(alpha = opacity)).padding(5.dp), state = catListState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
+                        items(categories(s)) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
+                        item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
+                        item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                    }
                 }
                 Row(Modifier.offset(13.dp, top + listHeight).width(panelWidth).height(30.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     val currentCategoryLabel = when {
@@ -358,7 +391,11 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 }
                 if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
-                LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(if (theme.categoryTabPill) 6.dp else (-8).dp)) {
+                val catRowState = rememberLazyListState()
+                LaunchedEffect(catRowState.isScrollInProgress) {
+                    if (catRowState.isScrollInProgress) s.touchPanelInteraction()
+                }
+                LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), state = catRowState, horizontalArrangement = Arrangement.spacedBy(if (theme.categoryTabPill) 6.dp else (-8).dp)) {
                     item { CategoryTab("Ara", s, image, false) { s.searching = true } }
                     items(categories(s)) { cat -> CategoryTab(cat, s, image, false, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
                 }
@@ -648,6 +685,7 @@ private fun handleChooseCategory(s: PreviewState, cat: String, focusFirstCard: B
 @Composable
 private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Modifier, onSeek: ((Float) -> Unit)? = null) {
     val clamped = progress.coerceIn(0f, 1f)
+    val panelInteraction = LocalPanelInteraction.current
     Box(
         modifier = modifier
             .height(20.dp)
@@ -656,6 +694,7 @@ private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Mo
                 if (onSeek != null) {
                     Modifier.pointerInput(onSeek) {
                         detectTapGestures { offset ->
+                            panelInteraction()
                             if (size.width > 0) {
                                 onSeek((offset.x / size.width.toFloat()).coerceIn(0f, 1f))
                             }
@@ -1079,10 +1118,38 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
     val values = s.visibleData.filtered(s.category, s.query)
     val listState = key(vertical) { rememberLazyListState() }
     val returns = LocalFocusReturn.current
-    LaunchedEffect(s.selected, values) {
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            s.touchPanelInteraction()
+        }
+    }
+    LaunchedEffect(s.selected, values.size, s.panel, vertical) {
         val index = values.indexOfFirst { it.id == s.selected }
-        if (!s.searching && s.moving == null && index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
-            listState.scrollToItem(index)
+        if (!s.searching && s.moving == null && index >= 0) {
+            if (!vertical) {
+                if (listState.layoutInfo.totalItemsCount == 0) {
+                    withFrameNanos { }
+                }
+                val layoutInfo = listState.layoutInfo
+                val viewportWidth = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                val itemWidth = layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 0
+                if (viewportWidth > 0 && itemWidth > 0) {
+                    val centerOffset = -((viewportWidth - itemWidth) / 2)
+                    runCatching { listState.animateScrollToItem(index, centerOffset) }
+                } else {
+                    runCatching { listState.scrollToItem(index) }
+                    withFrameNanos { }
+                    val info2 = listState.layoutInfo
+                    val vw2 = info2.viewportEndOffset - info2.viewportStartOffset
+                    val iw2 = info2.visibleItemsInfo.firstOrNull()?.size ?: 0
+                    if (vw2 > 0 && iw2 > 0) {
+                        val centerOffset = -((vw2 - iw2) / 2)
+                        runCatching { listState.scrollToItem(index, centerOffset) }
+                    }
+                }
+            } else if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+                listState.scrollToItem(index)
+            }
         }
     }
     LaunchedEffect(s.categoryFirstCardFocusRevision) {
@@ -1172,7 +1239,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
             if (isMoving) s.moveFinish()
             else {
                 requester.requestFocus()
-                s.select(ch.id)
+                s.selectFromList(ch.id)
             }
         },
         extraKey = { e ->
@@ -1220,13 +1287,11 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     ) {
         if (isMoving) {
             s.moveFinish()
-        } else if (isCardFocused || s.touchedFocusChannelId == ch.id) {
-            requester.requestFocus()
-            s.select(ch.id)
         } else {
             s.touchedFocusChannelId = ch.id
             s.touchPanelInteraction()
             runCatching { requester.requestFocus() }
+            s.selectFromList(ch.id)
         }
     }
 }
@@ -2033,7 +2098,7 @@ private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit
                     Action(s.message("EVET, SİL", "YES, DELETE", "JA, LÖSCHEN"), Modifier.fillMaxWidth(), enabled = !s.busy, click = s::deleteSource)
                 }
                 kind == "defaultSource" -> {
-                    Label(s.message("Etkin kaynak klonun trlist listesine dönecek. Kayıtlı listeler, favoriler ve tercihler korunur.", "Switch to the clone's trlist source. Saved lists, favorites and preferences are preserved.", "Zur trlist-Quelle wechseln. Listen, Favoriten und Einstellungen bleiben erhalten."))
+                    Label(s.message("Etkin kaynak klonun TiviListesi listesine dönecek. Kayıtlı listeler, favoriler ve tercihler korunur.", "Switch to the clone's TiviListesi source. Saved lists, favorites and preferences are preserved.", "Zur TiviListesi-Quelle wechseln. Listen, Favoriten und Einstellungen bleiben erhalten."))
                     Action(s.message("İPTAL", "CANCEL", "ABBRECHEN"), Modifier.fillMaxWidth(), click = s::dismiss)
                     Action(s.message("DEVAM ET", "CONTINUE", "WEITER"), Modifier.fillMaxWidth(), enabled = !s.busy, click = s::restoreDefault)
                 }

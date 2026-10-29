@@ -53,6 +53,18 @@ class ZapCardTest {
         assertEquals(before + 1, s.zapCardRevision)
     }
 
+    @Test fun selectFromListKeepsPanelOpenAndDoesNotTriggerZapCard() = runBlocking {
+        val s = PreviewState(Store(), this); s.load(); s.page = "live"; s.category = "Tümü"; s.panel = true
+        val channels = s.data.filtered("Tümü", ""); s.selected = channels[0].id
+        val beforeZap = s.zapCardRevision
+        val beforeInteraction = s.panelInteractionRevision
+        s.selectFromList(channels[2].id)
+        assertEquals(channels[2].id, s.selected)
+        assertTrue(s.panel, "Alt/yan kanal listesinden seçimde menü açık kalmalı")
+        assertEquals(beforeZap, s.zapCardRevision, "Liste seçiminde alttaki ZapCard açılmamalı")
+        assertTrue(s.panelInteractionRevision > beforeInteraction, "Liste seçimi 5 sn etkileşim sayacını sıfırlamalı")
+    }
+
     @Test fun zapCardNotTriggeredOutsideLivePage() = runBlocking {
         val s = PreviewState(Store(), this); s.load(); s.page = "settings"
         val channels = s.data.filtered("Tümü", "")
@@ -92,9 +104,12 @@ class ZapCardTest {
         assertEquals(Alignment.BottomStart, zapCardAlignment("Sol"))
         assertEquals(Alignment.BottomCenter, zapCardAlignment("Orta"))
         assertEquals(Alignment.BottomEnd, zapCardAlignment("Sağ"))
-        assertEquals(0.76f, zapCardScale("Küçük"), 0.001f)
-        assertEquals(1.0f, zapCardScale("Normal"), 0.001f)
-        assertEquals(1.25f, zapCardScale("Büyük"), 0.001f)
+        assertEquals(0.52f, zapCardScale("Küçük"), 0.001f)
+        assertEquals(0.76f, zapCardScale("Normal"), 0.001f)
+        assertEquals(1.0f, zapCardScale("Büyük"), 0.001f)
+        assertEquals(195f, zapCardWidthDp("Küçük", 900f), 0.001f)
+        assertEquals(300f, zapCardWidthDp("Normal", 900f), 0.001f)
+        assertEquals(405f, zapCardWidthDp("Büyük", 900f), 0.001f)
         assertTrue(zapCardWidthDp("Küçük", 900f) < zapCardWidthDp("Normal", 900f))
         assertTrue(zapCardWidthDp("Büyük", 900f) > zapCardWidthDp("Normal", 900f))
     }
