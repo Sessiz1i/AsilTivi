@@ -1243,6 +1243,7 @@ private val choices = mapOf(
     "audio" to listOf("Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Русский", "Auto"),
     "subtitle" to listOf("Kapalı", "Türkçe", "English", "Deutsch", "Français", "Español", "العربية", "Otomatik (İlk Bulunan)"),
     "theme" to listOf("Klasik", "Modern", "Altın", "Sinema"),
+    "radioBg" to listOf("Varsayılan", "Koyu Neon", "Klasik Ahşap"),
     "sleepTimer" to listOf("Kapalı", "15 dk", "30 dk", "45 dk", "60 dk", "90 dk", "120 dk"),
     "subtitleSize" to listOf("Küçük", "Normal", "Büyük", "Çok Büyük"),
     "subtitleColor" to listOf("Beyaz", "Sarı", "Yeşil", "Camgöbeği"),
@@ -1259,6 +1260,7 @@ private val titles = mapOf(
     "audio" to "Tercih Edilen Ses Dili",
     "subtitle" to "Altyazı Varsayılanı",
     "theme" to "Tema Seçimi",
+    "radioBg" to "Radyo Arka Planı",
     "sleepTimer" to "Uyku Zamanlayıcısı",
     "subtitleSize" to "Altyazı Boyutu",
     "subtitleColor" to "Altyazı Rengi",
@@ -1275,6 +1277,7 @@ private val settingIcons = mapOf(
     "audio" to "ikon_ses",
     "subtitle" to "ikon_subtitle",
     "theme" to "ikon_gorunum",
+    "radioBg" to "ikon_ses",
     "sleepTimer" to "ikon_saat",
     "subtitleSize" to "ikon_size",
     "subtitleColor" to "ikon_gorunum",
@@ -1427,6 +1430,12 @@ private fun SettingsTabIcon(
 @Composable private fun Settings(s: PreviewState, image: @Composable (String, Modifier) -> Unit, appVersionName: String) {
     val contentScroll = rememberScrollState()
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
+
+    // Sekme veya alt sayfa (dialog) değiştiğinde içeriğin en başa kaydırılması (C34, C13)
+    LaunchedEffect(s.section, s.dialog) {
+        contentScroll.scrollTo(0)
+    }
+
     CompositionLocalProvider(
         LocalSettingsFocusStroke provides theme.settingsFocusStroke,
         LocalSettingsFocusFill provides theme.settingsFocusFill,
@@ -1438,24 +1447,47 @@ private fun SettingsTabIcon(
                 if (!compact) Column(Modifier.width(148.dp).fillMaxHeight().background(theme.settingsPanelBg)) {
                     Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("✕", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        sections.forEachIndexed { i, title -> Action(title, Modifier.fillMaxWidth().height(47.dp), focusKey = "settings:section:$i", tint = Color.Transparent, selected = s.section == i, selectedTint = theme.settingsSelectedTabBg, strokeWidth = 0.dp, padding = PaddingValues(horizontal = 9.dp), content = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                SettingsTabIcon(i, s.section == i, plusColor = theme.settingsAccent)
-                                Label(
-                                    s.text(title, sectionsEn[i]),
-                                    11,
-                                    color = if (i == 5) {
-                                        if (s.section == i) theme.settingsAccent else theme.settingsAccent.copy(alpha = 0.85f)
-                                    } else {
-                                        if (s.section == i) Color.White else Color(0xFFB0B0B0)
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    bold = true,
-                                    lineHeight = 14f,
-                                    maxLines = 2
-                                )
+                        sections.forEachIndexed { i, title -> Action(
+                            label = title,
+                            modifier = Modifier.fillMaxWidth().height(47.dp).onFocusChanged {
+                                if (it.isFocused && s.section != i) {
+                                    s.dismiss()
+                                    s.cancelOpacity()
+                                    s.section = i
+                                }
+                            },
+                            focusKey = "settings:section:$i",
+                            tint = Color.Transparent,
+                            selected = s.section == i,
+                            selectedTint = theme.settingsSelectedTabBg,
+                            strokeWidth = 0.dp,
+                            padding = PaddingValues(horizontal = 9.dp),
+                            onFocused = {
+                                if (s.section != i) {
+                                    s.dismiss()
+                                    s.cancelOpacity()
+                                    s.section = i
+                                }
+                            },
+                            content = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    SettingsTabIcon(i, s.section == i, plusColor = theme.settingsAccent)
+                                    Label(
+                                        s.text(title, sectionsEn[i]),
+                                        11,
+                                        color = if (i == 5) {
+                                            if (s.section == i) theme.settingsAccent else theme.settingsAccent.copy(alpha = 0.85f)
+                                        } else {
+                                            if (s.section == i) Color.White else Color(0xFFB0B0B0)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        bold = true,
+                                        lineHeight = 14f,
+                                        maxLines = 2
+                                    )
+                                }
                             }
-                        }) { s.dismiss(); s.cancelOpacity(); s.section = i } }
+                        ) { s.dismiss(); s.cancelOpacity(); s.section = i } }
                     }
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                         Label("Beleş TiVi · v$appVersionName", 9, Color(0xFF7A89A0), bold = true)
@@ -1494,6 +1526,7 @@ private fun SettingsTabIcon(
                             }
                             1 -> {
                                 SettingsGroup("UYGULAMA TEMASI"); SettingCard(s, "theme", image)
+                                SettingCard(s, "radioBg", image)
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL BİLGİSİ"); SettingCard(s, "position", image); SettingCard(s, "size", image)
                             }
@@ -1911,9 +1944,48 @@ private fun LiveFormatStrip(s: PreviewState) {
 }
 
 @Composable
+private fun SourceErrorDialog(s: PreviewState) {
+    val okRequester = remember { FocusRequester() }
+    val title = s.sourceErrorDialogTitle.ifBlank { "Kaynağa bağlanılamadı" }
+    val msg = s.sourceErrorDialogMessage.ifBlank { "Lütfen geçerli bir M3U çalma listesi adresi girin." }
+    ReferenceOverlay(s, title, false) {
+        Column(
+            Modifier
+                .align(Alignment.Center)
+                .width(420.dp.coerceAtMost(maxWidth - 32.dp))
+                .background(Color(0xFF13233D), RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0xFF283D5C), RoundedCornerShape(12.dp))
+                .padding(20.dp)
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Label("⚠️", 18)
+                Label(title, 14, Color.White, bold = true)
+            }
+            Label(msg, 11, Color(0xFFB0BAC9), lineHeight = 16f)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Action(
+                    label = "Tamam",
+                    modifier = Modifier.width(90.dp).height(36.dp).focusRequester(okRequester),
+                    tint = Color(0xFFE67E22),
+                    radius = 8.dp,
+                    strokeWidth = 0.dp,
+                    content = { Label("Tamam", 11, Color.White, bold = true) }
+                ) {
+                    s.dialog = s.lastSourceDialog ?: "m3u"
+                }
+            }
+        }
+        LaunchedEffect(Unit) { okRequester.requestFocus() }
+    }
+}
+
+@Composable
 private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
     val kind = s.dialog ?: return
     if (kind == "exit") { ExitDialog(s, image); return }
+    if (kind == "sourceError") { SourceErrorDialog(s); return }
     if (kind == "webTransfer") { WebTransferDialog(s, image); return }
     if (kind == "networkDiagnostics") { NetworkDiagnosticsDialog(s, image); return }
     if (kind in sourceFormKinds || kind == "categories") return

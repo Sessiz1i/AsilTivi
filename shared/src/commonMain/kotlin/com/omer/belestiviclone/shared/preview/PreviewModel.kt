@@ -77,7 +77,8 @@ data class PreviewData(
         "autoPip" to "Açık",
         "epgUrl" to "",
         "savedMultiLayouts" to "",
-        "lastMultiLayout" to ""
+        "lastMultiLayout" to "",
+        "radioBg" to "Varsayılan"
     ),
     val sources: List<String> = listOf("Örnek kayıt"),
     val channels: List<PreviewChannel> = PreviewFixture.channels,
@@ -85,8 +86,10 @@ data class PreviewData(
     val library: SourceLibrary? = null,
 ) {
     fun pref(key: String): String {
-        val raw = preferences.getValue(key)
-        return if (key == "theme" && (raw == "Beleş TiVi Klasik" || raw.isBlank())) "Klasik" else raw
+        val raw = preferences[key].orEmpty()
+        return if (key == "theme" && (raw == "Beleş TiVi Klasik" || raw.isBlank())) "Klasik"
+        else if (key == "radioBg" && raw.isBlank()) "Varsayılan"
+        else raw
     }
     fun withPref(key: String, value: String) = copy(preferences = preferences + (key to value))
     fun filtered(category: String, query: String): List<PreviewChannel> {

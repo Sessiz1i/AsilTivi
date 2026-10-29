@@ -59,11 +59,12 @@ fun WebTransferDialog(
         CompositionLocalProvider(LocalDensity provides contentDensity) {
             Box(
                 Modifier
-                    .widthIn(max = 520.dp)
+                    .widthIn(max = 500.dp)
                     .fillMaxWidth()
+                    .heightIn(max = 415.dp)
                     .background(dialogBg, RoundedCornerShape(14.dp))
                     .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
-                    .padding(24.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
                     .semantics { paneTitle = "Telefondan Aktar" }
             ) {
                 Column(
@@ -71,7 +72,7 @@ fun WebTransferDialog(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -81,11 +82,11 @@ fun WebTransferDialog(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             image("ikon_export", Modifier.size(24.dp))
                             Column {
-                                Label("Telefondan Aktar", 16, bold = true)
+                                Label("Telefondan Aktar", 15, bold = true)
                                 Label("Yerel Wi-Fi üzerinden kolay aktarım", 10, Color(0xFF94A2B7))
                             }
                         }
-                        Action("×", Modifier.size(32.dp), tint = Color.Transparent, strokeWidth = 0.dp, click = s::dismiss)
+                        Action("×", Modifier.size(28.dp), tint = Color.Transparent, strokeWidth = 0.dp, click = s::dismiss)
                     }
 
                     if (info == null || !info.isRunning) {
@@ -109,9 +110,9 @@ fun WebTransferDialog(
                         // QR Code display
                         Box(
                             Modifier
-                                .size(176.dp)
+                                .size(140.dp)
                                 .background(Color.White, RoundedCornerShape(8.dp))
-                                .padding(8.dp),
+                                .padding(6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             if (qrMatrix != null) {
@@ -144,12 +145,14 @@ fun WebTransferDialog(
                                 .fillMaxWidth()
                                 .background(Color(0xFF0A1628), RoundedCornerShape(10.dp))
                                 .border(1.dp, Color(0xFF1E3557), RoundedCornerShape(10.dp))
-                                .padding(vertical = 10.dp, horizontal = 14.dp),
+                                .padding(vertical = 8.dp, horizontal = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Label("Telefondan bu adrese gidin veya QR kodu tarayın:", 10, Color(0xFF94A2B7))
-                            Spacer(Modifier.height(4.dp))
-                            Label(info.url, 15, amber, bold = true)
+                            Spacer(Modifier.height(3.dp))
+                            Label(info.url, 14, amber, bold = true)
+                            Spacer(Modifier.height(3.dp))
+                            Label("Oturum 10 dakika geçerlidir", 9, Color(0xFF7E8EA6), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         }
 
                         // Real-time transfer status

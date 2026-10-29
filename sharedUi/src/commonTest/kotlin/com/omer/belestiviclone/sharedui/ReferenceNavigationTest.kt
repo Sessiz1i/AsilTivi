@@ -43,7 +43,10 @@ class ReferenceNavigationTest {
     @Test fun emptyFormCannotSaveItsDisplayedPlaceholderAsSourceData() = runBlocking {
         val store = Store(); val s = PreviewState(store, this); s.load(); val before = s.data
         s.sourceForm("m3u"); s.saveSource(); yield()
-        assertEquals(0, store.writes); assertEquals(before, s.data); assertEquals("m3u", s.dialog)
+        assertEquals(0, store.writes); assertEquals(before, s.data)
+        // Faz P5 (C10): Boş URL girildiğinde "Kaynağa bağlanılamadı" hata modalı açılır, kaynak formu korunur
+        assertEquals("sourceError", s.dialog)
+        assertEquals("m3u", s.lastSourceDialog)
     }
     @Test fun categoryFooterRoutesPreserveCatalogMembershipAndPreferences() = runBlocking {
         for (route in listOf("multi", "settings")) {

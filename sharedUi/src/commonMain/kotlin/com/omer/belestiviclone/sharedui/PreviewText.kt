@@ -14,6 +14,7 @@ private val optionHeadings = mapOf(
     "theme" to "TEMA SEÇİMİ", "sleepTimer" to "UYKU ZAMANLAYICISI",
     "subtitleSize" to "ALTYAZI BOYUTU", "subtitleColor" to "ALTYAZI RENGİ",
     "subtitleBgOpacity" to "ALTYAZI ARKA PLAN OPAKLIĞI",
+    "radioBg" to "RADYO ARKA PLANI",
 )
 internal fun settingsSectionHeading(section: Int): String = sectionHeadings[section]
 internal fun optionHeading(kind: String): String = optionHeadings.getValue(kind)
@@ -28,6 +29,7 @@ private val translations = mapOf(
     "TEMA SEÇİMİ" to "THEME SELECTION", "UYKU ZAMANLAYICISI" to "SLEEP TIMER",
     "ALTYAZI BOYUTU" to "SUBTITLE SIZE", "ALTYAZI RENGİ" to "SUBTITLE COLOR",
     "ALTYAZI ARKA PLAN OPAKLIĞI" to "SUBTITLE BACKGROUND OPACITY",
+    "RADYO ARKA PLANI" to "RADIO BACKGROUND", "Radyo Arka Planı" to "Radio background",
     "Altyazı Boyutu" to "Subtitle size", "Altyazı Rengi" to "Subtitle color",
     "Altyazı Arka Plan Opaklığı" to "Subtitle background opacity",
     "Beleş TiVi Klasik" to "Beleş TiVi Classic", "Klasik" to "Classic", "Modern" to "Modern", "Altın" to "Gold", "Sinema" to "Cinema",

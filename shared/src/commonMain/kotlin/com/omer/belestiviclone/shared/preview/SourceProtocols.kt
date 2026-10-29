@@ -27,6 +27,15 @@ data class XtreamLiveStream(
     val directSource: String = "",
 )
 
+data class StalkerConfig(
+    val portalUrl: String = "",
+    val macAddress: String = "",
+    val serialNumber: String = "",
+    val deviceId: String = "",
+    val deviceId2: String = "",
+    val signature: String = ""
+)
+
 data class StalkerSession(
     val portalBaseUrl: String,
     val loadPhpUrl: String,
@@ -479,12 +488,25 @@ object StalkerPortalClient {
         return if (pathStart < 0) base else base.substring(0, pathStart)
     }
 
-    fun buildHeaders(macAddress: String, token: String? = null): Map<String, String> {
+    fun buildHeaders(
+        macAddress: String,
+        token: String? = null,
+        serialNumber: String = "",
+        deviceId: String = "",
+        deviceId2: String = ""
+    ): Map<String, String> {
         val mac = normalizeMac(macAddress)
         val headers = LinkedHashMap<String, String>()
-        headers["Cookie"] = "mac=$mac; stb_lang=tr; timezone=Europe/Istanbul"
+        val cookieParts = mutableListOf("mac=$mac", "stb_lang=tr", "timezone=Europe/Istanbul")
+        if (serialNumber.isNotBlank()) cookieParts.add("sn=$serialNumber")
+        if (deviceId.isNotBlank()) cookieParts.add("device_id=$deviceId")
+        if (deviceId2.isNotBlank()) cookieParts.add("device_id2=$deviceId2")
+        headers["Cookie"] = cookieParts.joinToString("; ")
         headers["User-Agent"] = "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3"
         headers["X-User-Agent"] = "Model: MAG250; Link: WiFi"
+        if (serialNumber.isNotBlank()) headers["X-Serial-Number"] = serialNumber
+        if (deviceId.isNotBlank()) headers["X-Device-Id"] = deviceId
+        if (deviceId2.isNotBlank()) headers["X-Device-Id2"] = deviceId2
         if (!token.isNullOrBlank()) {
             headers["Authorization"] = "Bearer ${token.trim()}"
         }

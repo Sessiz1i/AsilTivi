@@ -408,6 +408,19 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var formUser by mutableStateOf("")
     var formPassword by mutableStateOf("")
     var formMac by mutableStateOf("")
+    var formSerial by mutableStateOf("")
+    var formDeviceId by mutableStateOf("")
+    var formDeviceId2 by mutableStateOf("")
+    var sourceErrorDialogTitle by mutableStateOf("")
+    var sourceErrorDialogMessage by mutableStateOf("")
+    var lastSourceDialog by mutableStateOf<String?>(null)
+
+    fun showSourceError(title: String, message: String) {
+        lastSourceDialog = dialog
+        sourceErrorDialogTitle = title
+        sourceErrorDialogMessage = message
+        dialog = "sourceError"
+    }
     var editing by mutableStateOf<Int?>(null)
     var lastXtreamAccount by mutableStateOf<XtreamAccountInfo?>(null); private set
     var lastStalkerSession by mutableStateOf<StalkerSession?>(null); private set
@@ -774,7 +787,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (committingSource) return
         cancelSource(); documentRequest = null
         stopWebTransferServer()
-        dialog = null; formPassword = ""; formUser = ""; formMac = ""; formAddress = ""; formName = ""; editing = null
+        dialog = null; formPassword = ""; formUser = ""; formMac = ""; formSerial = ""; formDeviceId = ""; formDeviceId2 = ""; formAddress = ""; formName = ""; editing = null
     }
     fun moveStart() { moving = target; draft = data; dialog = null }
     fun moveBy(delta: Int) { val id = moving ?: return; val d = draft ?: return; draft = d.move(id, d.favorites.indexOf(id) + delta) }
@@ -915,8 +928,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             val id = savedSources[editing!!].id; val name = formName
             sourceOperation { before -> sources.renameFile(before, id, name) }; return
         }
-        val loader = sourceLoader ?: run { notice = "Kaynak yükleyici kullanılamıyor."; return }
         val name = formName.trim(); val address = formAddress.trim(); val extra = dialog == "supplement"
+        if (address.isBlank()) {
+            showSourceError(
+                message("Kaynağa bağlanılamadı", "Could not connect to source", "Verbindung fehlgeschlagen"),
+                message("Lütfen geçerli bir M3U çalma listesi adresi girin.", "Please enter a valid M3U playlist address.", "Bitte geben Sie eine gültige M3U-Adresse ein.")
+            )
+            return
+        }
+        val loader = sourceLoader ?: run { notice = "Kaynak yükleyici kullanılamıyor."; return }
         val id = if (extra) data.library?.extra?.id else editing?.let { savedSources.getOrNull(it)?.id }
         try { sources.validate(sources.bootstrap(data), name, address, id, extra) }
         catch (error: SourceProblem) { sourceError(error); return }
@@ -1024,7 +1044,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
     }
     private fun sourceError(error: Exception) {
-        notice = when ((error as? SourceProblem)?.code) {
+        val code = (error as? SourceProblem)?.code
+        if ((dialog == "m3u" || dialog == "supplement") && (code == "url" || code == "network" || code == "content")) {
+            showSourceError(
+                message("Kaynağa bağlanılamadı", "Could not connect to source", "Verbindung fehlgeschlagen"),
+                message("Lütfen geçerli bir M3U çalma listesi adresi girin.", "Please enter a valid M3U playlist address.", "Bitte geben Sie eine gültige M3U-Adresse ein.")
+            )
+            return
+        }
+        notice = when (code) {
             "name" -> message("Ad gerekli; en fazla 120 karakter kullanın.", "Name is required (up to 120 characters).", "Name erforderlich (maximal 120 Zeichen).")
             "url" -> message("Geçerli bir HTTP/HTTPS adresi girin.", "Enter a valid HTTP/HTTPS address.", "Gültige HTTP/HTTPS-Adresse eingeben.")
             "credentials" -> message("Kullanıcı adı ve şifre boş bırakılamaz.", "Username and password are required.", "Benutzername und Passwort erforderlich.")

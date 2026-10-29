@@ -33,16 +33,41 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
         "epg" -> s.message("XMLTV EPG KAYNAĞI", "XMLTV EPG SOURCE", "XMLTV EPG-QUELLE")
         else -> s.message(if (s.editing == null) "YENİ LİSTE EKLE" else "LİSTEYİ DÜZENLE", if (s.editing == null) "ADD NEW LIST" else "EDIT LIST", if (s.editing == null) "NEUE LISTE" else "LISTE BEARBEITEN")
     }
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 19.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Action(s.message("Kaynak", "Source", "Quelle") + " › $title · " + s.message("Geri", "Back", "Zurück"), Modifier.fillMaxWidth().height(45.dp).focusRequester(back), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 20.dp), content = {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(kind) { scrollState.scrollTo(0) }
+    Column(modifier.fillMaxWidth().verticalScroll(scrollState).padding(horizontal = 16.dp, vertical = 19.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Action("Kanallar Ve Listeler › $title · " + s.message("Geri", "Back", "Zurück"), Modifier.fillMaxWidth().height(45.dp).focusRequester(back), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 20.dp), content = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                Label("←", 12, Color(0xFFE67E22)); Label(s.message("Kaynak ›", "Source ›", "Quelle ›"), 10, Color(0xFF69798F), bold = true); Label(title, 10, bold = true, maxLines = 1)
+                Label("←", 12, Color(0xFFE67E22)); Label("Kanallar Ve Listeler ›", 10, Color(0xFF69798F), bold = true); Label(title, 10, bold = true, maxLines = 1)
             }
         }, click = s::dismiss)
         Spacer(Modifier.height(18.dp))
         Row(Modifier.height(26.dp), verticalAlignment = Alignment.Top) {
             Box(Modifier.width(3.dp).height(16.dp).background(Color(0xFFE67E22)))
             Label(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else title, 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), true, letterSpacing = 1f)
+        }
+        if (kind in setOf("m3u", "xtream", "stalker")) {
+            Action(
+                label = "Telefondan Aktar",
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                tint = Color(0xFF13233D),
+                stroke = Color(0xFF263F63),
+                strokeWidth = 1.dp,
+                radius = 10.dp,
+                padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                content = {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        image("ikon_export", Modifier.size(24.dp))
+                        Column(Modifier.weight(1f)) {
+                            Label("Telefondan Aktar", 12, Color.White, bold = true)
+                            Label("Uzun adresleri kumandayla yazmak yerine telefon kamerasıyla QR okutarak gönder", 9, Color(0xFF94A2B7))
+                        }
+                        Label("›", 16, Color(0xFFE67E22), bold = true)
+                    }
+                }
+            ) {
+                s.openWebTransfer()
+            }
         }
         when (kind) {
             "countries" -> CountryListsPanel(s)
@@ -72,6 +97,11 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
                 Field(s.formName, s.message("PORTAL ADI (İSTEĞE BAĞLI)", "PORTAL NAME (OPTIONAL)", "PORTALNAME (OPTIONAL)"), "ikon_liste_adi", image, placeholder = s.message("Örn: MAG Portalım", "Example: My MAG Portal", "Beispiel: Mein MAG-Portal")) { s.formName = it }
                 Field(s.formAddress, s.message("PORTAL ADRESİ", "PORTAL URL", "PORTALADRESSE"), "ikon_sunucu", image, placeholder = "http://portal-sunucu.com:8080/c/") { s.formAddress = it }
                 Field(s.formMac, s.message("MAC ADRESİ", "MAC ADDRESS", "MAC-ADRESSE"), "ikon_kullanici", image, placeholder = "00:1A:79:12:34:56") { s.formMac = it }
+                Spacer(Modifier.height(6.dp))
+                Label("CİHAZ BİLGİLERİ (İSTEĞE BAĞLI)", 10, Color(0xFF94A2B7), bold = true, letterSpacing = 1f)
+                Field(s.formSerial, "Seri numarası (Serial / SN)", "ikon_ayar", image, placeholder = "İsteğe bağlı") { s.formSerial = it }
+                Field(s.formDeviceId, "Cihaz kimliği (Device ID)", "ikon_ayar", image, placeholder = "İsteğe bağlı") { s.formDeviceId = it }
+                Field(s.formDeviceId2, "İkinci cihaz kimliği (Device ID 2)", "ikon_ayar", image, placeholder = "İsteğe bağlı") { s.formDeviceId2 = it }
                 Spacer(Modifier.height(9.dp))
                 PrimarySubmitButton(s, kind, image)
                 Label(

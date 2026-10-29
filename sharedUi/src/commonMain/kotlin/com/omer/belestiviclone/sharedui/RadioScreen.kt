@@ -106,23 +106,78 @@ fun RadioScreen(
                 }
             }
     ) {
-        // 1. Orijinal Beleş TiVi 4.1 Retro Radyo Arka Planı (BELEŞ ▶ RADYO neon tabelası ve ahşap radyo)
-        image("bg_retro_radio", Modifier.fillMaxSize())
-
-        // Hafif koyu degrade katman: Metin ve kartların net okunması için
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x99000000),
-                            Color(0x33000000),
-                            Color(0xAA000000)
+        val radioBg = s.data.pref("radioBg")
+        when (radioBg) {
+            "Koyu Neon" -> {
+                // Koyu Neon: Siber mor ve gece mavisi zengin degrade + neon yatay ışıma
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF2E0854), Color(0xFF0D0B24), Color(0xFF050510)),
+                                radius = 1200f
+                            )
                         )
-                    )
                 )
-        )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x3367E8F9),
+                                    Color(0x00000000),
+                                    Color(0x449333EA)
+                                )
+                            )
+                        )
+                )
+            }
+            "Klasik Ahşap" -> {
+                // Klasik Ahşap: Sıcak maun, ceviz ve kehribar ahşap tonları + radyal sıcak ışıma
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFF2B1408),
+                                    Color(0xFF45220E),
+                                    Color(0xFF1E0C04)
+                                )
+                            )
+                        )
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0x26FFB300), Color(0x00000000)),
+                                radius = 900f
+                            )
+                        )
+                )
+            }
+            else -> {
+                // Varsayılan: Orijinal Beleş TiVi 4.1 Retro Ahşap Radyo ve Neon Tabela Görseli
+                image("bg_retro_radio", Modifier.fillMaxSize())
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x99000000),
+                                    Color(0x33000000),
+                                    Color(0xAA000000)
+                                )
+                            )
+                        )
+                )
+            }
+        }
 
         // 2. Sağ Üst Saat ve Tarih (ekran_tvmod.png ve ekran_radyo_cikis.png referansına uygun)
         Column(

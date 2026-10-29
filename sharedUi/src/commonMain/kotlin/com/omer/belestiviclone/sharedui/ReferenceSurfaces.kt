@@ -52,9 +52,10 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
     val format = kind == "format"
     val selected = remember(kind) { FocusRequester() }
     ReferenceOverlay(s, title, quality) {
-        val width = if (quality) maxWidth * (256f / 855f) else 470.dp.coerceAtMost(maxWidth - 32.dp)
+        val width = if (quality) (maxWidth * (270f / 855f)).coerceIn(185.dp, 230.dp) else 470.dp.coerceAtMost(maxWidth - 32.dp)
         val height = when (kind) {
             "list" -> 144.dp
+            "radioBg" -> 180.dp
             "format" -> 368.dp
             "audio", "subtitle" -> 413.dp
             "quality" -> 211.dp
@@ -62,28 +63,30 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
             "subtitleBgOpacity" -> 270.dp
             else -> (values.size * 45 + 50).dp.coerceIn(144.dp, 400.dp)
         }
-        val placement = if (quality) Modifier.offset(x = maxWidth * (560f / 855f), y = maxHeight * (135f / 481f))
-            else Modifier.align(Alignment.Center)
+        val placement = if (quality) {
+            val qOffset = (maxWidth - width - 24.dp).coerceAtLeast(0.dp)
+            Modifier.offset(x = qOffset, y = maxHeight * (135f / 481f))
+        } else Modifier.align(Alignment.Center)
         Column(placement.width(width).heightIn(max = maxHeight - 12.dp).height(height)
             .background(theme.settingsCardBg, RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
             .border(1.dp, theme.settingsFocusStroke.copy(alpha = 0.25f), RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
             .pointerInput(Unit) { detectTapGestures { } }
-            .padding(horizontal = 20.dp, vertical = if (quality) 17.dp else 19.dp).focusGroup()) {
+            .padding(horizontal = 14.dp, vertical = if (quality) 14.dp else 18.dp).focusGroup()) {
             Label(title, 9, Color(0xFF94A2B7), bold = true, lineHeight = 16f, letterSpacing = if (quality) 0f else 1f)
             Spacer(Modifier.height(if (quality) 5.dp else 7.dp))
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 values.forEachIndexed { index, value ->
                     val chosen = if (format) isVideoFormatSelected(s.data.pref(kind), value) else s.data.pref(kind) == value
-                    Action(value, Modifier.fillMaxWidth().height(if (quality) 41.5.dp else 44.5.dp)
+                    Action(value, Modifier.fillMaxWidth().height(if (quality) 40.dp else 44.dp)
                         .then(if (chosen || (!format && s.data.pref(kind) !in values && index == 0)) Modifier.focusRequester(selected) else Modifier),
                         tint = Color.Transparent, radius = 6.dp, strokeWidth = 0.dp,
                         focusColor = theme.settingsFocusStroke,
                         focusFill = theme.settingsFocusFill,
                         enabled = !s.busy,
                         padding = PaddingValues(horizontal = 4.dp), content = {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                                Label(value, 12, Color(0xFFE9EEF5), bold = true)
-                                if (chosen) Label("✓", 20, theme.settingsAccent, Modifier.align(Alignment.CenterEnd).padding(end = 5.dp))
+                            Row(Modifier.fillMaxSize().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Label(value, 11, Color(0xFFE9EEF5), bold = true, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
+                                if (chosen) Label("✓", 16, theme.settingsAccent, Modifier.padding(start = 6.dp))
                             }
                         }) { s.pref(kind, value) }
                 }
