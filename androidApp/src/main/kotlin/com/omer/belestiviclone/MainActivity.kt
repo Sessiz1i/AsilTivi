@@ -220,6 +220,12 @@ class MainActivity : ComponentActivity() {
                 SampleVideo(channel, paused, muted, retry, format, modifier, state::played, preferences, onQuality,
                     captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0,
                     onTechnicalInfo = { if (state.page == "live") state.technicalInfo = it },
+                    onPlaybackStatus = { status, err ->
+                        if (state.page == "live") {
+                            state.playbackStatus = status
+                            state.playbackError = err
+                        }
+                    },
                     isMultiScreen = state.page == "multi",
                     liveSync = state.liveSyncRevision,
                     seekBack = state.seekBackRevision)
@@ -722,7 +728,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
 }
 
 @Composable
-internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false, liveSync: Int = 0, seekBack: Int = 0) {
+internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, onPlaybackStatus: (PlaybackStatus, String?) -> Unit = { _, _ -> }, isMultiScreen: Boolean = false, liveSync: Int = 0, seekBack: Int = 0) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val played by rememberUpdatedState(onPlayed)
@@ -747,7 +753,8 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
         }
     }
     LaunchedEffect(preferences) { player.preferences(preferences) }
-    SideEffect { onQuality(player.qualityDescription); onTechnicalInfo(player.technicalInfo) }
+    LaunchedEffect(player.status, player.error) { onPlaybackStatus(player.status, player.error) }
+    SideEffect { onQuality(player.qualityDescription); onTechnicalInfo(player.technicalInfo); onPlaybackStatus(player.status, player.error) }
     LaunchedEffect(paused, muted) { player.pause(paused); player.mute(muted) }
     DisposableEffect(player, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->

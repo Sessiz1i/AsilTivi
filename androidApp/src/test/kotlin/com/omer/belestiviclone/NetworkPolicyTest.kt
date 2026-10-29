@@ -18,7 +18,7 @@ class NetworkPolicyTest {
         }.toSet()
         val catalogue = File("src/main/assets/TiviListe.m3u").readLines().filter { it.trim().startsWith("http://") }
             .map { URI(it.trim()).host }.toSet()
-        val radioHttpHosts = setOf("46.20.3.204", "46.20.3.229", "46.20.7.126")
+        val radioHttpHosts = setOf("46.20.3.201", "46.20.3.204", "46.20.3.229", "46.20.7.126", "turkmedya.radyotvonline.com")
         assertEquals(catalogue + "dogusdyg-star.lg.mncdn.com" + radioHttpHosts, allowed)
         assertEquals(0, doc.getElementsByTagName("trust-anchors").length)
         assertEquals(0, doc.getElementsByTagName("debug-overrides").length)

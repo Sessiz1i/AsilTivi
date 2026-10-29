@@ -227,4 +227,24 @@ class RadioStateTest {
         assertNotNull(playbackUri(s.channel), "Seçili radyo istasyonunun playbackUri değeri geçerli olmalı")
         assertFalse(s.notice.contains("desteklenmiyor"), "Radyo istasyonu seçildiğinde desteklenmiyor uyarısı çıkmamalı")
     }
+
+    @Test
+    fun radioPlaybackStatusAndErrorResetOnStationSwitch() = runBlocking {
+        val s = PreviewState(DummyStore(), this)
+        s.load()
+        s.enterRadioMode()
+        assertEquals(PlaybackStatus.LOADING, s.playbackStatus)
+        assertNull(s.playbackError)
+
+        s.playbackStatus = PlaybackStatus.ERROR
+        s.playbackError = "Bağlantı hatası"
+        assertEquals(PlaybackStatus.ERROR, s.playbackStatus)
+        assertEquals("Bağlantı hatası", s.playbackError)
+
+        val secondStation = PreviewFixture.radioChannels[1]
+        s.select(secondStation.id)
+        assertEquals("Kral FM", s.channel?.name)
+        assertEquals(PlaybackStatus.LOADING, s.playbackStatus)
+        assertNull(s.playbackError)
+    }
 }

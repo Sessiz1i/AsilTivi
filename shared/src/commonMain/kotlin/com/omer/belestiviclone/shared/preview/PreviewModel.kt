@@ -32,7 +32,7 @@ object PreviewFixture {
             name = "TRT FM",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-fm-radyo-kanali.f4fa31f.png",
-            definition = def("https://tv-trtfm.medya.trt.com.tr/master.m3u8"),
+            definition = def("https://radio-trtfm.live.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -41,7 +41,7 @@ object PreviewFixture {
             name = "Kral FM",
             category = "Radyo",
             logo = "https://www.canliradyodinle.fm/wp-content/uploads/kral-fm-dinle.jpg",
-            definition = def("https://dygedge.radyotvonline.net/kralfm/playlist.m3u8"),
+            definition = def("http://46.20.3.204:80/"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -59,7 +59,7 @@ object PreviewFixture {
             name = "TRT Radyo 1",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-1-radyo-kanali.1dc612f.png",
-            definition = def("https://tv-trtradyo1.medya.trt.com.tr/master.m3u8"),
+            definition = def("https://radio-trtradyo1.live.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -68,7 +68,7 @@ object PreviewFixture {
             name = "TRT Radyo 3",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-3-radyo-kanali.101a3cf.png",
-            definition = def("https://tv-trtradyo3.medya.trt.com.tr/master.m3u8"),
+            definition = def("https://radio-trtradyo3.live.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -77,7 +77,7 @@ object PreviewFixture {
             name = "TRT Nağme",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-nagme-radyo-kanali.287afc0.png",
-            definition = def("https://tv-trtnagme.medya.trt.com.tr/master.m3u8"),
+            definition = def("https://radio-trtnagme.live.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -86,16 +86,16 @@ object PreviewFixture {
             name = "TRT Türkü",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-turku-radyo-kanali.7cd2153.png",
-            definition = def("https://tv-trtturku.medya.trt.com.tr/master.m3u8"),
+            definition = def("https://radio-trtturku.live.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
         PreviewChannel(
             id = OpaqueId(0x50524556, 108),
-            name = "Kral Pop Radyo",
+            name = "Kral Pop",
             category = "Radyo",
             logo = "https://raw.githubusercontent.com/GitLatte/m3ueditor/refs/heads/site/images/kanal-gorselleri/turkiye/kral-pop-tr.png",
-            definition = def("https://dygedge.radyotvonline.net/kralpop/playlist.m3u8"),
+            definition = def("http://46.20.3.201:80/"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -113,7 +113,7 @@ object PreviewFixture {
             name = "Alem FM",
             category = "Radyo",
             logo = "https://media.giphy.com/avatars/alemfm/JBnuJVfQAhJ4.png",
-            definition = def("https://turkmedya.radyotvonline.net/turkmedya/alemfm.stream/playlist.m3u8"),
+            definition = def("http://turkmedya.radyotvonline.com/turkmedya/alemfm.stream/playlist.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -131,7 +131,7 @@ object PreviewFixture {
             name = "Show Radyo",
             category = "Radyo",
             logo = "https://www.canliradyodinle.fm/wp-content/uploads/show-radyo.jpg",
-            definition = def("http://46.20.3.229/showradyo"),
+            definition = def("http://46.20.3.229:80/"),
             isRadio = true,
             groups = listOf("Radyo")
         ),

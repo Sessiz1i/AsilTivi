@@ -7,6 +7,7 @@
         <domain includeSubdomains="false">139.162.182.79</domain>
         <domain includeSubdomains="false">145.239.37.125</domain>
         <domain includeSubdomains="false">176.65.153.12</domain>
+        <domain includeSubdomains="false">46.20.3.201</domain>
         <domain includeSubdomains="false">46.20.3.204</domain>
         <domain includeSubdomains="false">46.20.3.229</domain>
         <domain includeSubdomains="false">46.20.7.126</domain>
@@ -22,5 +23,6 @@
         <domain includeSubdomains="false">nrttn172.kesintisizyayin.com</domain>
         <domain includeSubdomains="false">old.kuzeykibris.tv</domain>
         <domain includeSubdomains="false">rmtftbjlne.turknet.ercdn.net</domain>
+        <domain includeSubdomains="false">turkmedya.radyotvonline.com</domain>
     </domain-config>
 </network-security-config>

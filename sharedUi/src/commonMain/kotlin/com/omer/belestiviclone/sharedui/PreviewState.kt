@@ -66,6 +66,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var categoryMenu by mutableStateOf(false)
     var info by mutableStateOf(false)
     var technicalInfo by mutableStateOf(StreamTechnicalInfo())
+    var playbackStatus by mutableStateOf(PlaybackStatus.IDLE)
+    var playbackError by mutableStateOf<String?>(null)
     var selected by mutableStateOf(PreviewFixture.channels.first().id)
     var dialog by mutableStateOf<String?>(null)
     var target by mutableStateOf<OpaqueId?>(null)
@@ -752,6 +754,8 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     private fun changeChannel(id: OpaqueId, keepPanel: Boolean) {
         if (selected != id) {
             technicalInfo = StreamTechnicalInfo()
+            playbackStatus = PlaybackStatus.LOADING
+            playbackError = null
             channelSessionStartMs = System.currentTimeMillis()
         }
         selected = id

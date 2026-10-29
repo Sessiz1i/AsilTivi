@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.omer.belestiviclone.shared.preview.PlaybackStatus
 import com.omer.belestiviclone.shared.preview.PreviewChannel
 import com.omer.belestiviclone.shared.preview.PreviewCodec
 
@@ -301,17 +302,22 @@ fun RadioScreen(
         }
 
         // 4. Alt-Orta Canlı Radyo Bilgi Kartı (BELEŞ ▶ RADYO neon tabelasıyla çakışmaz)
+        val isError = s.playbackStatus == PlaybackStatus.ERROR || s.playbackError != null
+        val isLoading = !isError && !s.paused && (s.playbackStatus == PlaybackStatus.LOADING || s.playbackStatus == PlaybackStatus.IDLE)
+        val isLivePlaying = !isError && !s.paused && s.playbackStatus == PlaybackStatus.READY
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = if (s.panel) 142.dp else 34.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Şık Cam/Glass İstasyon Kartı
             Row(
                 modifier = Modifier
                     .background(Color(0xD908111E), RoundedCornerShape(14.dp))
-                    .border(1.dp, Color(0xFF283A4E), RoundedCornerShape(14.dp))
+                    .border(1.dp, if (isError) Color(0xFFE65100) else Color(0xFF283A4E), RoundedCornerShape(14.dp))
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -337,22 +343,35 @@ fun RadioScreen(
                     ) {
                         Label(currentStation?.name ?: "Radyo İstasyonu", 20, Color.White, bold = true)
 
-                        // CANLI Rozeti
+                        // Durum Rozeti (⏳ YÜKLENİYOR… / ● CANLI / ⚠️ YAYIN YOK / DURAKLADI)
+                        val badgeBg = when {
+                            isError -> Color(0xFFD84315)
+                            s.paused -> Color(0xFF555555)
+                            isLoading -> Color(0xFFD97706)
+                            else -> Color(0xFFD32F2F)
+                        }
                         Box(
                             modifier = Modifier
-                                .background(if (s.paused) Color(0xFF555555) else Color(0xFFD32F2F), RoundedCornerShape(6.dp))
+                                .background(badgeBg, RoundedCornerShape(6.dp))
                                 .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    Modifier
-                                        .size(5.dp)
-                                        .background(Color.White, CircleShape)
-                                )
-                                Label(if (s.paused) "DURAKLADI" else "CANLI", 9, Color.White, bold = true)
+                            when {
+                                isError -> Label("⚠️ YAYIN YOK", 9, Color.White, bold = true)
+                                s.paused -> Label("DURAKLADI", 9, Color.White, bold = true)
+                                isLoading -> Label("⏳ YÜKLENİYOR…", 9, Color.White, bold = true)
+                                else -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Box(
+                                            Modifier
+                                                .size(5.dp)
+                                                .background(Color.White, CircleShape)
+                                        )
+                                        Label("CANLI", 9, Color.White, bold = true)
+                                    }
+                                }
                             }
                         }
                     }
@@ -361,15 +380,52 @@ fun RadioScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val subtitleText = when {
+                            isError -> "Yayın bağlantısı kurulamadı."
+                            s.paused -> "Yayın duraklatıldı. Oynatmak için dokunun."
+                            isLoading -> "${currentStation?.name ?: "İstasyon"} yayına bağlanıyor…"
+                            else -> tipText
+                        }
                         Label(
-                            if (s.paused) "Yayın duraklatıldı. Oynatmak için dokunun." else tipText,
+                            subtitleText,
                             11,
-                            Color(0xFFB0BEC5)
+                            if (isError) Color(0xFFFFAB91) else Color(0xFFB0BEC5)
                         )
                         if (!s.paused) {
-                            EqualizerWaveAnimation(isLive = true)
+                            EqualizerWaveAnimation(isLive = isLivePlaying)
                         }
                     }
+                }
+            }
+
+            if (isError) {
+                Row(
+                    modifier = Modifier
+                        .background(Color(0xEB260E12), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE65100), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Label(
+                        "⚠️ Bu radyo istasyonunun yayınına şu an ulaşılamıyor. Yeniden deneyin veya başka bir istasyon seçin.",
+                        11,
+                        Color(0xFFFFE0B2),
+                        bold = true
+                    )
+                    Action(
+                        label = "Yeniden Dene",
+                        tint = Color(0xFFE65100),
+                        radius = 8.dp,
+                        stroke = Color(0xFFFFB74D),
+                        padding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                        content = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                PlayerRetryIcon(color = Color.White, modifier = Modifier.size(11.dp))
+                                Label("Yeniden Dene", 10, Color.White, bold = true)
+                            }
+                        }
+                    ) { s.retry++ }
                 }
             }
         }
