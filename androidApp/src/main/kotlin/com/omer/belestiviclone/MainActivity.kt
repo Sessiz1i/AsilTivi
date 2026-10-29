@@ -182,7 +182,7 @@ class MainActivity : ComponentActivity() {
         enforceLandscapeOrientation()
         val databaseName = "belestivi_preview_v1.db"
         val store = AndroidPreviewStore(applicationContext, databaseName = databaseName)
-        val catalog = AndroidPublicCatalog(applicationContext, "public-trlist-catalog-v1")
+        val catalog = AndroidPublicCatalog(applicationContext, "public-tiviliste-catalog-v2")
         val publicStore = AndroidPreviewStore(applicationContext, key = 2, databaseName = databaseName) {
             val channels = catalog.load()
             PreviewData(favorites = emptyList(), history = emptyList(), categories = CategoryNormalizer.deduplicateCategories(channels.flatMap { it.groups }.distinct()),
@@ -623,16 +623,38 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                 try {
                     val headers = channel.definition?.headers.orEmpty()
                     require(headers.map { it.name.lowercase() }.distinct().size == headers.size) { "Repeated headers unsupported" }
-                    val http = DefaultHttpDataSource.Factory().setDefaultRequestProperties(headers.associate { it.name to it.value })
+                    var effectiveUri = uri
+                    var effectiveHeaders = headers.associate { it.name to it.value }
                     var mime = channel.definition?.mimeType
-                    if (StreamType.needsProbe(uri, mime)) {
+                    if (WebStreamResolver.isWebPageUrl(effectiveUri)) {
+                        status = PlaybackStatus.LOADING
+                        val resolved = withContext(probeDispatcher) {
+                            WebStreamResolver.resolve(effectiveUri, effectiveHeaders)
+                        }
+                        effectiveUri = resolved.uri
+                        effectiveHeaders = effectiveHeaders + resolved.headers
+                        if (resolved.mimeType != null) {
+                            mime = resolved.mimeType
+                        }
+                    }
+                    val http = DefaultHttpDataSource.Factory().apply {
+                        effectiveHeaders["User-Agent"]?.let(::setUserAgent)
+                        setAllowCrossProtocolRedirects(true)
+                        setDefaultRequestProperties(effectiveHeaders)
+                    }
+                    if (StreamType.needsProbe(effectiveUri, mime)) {
                         status = PlaybackStatus.LOADING
                         mime = withContext(probeDispatcher) {
                             // One bounded normal GET; original URI and stored headers are used again for playback.
-                            val probe = DefaultHttpDataSource.Factory().setConnectTimeoutMs(3000).setReadTimeoutMs(3000)
-                                .setDefaultRequestProperties(headers.associate { it.name to it.value }).createDataSource()
+                            val probe = DefaultHttpDataSource.Factory().apply {
+                                effectiveHeaders["User-Agent"]?.let(::setUserAgent)
+                                setAllowCrossProtocolRedirects(true)
+                                setConnectTimeoutMs(3000)
+                                setReadTimeoutMs(3000)
+                                setDefaultRequestProperties(effectiveHeaders)
+                            }.createDataSource()
                             try {
-                                probe.open(DataSpec.Builder().setUri(uri).build())
+                                probe.open(DataSpec.Builder().setUri(effectiveUri).build())
                                 val bytes = ByteArray(1024)
                                 val count = probe.read(bytes, 0, bytes.size).coerceAtLeast(0)
                                 val type = probe.responseHeaders.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value?.firstOrNull()
@@ -645,7 +667,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     if (released || attempt?.accepts(active.id) != true) return@launch
                     stage = PlaybackFailure.MEDIA_SOURCE
                     val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, http))
-                    val item = MediaItem.Builder().setUri(uri).setMimeType(mime).setMediaId(active.id).build()
+                    val item = MediaItem.Builder().setUri(effectiveUri).setMimeType(mime).setMediaId(active.id).build()
                     val source = factory.createMediaSource(item)
                     exo.setMediaSource(source)
                     stage = PlaybackFailure.PLAYER

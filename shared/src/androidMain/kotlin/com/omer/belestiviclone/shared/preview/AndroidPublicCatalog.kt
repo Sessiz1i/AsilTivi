@@ -1,4 +1,4 @@
-﻿package com.omer.belestiviclone.shared.preview
+package com.omer.belestiviclone.shared.preview
 
 import android.content.Context
 import android.util.AtomicFile
@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Opaque random IDs allocated once, stored atomically with the last successful catalog. No migration. */
-class AndroidPublicCatalog(private val context: Context, private val cacheName: String = "public-tiviliste-catalog-v1") {
+class AndroidPublicCatalog(private val context: Context, private val cacheName: String = "public-tiviliste-catalog-v2") {
     suspend fun load(): List<PreviewChannel> = withContext(Dispatchers.IO) {
         val file = AtomicFile(File(context.filesDir, cacheName))
         if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()) return@withContext decode(file.readFully().toString(Charsets.UTF_8)).also { logBinding("cache", it) }

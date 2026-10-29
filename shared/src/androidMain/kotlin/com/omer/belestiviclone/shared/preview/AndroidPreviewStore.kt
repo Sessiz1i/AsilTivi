@@ -3,6 +3,7 @@ package com.omer.belestiviclone.shared.preview
 import android.content.Context
 import androidx.room.*
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import com.omer.belestiviclone.shared.catalog.ComparisonV1
 import kotlinx.coroutines.Dispatchers
 
 @Entity(tableName = "preview_state")
@@ -23,7 +24,32 @@ class AndroidPreviewStore(context: Context, private val key: Int = 1, private va
     override suspend fun load(): PreviewData {
         val base = initial()
         val row = db.state().read(key) ?: return base.also { save(it) }
-        return decode(row, base)
+        val loaded = decode(row, base)
+        if (loaded.profileId == PublicM3u.profile &&
+            (loaded.library == null || loaded.library.active == PublicM3u.source) &&
+            loaded.channels.none { it.name.equals("CNN Türk", ignoreCase = true) } &&
+            base.channels.any { it.name.equals("CNN Türk", ignoreCase = true) }
+        ) {
+            val existingByKey = loaded.channels.mapNotNull { ch ->
+                ch.definition?.let(ComparisonV1::playbackKey)?.let { it to ch.id }
+            }.toMap()
+            val syncedChannels = base.channels.map { ch ->
+                val playbackKey = ch.definition?.let(ComparisonV1::playbackKey)
+                val existingId = playbackKey?.let { existingByKey[it] }
+                if (existingId != null) ch.copy(id = existingId) else ch
+            }
+            val synced = loaded.copy(
+                channels = syncedChannels,
+                categories = CategoryNormalizer.deduplicateCategories(
+                    loaded.categories + syncedChannels.flatMap { it.groups }.distinct(),
+                    normalizeAliases = true
+                ),
+                library = null,
+            )
+            save(synced)
+            return synced
+        }
+        return loaded
     }
     private fun decode(row: PreviewRow, base: PreviewData): PreviewData {
         val prefs = PreviewCodec.unpack(row.preferences); require(prefs.size % 2 == 0)

@@ -10,13 +10,14 @@ class PublicSnapshotTest {
     @Test fun packagedSnapshotHashAndProductionCatalogCountsMatchAcquisition() {
         val file = listOf(File("../androidApp/src/main/assets/TiviListe.m3u"), File("androidApp/src/main/assets/TiviListe.m3u")).first { it.isFile }
         val bytes = file.readBytes()
-        assertEquals("d3af8303f1588cb8a0fd7b817c38997969db8618e9b3425e9202ed6cc8c5be08", MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) })
+        assertEquals("0956cd48a6bcb8417cf40bc0e3a66c934e1a83c59aa907790236885a7a76cbd4", MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) })
         val parsed = PublicM3u.parse(bytes.toString(Charsets.UTF_8))
-        assertEquals(273, parsed.rawRecords); assertEquals(273, parsed.rows.size); assertTrue(parsed.skipped.isEmpty())
+        assertEquals(274, parsed.rawRecords); assertEquals(274, parsed.rows.size); assertTrue(parsed.skipped.isEmpty())
         val n = parsed.rows.size
         val catalog = PublicM3u.catalog(parsed, IdentitySupply(List(n) { ChannelId(OpaqueId(1, it.toLong())) }, List(n) { MembershipId(OpaqueId(2, it.toLong())) }, List(n) { CategoryId(OpaqueId(3, it.toLong())) }))
-        assertEquals(273, catalog.size); assertEquals(10, catalog.flatMap { it.groups }.distinct().size)
-        assertEquals(273, parsed.rows.size); assertTrue(catalog.all { playbackUri(it) == it.definition!!.address.raw })
+        assertEquals(274, catalog.size); assertEquals(10, catalog.flatMap { it.groups }.distinct().size)
+        assertEquals(274, parsed.rows.size); assertTrue(catalog.all { playbackUri(it) == it.definition!!.address.raw })
+        assertTrue(catalog.any { it.name == "CNN Türk" && playbackUri(it) == "https://www.cnnturk.com/canli-yayin" })
         assertTrue(catalog.any { "Çocuk" in it.groups }); assertTrue(catalog.any { "Müzik" in it.groups })
         assertTrue(catalog.none { it.id in PreviewData().favorites })
     }
