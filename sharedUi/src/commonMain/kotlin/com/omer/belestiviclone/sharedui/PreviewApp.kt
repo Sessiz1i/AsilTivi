@@ -73,7 +73,7 @@ internal fun Label(value: String, size: Int = 12, color: Color = Color.White, mo
 
 /** Key repeat is consumed; long OK never produces an additional short action. */
 @Composable
-internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, onFocused: (() -> Unit)? = null, click: () -> Unit) {
+internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, onFocused: (() -> Unit)? = null, keyClick: (() -> Unit)? = null, click: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val gate = remember { OkGesture() }
     val clock = remember { TimeSource.Monotonic.markNow() }
@@ -107,7 +107,7 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
                 val now = clock.elapsedNow().inWholeMilliseconds
                 val signal = keySignal(e)
                 val action = when (e.type) { KeyEventType.KeyDown -> gate.down(now, long != null, signal.longPress, signal.repeat); KeyEventType.KeyUp -> gate.up(now, long != null); else -> OkAction.NONE }
-                when (action) { OkAction.SHORT -> invoke(click); OkAction.LONG -> long?.let { invoke(it) }; OkAction.NONE -> Unit }
+                when (action) { OkAction.SHORT -> invoke(keyClick ?: click); OkAction.LONG -> long?.let { invoke(it) }; OkAction.NONE -> Unit }
                 true
             } else false
         }
@@ -189,6 +189,35 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
             Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).widthIn(max = 540.dp).background(Color(0xEE20354C), RoundedCornerShape(12.dp)).padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }) { Label(s.notice, 14) }
         }
         if (s.dialog != null) CompositionLocalProvider(LocalModalLayer provides true) { Modal(s, image) }
+        val toastMsg = s.bottomToastMessage
+        if (!toastMsg.isNullOrEmpty()) {
+            val currentRev = s.bottomToastRevision
+            LaunchedEffect(currentRev) {
+                kotlinx.coroutines.delay(BottomToastDurationMs)
+                if (s.bottomToastRevision == currentRev) s.clearBottomToast()
+            }
+            val toastBg = when (s.bottomToastTone) {
+                ToastTone.Success -> Color(0xFF1F8B4C)
+                ToastTone.Warning -> Color(0xFFD97706)
+            }
+            val toastBorder = when (s.bottomToastTone) {
+                ToastTone.Success -> Color(0x884ADE80)
+                ToastTone.Warning -> Color(0x88FBBF24)
+            }
+            val boundsObserver = LocalBoundsObserver.current
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 54.dp)
+                    .onGloballyPositioned { boundsObserver("bottom-toast-pill", it.boundsInWindow()) }
+                    .background(toastBg, RoundedCornerShape(50))
+                    .border(1.dp, toastBorder, RoundedCornerShape(50))
+                    .padding(horizontal = 20.dp, vertical = 9.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+            ) {
+                Label(toastMsg, 13, Color.White, bold = true, maxLines = 1)
+            }
+        }
     }
     }
     }
@@ -271,10 +300,16 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
         }
-        LaunchedEffect(s.panel, s.selected, s.query, s.categoryMenu, s.moving, s.dialog, s.info) {
+        LaunchedEffect(s.panel, s.selected, s.query, s.categoryMenu, s.moving, s.dialog, s.info, s.panelInteractionRevision) {
             if (s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.categoryMenu && !s.info) {
                 kotlinx.coroutines.delay(5000L)
                 s.panel = false
+            }
+        }
+        LaunchedEffect(s.panel, s.category, s.selected) {
+            if (s.panel) {
+                val list = s.visibleData.filtered(s.category, s.query)
+                s.touchedFocusChannelId = if (list.any { it.id == s.selected }) s.selected else list.firstOrNull()?.id
             }
         }
         val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
@@ -304,7 +339,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 }
                 if (s.categoryMenu) LazyColumn(Modifier.offset(13.dp, top).width(122.dp).height(listHeight).background(Color.Black.copy(alpha = opacity)).padding(5.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true) { handleChooseCategory(s, cat) } }
+                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
                     item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
                     item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
                 }
@@ -312,7 +347,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     val currentCategoryLabel = when {
                         s.category.equals("Favoriler", ignoreCase = true) || s.category.equals("FAVORİ TV", ignoreCase = true) -> "FAVORİ TV"
                         s.category.equals("Tümü", ignoreCase = true) || s.category.equals("TÜMÜ", ignoreCase = true) -> "TÜMÜ"
-                        else -> s.category
+                        else -> CategoryNormalizer.normalizeDisplayLabel(s.category)
                     }
                     Action(currentCategoryLabel, Modifier.weight(1f), tint = Color(0xB3000000), radius = 0.dp, focusKey = "live:category") { s.categoryMenu = !s.categoryMenu }
                     IconAction("Ara", "kategori_ara", image) { s.searching = true }
@@ -321,7 +356,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
                 LazyRow(Modifier.height(44.dp).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(if (theme.categoryTabPill) 6.dp else (-8).dp)) {
                     item { CategoryTab("Ara", s, image, false) { s.searching = true } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, false) { handleChooseCategory(s, cat) } }
+                    items(categories(s)) { cat -> CategoryTab(cat, s, image, false, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
                 }
                 Channels(s, image, false, Modifier.fillMaxWidth().height(68.dp))
                 if (s.searching) Search(s)
@@ -597,13 +632,13 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
 @Composable private fun IconAction(label: String, icon: String, image: @Composable (String, Modifier) -> Unit, width: Dp? = null, visibleLabel: String = label, click: () -> Unit) {
     Action(label, Modifier.height(29.dp).then(if (width != null) Modifier.width(width) else Modifier), tint = Color(0xB8000000), radius = 11.dp, stroke = Color(0xFF344454), content = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { image(icon, Modifier.size(13.dp, 14.dp)); Label(visibleLabel, 11, bold = true) } }, click = click)
 }
-private fun handleChooseCategory(s: PreviewState, cat: String) {
+private fun handleChooseCategory(s: PreviewState, cat: String, focusFirstCard: Boolean = false) {
     val targetCategory = when {
         cat.equals("FAVORİ TV", ignoreCase = true) || cat.equals("Favoriler", ignoreCase = true) -> "Favoriler"
         cat.equals("TÜMÜ", ignoreCase = true) || cat.equals("Tümü", ignoreCase = true) -> "Tümü"
         else -> cat
     }
-    s.chooseCategory(targetCategory)
+    s.chooseCategory(targetCategory, focusFirstCard = focusFirstCard)
 }
 
 @Composable
@@ -688,50 +723,53 @@ private fun PlayerActionButton(
     )
 }
 
-private fun categorySymbol(cat: String) = when (cat.uppercase()) {
+private fun categorySymbol(cat: String) = when (CategoryNormalizer.canonicalKey(cat)) {
     "ARA" -> "🔍"
-    "FAVORİ TV", "FAVORILER", "FAVORİLER" -> "🏆"
-    "TÜMÜ", "TUMU" -> "⊞"
+    "FAVORİ TV" -> "🏆"
+    "TÜMÜ" -> "⊞"
     "ULUSAL" -> "🇹🇷"
     "HABER" -> "📰"
     "SPOR" -> "⚽"
-    "ÇOCUK", "COCUK" -> "🪁"
+    "ÇOCUK" -> "🪁"
     "BELGESEL" -> "🌍"
-    "MÜZİK", "MUZIK" -> "🎵"
-    "DİNİ", "DINI" -> "🕌"
+    "MÜZİK" -> "🎵"
+    "DİNİ" -> "🕌"
     "YEREL" -> "📍"
     "KKTC" -> "🇨🇾"
-    "AZ", "AZERBAYCAN" -> "🇦🇿"
+    "AZERBAYCAN" -> "🇦🇿"
     "ALMANYA / AVRUPA" -> "🇩🇪"
-    "DÜNYA", "DUNYA" -> "🌐"
-    "EKONOMİ", "EKONOMI" -> "📈"
+    "DÜNYA" -> "🌐"
+    "7/24 DİZİ/FİLM" -> "🎬"
+    "RADYO" -> "📻"
+    "EKONOMİ" -> "📈"
     "KURUMLAR" -> "🏛️"
-    "DİĞER", "DIGER" -> "📺"
+    "DİĞER" -> "📺"
     "ÇOKLU EKRAN", "AYARLAR" -> null
     else -> if (cat.startsWith("7/24")) "🎬" else "📺"
 }
 
-@Composable private fun CategoryTab(cat: String, s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, click: () -> Unit) {
+@Composable private fun CategoryTab(cat: String, s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, keyClick: (() -> Unit)? = null, click: () -> Unit) {
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
-    val shades = when (cat.uppercase()) {
+    val shades = when (CategoryNormalizer.canonicalKey(cat)) {
         "ÇOKLU EKRAN" -> listOf(Color(0xFFDA6800), Color(0xFFF4A10B))
         "AYARLAR" -> listOf(Color(0xFF292A2A), Color(0xFF070707))
         "ARA" -> listOf(Color(0xFF247675))
-        "FAVORİ TV", "FAVORILER", "FAVORİLER" -> listOf(Color(0xFFB8860B), Color(0xFFE5A910))
-        "TÜMÜ", "TUMU" -> listOf(Color(0xFF30495C))
+        "FAVORİ TV" -> listOf(Color(0xFFB8860B), Color(0xFFE5A910))
+        "TÜMÜ" -> listOf(Color(0xFF30495C))
         "ULUSAL" -> listOf(Color(0xFFFAFAFA))
         "HABER" -> listOf(Color(0xFF315D77))
         "SPOR" -> listOf(Color(0xFF1A9B67))
-        "ÇOCUK", "COCUK" -> listOf(Color(0xFF7A4FAC), Color(0xFF568AD1))
+        "ÇOCUK" -> listOf(Color(0xFF7A4FAC), Color(0xFF568AD1))
         "BELGESEL" -> listOf(Color(0xFF455B65))
-        "MÜZİK", "MUZIK" -> listOf(Color(0xFFDC4835), Color(0xFFE99A18))
-        "DİNİ", "DINI" -> listOf(Color(0xFF1BAE91))
+        "MÜZİK" -> listOf(Color(0xFFDC4835), Color(0xFFE99A18))
+        "DİNİ" -> listOf(Color(0xFF1BAE91))
         "YEREL" -> listOf(Color(0xFF87918F))
         "KKTC" -> listOf(Color(0xFFC0392B), Color(0xFFE74C3C))
-        "AZ", "AZERBAYCAN" -> listOf(Color(0xFF007A87), Color(0xFF96253F))
+        "AZERBAYCAN" -> listOf(Color(0xFF007A87), Color(0xFF96253F))
         "ALMANYA / AVRUPA" -> listOf(Color(0xFF2C3E50), Color(0xFFD35400))
-        "DÜNYA", "DUNYA" -> listOf(Color(0xFF1565C0), Color(0xFF00ACC1))
-        "7/24 YOUTUBE" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
+        "DÜNYA" -> listOf(Color(0xFF1565C0), Color(0xFF00ACC1))
+        "7/24 DİZİ/FİLM" -> listOf(Color(0xFFE0AF0D), Color(0xFFBB7714))
+        "RADYO" -> listOf(Color(0xFF5C6BC0), Color(0xFF3949AB))
         else -> listOf(Color(0xFF2684A6), Color(0xFF18B59F))
     }
     val shape = if (vertical) RoundedCornerShape(0.dp)
@@ -744,11 +782,13 @@ private fun categorySymbol(cat: String) = when (cat.uppercase()) {
     val isSelected = s.category == cat ||
         (isFav && (s.category == "Favoriler" || s.category == "FAVORİ TV")) ||
         (cat.equals("TÜMÜ", ignoreCase = true) && (s.category == "Tümü" || s.category == "TÜMÜ")) ||
-        (cat.equals("AZ", ignoreCase = true) && (s.category == "AZ" || s.category == "AZERBAYCAN")) ||
-        cat.equals(s.category, ignoreCase = true)
+        CategoryNormalizer.matches(s.category, cat)
 
+    var isTabFocused by remember { mutableStateOf(false) }
     val favBorder = if (isFav && !theme.categoryTabPill) Color(0xFFFFD700) else Color.Transparent
-    val selection = if (isSelected) {
+    val selection = if (isTabFocused) {
+        Modifier.border(2.dp, Color(0xFFFFCF37), shape)
+    } else if (isSelected) {
         Modifier.border(if (theme.categoryTabPill) 1.5.dp else 2.dp, theme.categoryTabSelectedStroke, shape)
     } else if (favBorder != Color.Transparent) {
         Modifier.border(1.5.dp, favBorder, shape)
@@ -775,7 +815,7 @@ private fun categorySymbol(cat: String) = when (cat.uppercase()) {
     } else Modifier.background(tabBrush, shape)
 
     val language = LocalLanguage.current
-    val label = presentationText(cat, language).let { if (language == "Türkçe") it.replace('i', 'İ').replace('ı', 'I').uppercase() else it.uppercase() }
+    val label = presentationText(cat, language).let { if (language == "Türkçe") CategoryNormalizer.toTurkishUpper(it) else it.uppercase() }
     val horizontalPadding = if (vertical) 9.dp else if (theme.categoryTabPill) 12.dp else 14.dp
     val textColor = if (isUlusal) {
         Color(0xFFE00010)
@@ -785,7 +825,7 @@ private fun categorySymbol(cat: String) = when (cat.uppercase()) {
         Color.White
     }
 
-    Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), content = {
+    Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).onFocusChanged { isTabFocused = it.isFocused }.clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), onFocused = { s.touchPanelInteraction() }, keyClick = keyClick, content = {
         Box(if (vertical) Modifier.fillMaxWidth() else Modifier) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val symbol = categorySymbol(cat)
@@ -797,29 +837,62 @@ private fun categorySymbol(cat: String) = when (cat.uppercase()) {
     }, click = click)
 }
 
-private fun categories(s: PreviewState): List<String> {
-    val template = listOf("FAVORİ TV", "TÜMÜ", "Ulusal", "Haber", "Spor", "Çocuk", "Belgesel", "Müzik", "Dini", "Yerel", "KKTC", "AZ")
-    val available = s.data.categories.filter { it !in s.data.hiddenCategories && s.data.channels.any { ch -> ch.available && it in ch.groups } }
+internal fun categories(s: PreviewState): List<String> {
+    val template = listOf(
+        "FAVORİ TV",
+        "TÜMÜ",
+        "Ulusal",
+        "Haber",
+        "Spor",
+        "Çocuk",
+        "Belgesel",
+        "Müzik",
+        "Dini",
+        "Yerel",
+        "KKTC",
+        "AZERBAYCAN",
+        "DÜNYA",
+        "7/24 DİZİ/FİLM"
+    )
+    val available = s.managedCategories.filter { cat ->
+        !s.isCategoryHidden(cat) && s.data.channels.any { ch ->
+            ch.available && (ch.groups.any { g -> CategoryNormalizer.matches(g, cat) } || CategoryNormalizer.matches(ch.category, cat))
+        }
+    }
     val result = mutableListOf<String>()
     for (item in template) {
         if (item == "FAVORİ TV" || item == "TÜMÜ") {
             result.add(item)
         } else {
-            val matched = available.any { it.equals(item, ignoreCase = true) || (item == "AZ" && it.equals("AZERBAYCAN", ignoreCase = true)) }
-            val channelMatched = s.data.channels.any { ch ->
-                ch.available && (ch.groups.any { g -> g.equals(item, ignoreCase = true) || (item == "AZ" && g.equals("AZERBAYCAN", ignoreCase = true)) } ||
-                    ch.category.equals(item, ignoreCase = true) || (item == "AZ" && ch.category.equals("AZERBAYCAN", ignoreCase = true)))
-            }
-            if (matched || channelMatched) {
-                result.add(item)
+            val isHidden = s.isCategoryHidden(item)
+            if (!isHidden) {
+                val matched = available.any { CategoryNormalizer.matches(it, item) }
+                val channelMatched = s.data.channels.any { ch ->
+                    ch.available && (ch.groups.any { g -> CategoryNormalizer.matches(g, item) } || CategoryNormalizer.matches(ch.category, item))
+                }
+                if (matched || channelMatched) {
+                    result.add(item)
+                }
             }
         }
     }
+    var hasRadio = false
     for (cat in available) {
-        val already = template.any { it.equals(cat, ignoreCase = true) || (it == "AZ" && cat.equals("AZERBAYCAN", ignoreCase = true)) }
+        if (CategoryNormalizer.matches(cat, "RADYO")) {
+            hasRadio = true
+            continue
+        }
+        val already = template.any { CategoryNormalizer.matches(cat, it) } ||
+            result.any { CategoryNormalizer.matches(cat, it) }
         if (!already && !cat.equals("Favoriler", true) && !cat.equals("Son İzlenenler", true) && !cat.equals("Tümü", true)) {
             result.add(cat)
         }
+    }
+    val radioChannelMatched = !s.isCategoryHidden("RADYO") && s.data.channels.any { ch ->
+        ch.available && (ch.groups.any { g -> CategoryNormalizer.matches(g, "RADYO") } || CategoryNormalizer.matches(ch.category, "RADYO"))
+    }
+    if ((hasRadio || radioChannelMatched) && result.none { CategoryNormalizer.matches(it, "RADYO") }) {
+        result.add("RADYO")
     }
     return result
 }
@@ -836,10 +909,24 @@ private fun categories(s: PreviewState): List<String> {
 private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, modifier: Modifier) {
     val values = s.visibleData.filtered(s.category, s.query)
     val listState = key(vertical) { rememberLazyListState() }
+    val returns = LocalFocusReturn.current
     LaunchedEffect(s.selected, values) {
         val index = values.indexOfFirst { it.id == s.selected }
         if (!s.searching && s.moving == null && index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
             listState.scrollToItem(index)
+        }
+    }
+    LaunchedEffect(s.categoryFirstCardFocusRevision) {
+        if (s.categoryFirstCardFocusRevision > 0 && values.isNotEmpty() && !s.searching && s.dialog == null) {
+            val targetIndex = 0
+            val targetId = values[targetIndex].id
+            s.touchedFocusChannelId = targetId
+            runCatching { listState.scrollToItem(targetIndex) }
+            withFrameNanos { }
+            withFrameNanos { }
+            val key = "channel:${PreviewCodec.id(targetId)}"
+            val requester = returns?.registry?.entryTarget(key, returns.active)
+            runCatching { requester?.requestFocus() }
         }
     }
     val swipeThreshold = with(LocalDensity.current) { 44.dp.toPx() }
@@ -852,14 +939,18 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
 }
 @Composable
 private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable (String, Modifier) -> Unit, vertical: Boolean) {
-    val requester = remember { FocusRequester() }
+    val returns = LocalFocusReturn.current
+    val focusKey = "channel:${PreviewCodec.id(ch.id)}"
+    val requester = remember(returns, focusKey) { returns?.registry?.requester(focusKey) { FocusRequester() } ?: FocusRequester() }
+    var isCardFocused by remember { mutableStateOf(false) }
     val keySignal = LocalKeySignal.current
     val number = if (s.category == "Favoriler" && !s.searching) "${s.visibleData.favorites.indexOf(ch.id) + 1}. " else ""
     val isMoving = s.moving == ch.id
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
-    val isSelected = ch.id == s.selected || isMoving
+    val activeHighlightId = s.touchedFocusChannelId ?: s.selected
+    val hasHighlightStroke = ch.id == activeHighlightId || isCardFocused || isMoving
     val strokeColor = if (isMoving) Color(0xFFFFCF37) else theme.cardSelectedStroke
-    val strokeWidth = if (isSelected) theme.cardSelectedStrokeWidthDp.dp else 0.dp
+    val strokeWidth = if (hasHighlightStroke) theme.cardSelectedStrokeWidthDp.dp else 0.dp
     val cardRadius = if (theme.isCardFlat) 0.dp else 8.dp
     val cardTint = if (theme.isCardFlat) Color.Transparent else theme.cardBackground
 
@@ -869,12 +960,24 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     LaunchedEffect(s.selected) {
         if (windowFocused && s.dialog == null && !s.searching && s.selected == ch.id) requester.requestFocus()
     }
+    LaunchedEffect(s.categoryFirstCardFocusRevision) {
+        if (s.categoryFirstCardFocusRevision > 0 && windowFocused && s.dialog == null && !s.searching && s.touchedFocusChannelId == ch.id) {
+            runCatching { requester.requestFocus() }
+        }
+    }
     Action(
         number + ch.name,
-        (if (vertical) Modifier.fillMaxWidth().height(38.5.dp) else Modifier.width(69.dp).height(68.dp)).focusRequester(requester)
+        (if (vertical) Modifier.fillMaxWidth().height(38.5.dp) else Modifier.width(69.dp).height(68.dp))
+            .onFocusChanged { focusState ->
+                isCardFocused = focusState.isFocused
+                if (focusState.isFocused) {
+                    s.touchedFocusChannelId = ch.id
+                    s.touchPanelInteraction()
+                }
+            }
             .then(if (isMoving) Modifier.pointerInput(ch.id, vertical) { detectDragGestures(onDragStart = { drag = 0f }, onDragEnd = { s.moveFinish() }, onDragCancel = { s.draft = null; s.moving = null }) { change, amount -> change.consume(); drag += if (vertical) amount.y else amount.x; if (abs(drag) > 45) { s.moveBy(if (drag > 0) 1 else -1); drag = 0f } } } else Modifier),
-        focusKey = "channel:${PreviewCodec.id(ch.id)}",
-        selected = isSelected,
+        focusKey = focusKey,
+        selected = ch.id == s.selected || isMoving,
         tint = cardTint,
         radius = cardRadius,
         strokeWidth = strokeWidth,
@@ -884,6 +987,13 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         channelFocus = !isMoving,
         padding = PaddingValues(0.dp),
         long = { s.target = ch.id; s.dialog = if (s.category == "Favoriler") "favorite" else "channel" },
+        keyClick = {
+            if (isMoving) s.moveFinish()
+            else {
+                requester.requestFocus()
+                s.select(ch.id)
+            }
+        },
         extraKey = { e ->
             val delta = channelArrowDelta(vertical, e.key)
             if (isMoving && e.type == KeyEventType.KeyDown && e.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) { s.moveBy(if (e.key in listOf(Key.DirectionUp, Key.DirectionLeft)) -1 else 1); true }
@@ -924,7 +1034,18 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
                 }
             }
         }
-    ) { if (isMoving) s.moveFinish() else { requester.requestFocus(); s.select(ch.id) } }
+    ) {
+        if (isMoving) {
+            s.moveFinish()
+        } else if (isCardFocused || s.touchedFocusChannelId == ch.id) {
+            requester.requestFocus()
+            s.select(ch.id)
+        } else {
+            s.touchedFocusChannelId = ch.id
+            s.touchPanelInteraction()
+            runCatching { requester.requestFocus() }
+        }
+    }
 }
 
 private val sections = listOf("Kanallar Ve Listeler", "Görünüm", "Oynatma", "Uygulama", "Yedekleme Ve Aktarım", "Beleş TiVi +", "Yardım Ve Hakkında")
@@ -1432,13 +1553,13 @@ private fun ChannelMenu(s: PreviewState, image: @Composable (String, Modifier) -
                     }
                 }, click = click)
             }
-            row(if (ch.id in s.data.favorites) "Favorilerden kaldır" else "Favorilere ekle", if (ch.id in s.data.favorites) "ikon_menu_favoriden_cikar" else "ikon_menu_favori", Modifier.focusRequester(first)) { s.channelChange(s.data.toggleFavorite(ch.id)) }
+            row(if (ch.id in s.data.favorites) "Favorilerden kaldır" else "Favorilere ekle", if (ch.id in s.data.favorites) "ikon_menu_favoriden_cikar" else "ikon_menu_favori", Modifier.focusRequester(first)) { s.toggleFavoriteWithToast(ch.id) }
             if (favorite) {
                 row("Sırasını değiştir…", ":↔", click = s::moveStart)
                 row("En başa taşı", ":⇤") { s.commit(s.data.move(ch.id, 0)) { s.dismiss() } }
                 row("En sona taşı", ":⇥") { s.commit(s.data.move(ch.id, s.data.favorites.lastIndex)) { s.dismiss() } }
             } else {
-                row("Kanalı gizle", "ikon_menu_gizle") { s.channelChange(s.data.copy(hidden = s.data.hidden + ch.id)) }
+                row("Kanalı gizle", "ikon_menu_gizle") { s.hideChannelWithToast(ch.id) }
                 row("Gizlenen kanalları geri getir", "ikon_menu_gerigetir") { s.commit(s.data.copy(hidden = emptySet())) { s.dismiss() } }
             }
             row("Vazgeç", "ikon_menu_vazgec", dismiss = true, click = s::dismiss)

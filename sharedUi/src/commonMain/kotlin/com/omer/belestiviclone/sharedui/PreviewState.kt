@@ -62,6 +62,33 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var dialog by mutableStateOf<String?>(null)
     var target by mutableStateOf<OpaqueId?>(null)
     var notice by mutableStateOf("")
+    var bottomToastMessage by mutableStateOf<String?>(null); private set
+    var bottomToastTone by mutableStateOf(ToastTone.Success); private set
+    var bottomToastRevision by mutableStateOf(0); private set
+
+    fun showBottomToast(message: String, tone: ToastTone = ToastTone.Success) {
+        bottomToastMessage = message
+        bottomToastTone = tone
+        bottomToastRevision++
+    }
+
+    fun clearBottomToast() {
+        bottomToastMessage = null
+    }
+
+    var panelInteractionRevision by mutableStateOf(0); private set
+    fun touchPanelInteraction() {
+        panelInteractionRevision++
+    }
+
+    var categoryFirstCardFocusRevision by mutableStateOf(0); private set
+    fun requestCategoryFirstCardFocus() {
+        categoryFirstCardFocusRevision++
+        touchPanelInteraction()
+    }
+
+    var touchedFocusChannelId by mutableStateOf<OpaqueId?>(null)
+
     var paused by mutableStateOf(false)
     var muted by mutableStateOf(false)
     var retry by mutableStateOf(0)
@@ -469,6 +496,9 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             } finally { busy = false }
         }
     }
+    val managedCategories: List<String>
+        get() = CategoryNormalizer.deduplicateCategories(data.categories, normalizeAliases = true)
+
     fun pref(key: String, value: String) = commit(data.withPref(key, value)) {
         if (key == "history" && value == "Kapalı" && category == "Son İzlenenler") category = "Tümü"
         dialog = null
@@ -480,23 +510,77 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
         if (key in listOf("subtitleSize", "subtitleColor", "subtitleBgOpacity")) notice = "Altyazı görünüm tercihi güncellendi."
         if (key == "theme") notice = "Tema: $value seçildi."
+        if (key == "list") {
+            val shortLabel = if (value.startsWith("Dikey", ignoreCase = true)) "Dikey" else "Yatay"
+            showBottomToast("✅ Kanal listesi: $shortLabel", ToastTone.Success)
+        }
+        if (key == "size") {
+            showBottomToast("✅ Banner boyutu güncellendi", ToastTone.Success)
+        }
+        if (key == "position") {
+            showBottomToast("✅ Banner konumu güncellendi", ToastTone.Success)
+        }
     }
-    fun chooseCategory(value: String) { category = value; query = ""; categoryMenu = false }
+    fun chooseCategory(value: String, focusFirstCard: Boolean = false) {
+        category = value
+        query = ""
+        categoryMenu = false
+        touchPanelInteraction()
+        if (focusFirstCard) {
+            categoryFirstCardFocusRevision++
+        }
+    }
     fun categoryAction(route: String) {
         categoryMenu = false
         when (route) { "multi" -> dialog = "warning"; "settings" -> settings() }
     }
+    fun isCategoryHidden(cat: String): Boolean =
+        cat in data.hiddenCategories || data.hiddenCategories.any { CategoryNormalizer.matches(it, cat) }
+
     fun toggleCategory(category: String) {
-        if (category !in data.categories) return
-        commit(data.copy(hiddenCategories = if (category in data.hiddenCategories) data.hiddenCategories - category else data.hiddenCategories + category))
+        if (category !in data.categories && data.categories.none { CategoryNormalizer.matches(it, category) }) return
+        val matching = if (category in data.categories) listOf(category) else data.categories.filter { CategoryNormalizer.matches(it, category) }
+        val currentlyHidden = matching.all { it in data.hiddenCategories }
+        val nextHidden = if (currentlyHidden) data.hiddenCategories - matching.toSet() else data.hiddenCategories + matching
+        commit(data.copy(hiddenCategories = nextHidden))
     }
     fun showCategories(visible: Boolean) = commit(data.copy(hiddenCategories = if (visible) emptySet() else data.categories.toSet()))
     fun moveCategory(category: String, delta: Int) {
-        val from = data.categories.indexOf(category)
-        val to = from + delta
-        if (from < 0 || to !in data.categories.indices || delta !in listOf(-1, 1)) return
-        val order = data.categories.toMutableList(); order.removeAt(from); order.add(to, category)
-        commit(data.copy(categories = order))
+        if (delta !in listOf(-1, 1)) return
+        val exactIndex = data.categories.indexOf(category)
+        if (exactIndex >= 0) {
+            val to = exactIndex + delta
+            if (to !in data.categories.indices) return
+            val order = data.categories.toMutableList()
+            order.removeAt(exactIndex)
+            order.add(to, category)
+            commit(data.copy(categories = order))
+        } else {
+            val dedup = managedCategories.toMutableList()
+            val from = dedup.indexOfFirst { CategoryNormalizer.matches(it, category) }
+            val to = from + delta
+            if (from < 0 || to !in dedup.indices) return
+            val moved = dedup.removeAt(from)
+            dedup.add(to, moved)
+            commit(data.copy(categories = dedup))
+        }
+    }
+    fun toggleFavoriteWithToast(channelId: OpaqueId) {
+        val ch = data.channels.find { it.id == channelId } ?: return
+        val wasFavorite = channelId in data.favorites
+        channelChange(data.toggleFavorite(channelId)) {
+            if (!wasFavorite) {
+                showBottomToast("✅ ⭐ ${ch.name} favorilere eklendi", ToastTone.Success)
+            } else {
+                showBottomToast("⭐ ${ch.name} favorilerden çıkarıldı", ToastTone.Warning)
+            }
+        }
+    }
+    fun hideChannelWithToast(channelId: OpaqueId) {
+        val ch = data.channels.find { it.id == channelId } ?: return
+        channelChange(data.copy(hidden = data.hidden + channelId)) {
+            showBottomToast("Kanal gizlendi: ${ch.name}", ToastTone.Warning)
+        }
     }
     /** Kullanıcı kanal seçimi (liste tıklaması vb.): canlı TV'de panel kapanır ve kanal değişim kartı gösterilir. */
     fun select(id: OpaqueId) = changeChannel(id, keepPanel = false)
@@ -580,13 +664,14 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             page == "live" -> dialog = "exit"
         }
     }
-    fun channelChange(next: PreviewData) {
+    fun channelChange(next: PreviewData, onCommitted: () -> Unit = {}) {
         val oldList = data.filtered(category, query)
         val index = oldList.indexOfFirst { it.id == target }.coerceAtLeast(0)
         commit(next) {
             val list = data.filtered(category, query)
             if (list.none { it.id == target }) target = list.getOrNull(index.coerceAtMost(list.lastIndex))?.id
             dismiss()
+            onCommitted()
         }
     }
     fun sourceForm(type: String, index: Int? = null) {
@@ -996,3 +1081,9 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
 }
 
 const val NumberInputTimeoutMs = 2500L
+const val BottomToastDurationMs = 2500L
+
+enum class ToastTone {
+    Success,
+    Warning,
+}

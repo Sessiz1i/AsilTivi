@@ -97,10 +97,10 @@ data class PreviewData(
                 history.mapNotNull { id -> channels.find { it.id == id } }
             category.equals("Tümü", ignoreCase = true) || category.equals("TÜMÜ", ignoreCase = true) ->
                 channels.filter { it.available }
-            category.equals("AZ", ignoreCase = true) || category.equals("AZERBAYCAN", ignoreCase = true) ->
-                channels.filter { it.available && (it.groups.any { g -> g.equals("AZ", true) || g.equals("AZERBAYCAN", true) } || it.category.equals("AZ", true) || it.category.equals("AZERBAYCAN", true)) }
             else ->
-                channels.filter { it.available && (it.groups.any { g -> g.equals(category, true) } || it.category.equals(category, true)) }
+                channels.filter { ch ->
+                    ch.available && (ch.groups.any { g -> CategoryNormalizer.matches(g, category) } || CategoryNormalizer.matches(ch.category, category))
+                }
         }
         return base.filter { it.id !in hidden && it.name.contains(query, ignoreCase = true) }
     }
@@ -257,5 +257,130 @@ class OkGesture {
         val action = if (longFired) OkAction.NONE else if (hasLong && now - start >= 500) OkAction.LONG else OkAction.SHORT
         reset(); return action
     }
-    fun reset() { started = null; longFired = false }
+        fun reset() { started = null; longFired = false }
+}
+
+/**
+ * Türkçe büyük/küçük harf duyarlı kategori normalizasyonu, takma ad (alias) eşlemesi ve
+ * v4.1 orijinal kategori sıralaması (`ARA › FAVORİ TV › TÜMÜ › ULUSAL › HABER › SPOR › ÇOCUK › BELGESEL › MÜZİK › DİNİ › YEREL › KKTC › AZERBAYCAN › DÜNYA › 7/24 DİZİ/FİLM › RADYO`).
+ */
+object CategoryNormalizer {
+    val v41BuiltInOrder: List<String> = listOf(
+        "FAVORİ TV",
+        "TÜMÜ",
+        "ULUSAL",
+        "HABER",
+        "SPOR",
+        "ÇOCUK",
+        "BELGESEL",
+        "MÜZİK",
+        "DİNİ",
+        "YEREL",
+        "KKTC",
+        "AZERBAYCAN",
+        "DÜNYA",
+        "7/24 DİZİ/FİLM",
+        "RADYO",
+    )
+
+    fun toTurkishUpper(value: String): String {
+        val sb = StringBuilder(value.length)
+        for (ch in value.trim()) {
+            when (ch) {
+                'i' -> sb.append('İ')
+                'ı' -> sb.append('I')
+                'ğ' -> sb.append('Ğ')
+                'ü' -> sb.append('Ü')
+                'ş' -> sb.append('Ş')
+                'ö' -> sb.append('Ö')
+                'ç' -> sb.append('Ç')
+                else -> sb.append(ch.uppercaseChar())
+            }
+        }
+        return sb.toString()
+    }
+
+    fun canonicalKey(raw: String): String {
+        val up = toTurkishUpper(raw)
+        return when (up) {
+            "FAVORİLER", "FAVORILER", "FAVORİ TV", "FAVORI TV" -> "FAVORİ TV"
+            "TÜMÜ", "TUMU" -> "TÜMÜ"
+            "ULUSAL" -> "ULUSAL"
+            "HABER" -> "HABER"
+            "SPOR" -> "SPOR"
+            "ÇOCUK", "COCUK" -> "ÇOCUK"
+            "BELGESEL" -> "BELGESEL"
+            "MÜZİK", "MUZIK" -> "MÜZİK"
+            "DİNİ", "DINI" -> "DİNİ"
+            "YEREL" -> "YEREL"
+            "KKTC", "KIBRIS", "K.K.T.C", "K.K.T.C.", "KUZEY KIBRIS" -> "KKTC"
+            "AZ", "AZERBAYCAN", "AZERBAIJAN", "AZƏRBAYCAN" -> "AZERBAYCAN"
+            "DÜNYA", "DUNYA", "WORLD", "ULUSLARARASI" -> "DÜNYA"
+            "7/24 DİZİ/FİLM", "7/24 DIZI/FILM", "7/24 DİZİ", "7/24 FİLM", "DİZİ/FİLM", "FİLM/DİZİ" -> "7/24 DİZİ/FİLM"
+            "RADYO", "RADIO" -> "RADYO"
+            else -> up
+        }
+    }
+
+    fun normalizeDisplayLabel(raw: String): String {
+        val key = canonicalKey(raw)
+        return when (key) {
+            "ULUSAL" -> "Ulusal"
+            "HABER" -> "Haber"
+            "SPOR" -> "SPOR"
+            "ÇOCUK" -> "Çocuk"
+            "BELGESEL" -> "Belgesel"
+            "MÜZİK" -> "Müzik"
+            "DİNİ" -> "Dini"
+            "YEREL" -> "Yerel"
+            "KKTC" -> "KKTC"
+            "AZERBAYCAN" -> "AZERBAYCAN"
+            "DÜNYA" -> "DÜNYA"
+            "7/24 DİZİ/FİLM" -> "7/24 DİZİ/FİLM"
+            "RADYO" -> "Radyo"
+            else -> raw.trim().ifEmpty { key }
+        }
+    }
+
+    fun matches(groupOrCategory: String, targetCategory: String): Boolean {
+        if (groupOrCategory.equals(targetCategory, ignoreCase = true)) return true
+        val gKey = canonicalKey(groupOrCategory)
+        val tKey = canonicalKey(targetCategory)
+        if (gKey == tKey) return true
+        if (tKey == "DÜNYA" && (gKey == "ULUSAL - YURT DIŞI" || gKey == "ULUSAL - YURT DISI" || gKey == "YURT DIŞI" || gKey == "YURT DISI")) {
+            return true
+        }
+        if (tKey == "7/24 DİZİ/FİLM" && gKey == "7/24 YOUTUBE") {
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Büyük/küçük harf farkından ("SPOR" vs "Spor") veya takma adlardan ("Kıbrıs" vs "KKTC", "AZ" vs "AZERBAYCAN")
+     * kaynaklanan çift kategorileri tekilleştirir.
+     */
+    fun deduplicateCategories(rawCategories: List<String>, normalizeAliases: Boolean = true): List<String> {
+        val seenKeys = mutableSetOf<String>()
+        val result = mutableListOf<String>()
+        for (raw in rawCategories) {
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) continue
+            val key = if (normalizeAliases) canonicalKey(trimmed) else toTurkishUpper(trimmed)
+            if (seenKeys.add(key)) {
+                val label = if (normalizeAliases) {
+                    when (key) {
+                        "SPOR" -> "SPOR"
+                        "KKTC" -> "KKTC"
+                        "AZERBAYCAN" -> "AZERBAYCAN"
+                        "DÜNYA" -> "DÜNYA"
+                        "7/24 DİZİ/FİLM" -> "7/24 DİZİ/FİLM"
+                        else -> trimmed
+                    }
+                } else trimmed
+                result.add(label)
+            }
+        }
+        return result
+    }
 }

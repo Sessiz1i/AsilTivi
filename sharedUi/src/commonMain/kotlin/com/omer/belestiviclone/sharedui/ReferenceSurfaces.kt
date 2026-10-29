@@ -598,17 +598,18 @@ internal fun CategoryManagement(s: PreviewState, image: @Composable (String, Mod
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) { image("ikon_hide", Modifier.size(12.dp)); Label("TÜMÜNÜ GİZLE", 10, bold = true) }
             }) { s.showCategories(false) }
         }
-        Spacer(Modifier.height(25.dp)); SettingsGroup("KATEGORİLER (${s.data.categories.size})")
-        s.data.categories.forEachIndexed { index, category ->
+        val managedCats = s.managedCategories
+        Spacer(Modifier.height(25.dp)); SettingsGroup("KATEGORİLER (${managedCats.size})")
+        managedCats.forEachIndexed { index, category ->
             key(category) {
-                val hidden = category in s.data.hiddenCategories
+                val hidden = s.isCategoryHidden(category)
                 Row(Modifier.fillMaxWidth().height(52.dp).background(referenceCard, RoundedCornerShape(10.dp)).padding(start = 13.dp, end = 19.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     Box(Modifier.size(26.dp).background(Color(0xFF1A2D4F), CircleShape), contentAlignment = Alignment.Center) { Label("${index + 1}", 10, bold = true) }
                     Label(category, 11, if (hidden) Color(0xFF62718A) else Color.White, Modifier.weight(1f), bold = true, maxLines = 1, decoration = if (hidden) TextDecoration.LineThrough else null)
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Action("$category ${if (hidden) "göster" else "gizle"}", Modifier.size(35.dp, 33.dp), tint = Color(0xFF1A2D4F), radius = 8.dp, strokeWidth = 0.dp, enabled = !s.busy, content = { Label(if (hidden) "⊘" else "✓", 19, if (hidden) Color(0xFFFF3D68) else Color.White) }) { s.toggleCategory(category) }
                         Action("$category yukarı taşı", Modifier.size(35.dp, 33.dp), tint = Color(0xFF1A2D4F), radius = 8.dp, strokeWidth = 0.dp, enabled = index > 0 && !s.busy, content = { Label("▲", 11, if (index > 0) Color.White else Color(0xFF4A5B74)) }) { s.moveCategory(category, -1) }
-                        Action("$category aşağı taşı", Modifier.size(35.dp, 33.dp), tint = Color(0xFF1A2D4F), radius = 8.dp, strokeWidth = 0.dp, enabled = index < s.data.categories.lastIndex && !s.busy, content = { Label("▼", 11, if (index < s.data.categories.lastIndex) Color.White else Color(0xFF4A5B74)) }) { s.moveCategory(category, 1) }
+                        Action("$category aşağı taşı", Modifier.size(35.dp, 33.dp), tint = Color(0xFF1A2D4F), radius = 8.dp, strokeWidth = 0.dp, enabled = index < managedCats.lastIndex && !s.busy, content = { Label("▼", 11, if (index < managedCats.lastIndex) Color.White else Color(0xFF4A5B74)) }) { s.moveCategory(category, 1) }
                     }
                 }
                 Spacer(Modifier.height(1.dp))

@@ -27,11 +27,17 @@ class AndroidPreviewStore(context: Context, private val key: Int = 1, private va
     }
     private fun decode(row: PreviewRow, base: PreviewData): PreviewData {
         val prefs = PreviewCodec.unpack(row.preferences); require(prefs.size % 2 == 0)
+        val rawCats = PreviewCodec.unpack(row.categories)
+        val rawHiddenCats = PreviewCodec.unpack(row.hiddenCategories).toSet()
+        val dedupCats = CategoryNormalizer.deduplicateCategories(rawCats, normalizeAliases = true)
+        val dedupHiddenCats = rawHiddenCats.mapNotNull { h ->
+            dedupCats.firstOrNull { CategoryNormalizer.matches(it, h) } ?: h
+        }.toSet()
         val user = base.copy(
             favorites = PreviewCodec.unpack(row.favorites).map(PreviewCodec::id),
             hidden = PreviewCodec.unpack(row.hidden).map(PreviewCodec::id).toSet(),
             history = PreviewCodec.unpack(row.history).map(PreviewCodec::id),
-            categories = PreviewCodec.unpack(row.categories), hiddenCategories = PreviewCodec.unpack(row.hiddenCategories).toSet(),
+            categories = dedupCats, hiddenCategories = dedupHiddenCats,
             preferences = (base.preferences + prefs.chunked(2).associate { it[0] to it[1] }),
         )
         // An unreadable source envelope must not lock the profile: favorites, history and

@@ -181,7 +181,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
             .filter { ch -> ch.definition?.let(ComparisonV1::playbackKey) !in existingKeys }
         val mergedChannels = baseChannels + addedChannels
         val newGroups = addedChannels.flatMap { it.groups }.distinct()
-        val updatedCategories = data.categories + newGroups.filter { it !in data.categories }
+        val updatedCategories = CategoryNormalizer.deduplicateCategories(data.categories + newGroups, normalizeAliases = true)
         return data.withPref("countryLists", formatted).copy(
             channels = mergedChannels,
             categories = updatedCategories,
@@ -213,7 +213,7 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
         val activeIds = active.map { it.id }.toSet()
         val archived = data.channels.filter { it.id !in activeIds }.map { it.copy(available = false) }
         val snapshot = CatalogSnapshot(sources, plan.channels.map { it.record }, plan.memberships.map { it.record.copy(isCurrent = it.isCurrentInPlan) }, plan.categories)
-        val categories = data.categories + active.flatMap { it.groups }.filter { it !in data.categories }.distinct()
+        val categories = CategoryNormalizer.deduplicateCategories(data.categories + active.flatMap { it.groups }.distinct(), normalizeAliases = true)
         val baseRebuilt = data.copy(channels = active + archived, categories = categories, library = library.copy(snapshot = snapshot))
         val enabledCountries = CountryListsCatalog.parseEnabledCodes(data.preferences["countryLists"])
         return if (enabledCountries.isEmpty()) baseRebuilt else applyCountryLists(baseRebuilt, enabledCountries)

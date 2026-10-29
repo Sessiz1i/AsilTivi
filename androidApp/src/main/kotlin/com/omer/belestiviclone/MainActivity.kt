@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
         val catalog = AndroidPublicCatalog(applicationContext, "public-trlist-catalog-v1")
         val publicStore = AndroidPreviewStore(applicationContext, key = 2, databaseName = databaseName) {
             val channels = catalog.load()
-            PreviewData(favorites = emptyList(), history = emptyList(), categories = channels.flatMap { it.groups }.distinct(),
+            PreviewData(favorites = emptyList(), history = emptyList(), categories = CategoryNormalizer.deduplicateCategories(channels.flatMap { it.groups }.distinct()),
                 preferences = store.load().preferences, sources = listOf("Özel M3U · trlist · 8 Ekim 2026"), channels = channels, profileId = PublicM3u.profile)
         }
         setContent {
