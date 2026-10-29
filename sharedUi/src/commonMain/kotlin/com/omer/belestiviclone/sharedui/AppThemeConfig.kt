@@ -19,7 +19,16 @@ data class ThemeConfig(
     val categoryTabBg: Color? = null,
     val categoryTabSelectedStroke: Color,
     val backgroundTint: Color = Color.Black,
-    val seekbarColor: Color = Color(0xFFE53935)
+    val seekbarColor: Color = Color(0xFFE53935),
+    val settingsBg: Color = Color(0xFF0A1628),
+    val settingsPanelBg: Color = Color(0xFF0F1F3A),
+    val settingsCardBg: Color = Color(0xFF13233D),
+    val settingsAccent: Color = Color(0xFFE67E22),
+    val settingsSlider: Color = Color(0xFF80CBC4),
+    val settingsFocusStroke: Color = Color(0xFFE67E22),
+    val settingsFocusFill: Color = Color(0xFF2A4A7F),
+    val settingsSelectedTabBg: Color = Color(0xFF1A2D4F),
+    val settingsBottomBarBg: Color = Color(0xFF0A1424)
 )
 
 object AppThemes {
@@ -31,7 +40,7 @@ object AppThemes {
             "Modern" -> ThemeConfig(
                 name = "Modern",
                 accentColor = Color(0xFF00BCD4),
-                headingTitleColor = Color(0xFF80DEEA),
+                headingTitleColor = Color(0xFF67E8F9),
                 headingSubtitleColor = Color.White.copy(alpha = 0.85f),
                 cardBackground = Color(0xFF13233D),
                 cardShape = RoundedCornerShape(8.dp),
@@ -42,7 +51,16 @@ object AppThemes {
                 categoryTabBg = Color(0xFF0F1F38),
                 categoryTabSelectedStroke = Color(0xFF00BCD4),
                 backgroundTint = Color(0xFF0B1422),
-                seekbarColor = Color(0xFF00BCD4)
+                seekbarColor = Color(0xFF00BCD4),
+                settingsBg = Color(0xFF090F1D),
+                settingsPanelBg = Color(0xFF0D1626),
+                settingsCardBg = Color(0xFF131F32),
+                settingsAccent = Color(0xFF67E8F9),
+                settingsSlider = Color(0xFF67E8F9),
+                settingsFocusStroke = Color(0xFF67E8F9),
+                settingsFocusFill = Color(0xFF19394D),
+                settingsSelectedTabBg = Color(0xFF1A2A40),
+                settingsBottomBarBg = Color(0xFF0A111C)
             )
             "Altın" -> ThemeConfig(
                 name = "Altın",
@@ -58,7 +76,16 @@ object AppThemes {
                 categoryTabBg = Color(0xFF231C10),
                 categoryTabSelectedStroke = Color(0xFFFFC107),
                 backgroundTint = Color(0xFF18150E),
-                seekbarColor = Color(0xFFFFC107)
+                seekbarColor = Color(0xFFFFC107),
+                settingsBg = Color(0xFF141416),
+                settingsPanelBg = Color(0xFF1C1C1F),
+                settingsCardBg = Color(0xFF242428),
+                settingsAccent = Color(0xFFFFC107),
+                settingsSlider = Color(0xFFFFC107),
+                settingsFocusStroke = Color(0xFFFFC107),
+                settingsFocusFill = Color(0xFF423214),
+                settingsSelectedTabBg = Color(0xFF362B16),
+                settingsBottomBarBg = Color(0xFF141417)
             )
             "Sinema" -> ThemeConfig(
                 name = "Sinema",
@@ -74,7 +101,16 @@ object AppThemes {
                 categoryTabBg = Color(0xFF200E11),
                 categoryTabSelectedStroke = Color(0xFFE50914),
                 backgroundTint = Color(0xFF160D0F),
-                seekbarColor = Color(0xFFE50914)
+                seekbarColor = Color(0xFFE50914),
+                settingsBg = Color(0xFF0A0A0C),
+                settingsPanelBg = Color(0xFF121216),
+                settingsCardBg = Color(0xFF1A1A20),
+                settingsAccent = Color(0xFFE50914),
+                settingsSlider = Color(0xFFE50914),
+                settingsFocusStroke = Color(0xFFE50914),
+                settingsFocusFill = Color(0xFF3D1014),
+                settingsSelectedTabBg = Color(0xFF381318),
+                settingsBottomBarBg = Color(0xFF0D0D10)
             )
             else -> ThemeConfig( // "Klasik"
                 name = "Klasik",
@@ -90,7 +126,16 @@ object AppThemes {
                 categoryTabBg = null,
                 categoryTabSelectedStroke = Color(0xFFFF6B00),
                 backgroundTint = Color.Black,
-                seekbarColor = Color(0xFFE53935)
+                seekbarColor = Color(0xFFE53935),
+                settingsBg = Color(0xFF0A1628),
+                settingsPanelBg = Color(0xFF0F1F3A),
+                settingsCardBg = Color(0xFF13233D),
+                settingsAccent = Color(0xFFE67E22),
+                settingsSlider = Color(0xFF80CBC4),
+                settingsFocusStroke = Color(0xFFE67E22),
+                settingsFocusFill = Color(0xFF2A4A7F),
+                settingsSelectedTabBg = Color(0xFF1A2D4F),
+                settingsBottomBarBg = Color(0xFF0A1424)
             )
         }
     }

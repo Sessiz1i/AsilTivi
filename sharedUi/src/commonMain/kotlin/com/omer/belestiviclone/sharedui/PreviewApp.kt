@@ -73,7 +73,7 @@ internal fun Label(value: String, size: Int = 12, color: Color = Color.White, mo
 
 /** Key repeat is consumed; long OK never produces an additional short action. */
 @Composable
-internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, onFocused: (() -> Unit)? = null, keyClick: (() -> Unit)? = null, click: () -> Unit) {
+internal fun Action(label: String, modifier: Modifier = Modifier, selected: Boolean = false, enabled: Boolean = true, tint: Color = card, selectedTint: Color = Color(0xB3A75F19), radius: Dp = 10.dp, brush: Brush? = null, stroke: Color = Color(0xFF34404A), strokeWidth: Dp = 1.dp, focusColor: Color = Color.White, focusFill: Color? = null, horizontalFocus: Boolean = false, channelFocus: Boolean = false, padding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp), long: (() -> Unit)? = null, double: (() -> Unit)? = null, extraKey: ((KeyEvent) -> Boolean)? = null, content: (@Composable () -> Unit)? = null, focusKey: String? = null, returnFocusKey: String? = null, onFocused: (() -> Unit)? = null, keyClick: (() -> Unit)? = null, click: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val gate = remember { OkGesture() }
     val clock = remember { TimeSource.Monotonic.markNow() }
@@ -85,6 +85,10 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
     val focusObserver = LocalFocusObserver.current
     val navigationObserver = LocalNavigationObserver.current
     val accessibilityLabel = presentationText(label, LocalLanguage.current)
+    val themeFocusStroke = LocalSettingsFocusStroke.current
+    val themeFocusFill = LocalSettingsFocusFill.current
+    val effectiveFocusColor = if (focusColor != Color.White) focusColor else (themeFocusStroke ?: Color.White)
+    val effectiveFocusFill = focusFill ?: themeFocusFill
     DisposableEffect(requester) {
         returns?.active?.add(requester)
         onDispose { returns?.active?.remove(requester); if (returns?.focused == requester) returns.focused = null }
@@ -111,15 +115,15 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
                 true
             } else false
         }
-        .then(if (brush != null && !selected) Modifier.background(brush, RoundedCornerShape(radius)) else Modifier.background(if (selected) selectedTint else if (focused && channelFocus) Color(0x668A531B) else tint, RoundedCornerShape(radius)))
-        .then(if (strokeWidth > 0.dp || (focused && !horizontalFocus && !channelFocus)) Modifier.border(if (focused && !horizontalFocus && !channelFocus) 2.dp else strokeWidth, if (focused && !horizontalFocus && !channelFocus) focusColor else stroke, RoundedCornerShape(radius)) else Modifier)
+        .then(if (brush != null && !selected) Modifier.background(brush, RoundedCornerShape(radius)) else Modifier.background(if (selected) selectedTint else if (focused && effectiveFocusFill != null && !channelFocus) effectiveFocusFill else if (focused && channelFocus) Color(0x668A531B) else tint, RoundedCornerShape(radius)))
+        .then(if (strokeWidth > 0.dp || (focused && !horizontalFocus && !channelFocus)) Modifier.border(if (focused && !horizontalFocus && !channelFocus) 2.dp else strokeWidth, if (focused && !horizontalFocus && !channelFocus) effectiveFocusColor else stroke, RoundedCornerShape(radius)) else Modifier)
         .drawWithContent {
             drawContent()
             if (focused && horizontalFocus && !channelFocus) {
                 val edge = 1.dp.toPx()
                 drawLine(Color.White, Offset(0f, edge / 2), Offset(size.width, edge / 2), edge)
-                drawLine(focusColor, Offset(0f, edge * 2), Offset(size.width, edge * 2), edge * 2)
-                drawLine(focusColor, Offset(0f, size.height - edge * 2), Offset(size.width, size.height - edge * 2), edge * 2)
+                drawLine(effectiveFocusColor, Offset(0f, edge * 2), Offset(size.width, edge * 2), edge * 2)
+                drawLine(effectiveFocusColor, Offset(0f, size.height - edge * 2), Offset(size.width, size.height - edge * 2), edge * 2)
                 drawLine(Color.White, Offset(0f, size.height - edge / 2), Offset(size.width, size.height - edge / 2), edge)
             }
         }
@@ -372,7 +376,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             val barStartPadding = if (vertical) {
                 val pWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
                 val panelRightEdge = (if (s.categoryMenu) 135.dp else 13.dp) + pWidth
-                (panelRightEdge + 14.dp).coerceAtMost(maxWidth * 0.45f)
+                panelRightEdge + 18.dp
             } else {
                 24.dp
             }
@@ -748,6 +752,169 @@ private fun categorySymbol(cat: String) = when (CategoryNormalizer.canonicalKey(
     else -> if (cat.startsWith("7/24")) "🎬" else "📺"
 }
 
+@Composable
+private fun CategoryTabIcon(
+    cat: String,
+    isMonochrome: Boolean,
+    color: Color = Color.White,
+    modifier: Modifier = Modifier
+) {
+    if (!isMonochrome) {
+        val symbol = categorySymbol(cat)
+        if (symbol != null) {
+            BasicText(symbol, Modifier.clearAndSetSemantics { }, style = TextStyle(fontSize = 12.sp))
+        }
+        return
+    }
+
+    val key = CategoryNormalizer.canonicalKey(cat)
+    Canvas(modifier = modifier.size(13.dp)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.3f.dp.toPx()
+
+        when (key) {
+            "ARA" -> {
+                val r = w * 0.30f
+                val cx = w * 0.40f
+                val cy = h * 0.40f
+                drawCircle(color, radius = r, center = Offset(cx, cy), style = Stroke(stroke))
+                val cos45 = 0.7071f
+                drawLine(
+                    color,
+                    start = Offset(cx + r * cos45, cy + r * cos45),
+                    end = Offset(w * 0.90f, h * 0.90f),
+                    strokeWidth = stroke * 1.2f,
+                    cap = StrokeCap.Round
+                )
+            }
+            "FAVORİ TV" -> {
+                val cx = w / 2f
+                val cy = h / 2f
+                val outer = w * 0.44f
+                val starPath = Path().apply {
+                    moveTo(cx, cy - outer)
+                    quadraticTo(cx, cy, cx + outer, cy)
+                    quadraticTo(cx, cy, cx, cy + outer)
+                    quadraticTo(cx, cy, cx - outer, cy)
+                    quadraticTo(cx, cy, cx, cy - outer)
+                    close()
+                }
+                drawPath(starPath, color)
+            }
+            "TÜMÜ" -> {
+                val pad = 1.dp.toPx()
+                val cell = (w - pad * 3f) / 2f
+                for (r in 0..1) {
+                    for (c in 0..1) {
+                        drawRoundRect(
+                            color,
+                            topLeft = Offset(pad + c * (cell + pad), pad + r * (cell + pad)),
+                            size = Size(cell, cell),
+                            cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx()),
+                            style = Stroke(stroke * 0.9f)
+                        )
+                    }
+                }
+            }
+            "ULUSAL" -> {
+                val rw = w * 0.86f
+                val rh = h * 0.62f
+                val left = (w - rw) / 2f
+                val top = h * 0.12f
+                drawRoundRect(color, topLeft = Offset(left, top), size = Size(rw, rh), cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()), style = Stroke(stroke))
+                drawLine(color, Offset(w / 2f, top + rh), Offset(w / 2f, h * 0.90f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.28f, h * 0.90f), Offset(w * 0.72f, h * 0.90f), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "HABER" -> {
+                drawRoundRect(color, topLeft = Offset(w * 0.12f, h * 0.12f), size = Size(w * 0.76f, h * 0.76f), cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()), style = Stroke(stroke))
+                drawLine(color, Offset(w * 0.26f, h * 0.35f), Offset(w * 0.74f, h * 0.35f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.26f, h * 0.52f), Offset(w * 0.74f, h * 0.52f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.26f, h * 0.69f), Offset(w * 0.58f, h * 0.69f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
+            }
+            "SPOR" -> {
+                val r = w * 0.42f
+                val c = Offset(w / 2f, h / 2f)
+                drawCircle(color, radius = r, center = c, style = Stroke(stroke))
+                drawLine(color, Offset(w * 0.2f, h / 2f), Offset(w * 0.8f, h / 2f), strokeWidth = stroke * 0.7f)
+                drawArc(color, 270f, 180f, false, topLeft = Offset(w * 0.25f, h * 0.08f), size = Size(w * 0.5f, h * 0.84f), style = Stroke(stroke * 0.7f))
+            }
+            "ÇOCUK" -> {
+                val r = w * 0.42f
+                val c = Offset(w / 2f, h / 2f)
+                drawCircle(color, radius = r, center = c, style = Stroke(stroke))
+                drawCircle(color, radius = 0.8.dp.toPx(), center = Offset(w * 0.36f, h * 0.38f))
+                drawCircle(color, radius = 0.8.dp.toPx(), center = Offset(w * 0.64f, h * 0.38f))
+                drawArc(color, 30f, 120f, false, topLeft = Offset(w * 0.30f, h * 0.44f), size = Size(w * 0.40f, h * 0.30f), style = Stroke(stroke * 0.8f, cap = StrokeCap.Round))
+            }
+            "BELGESEL", "DÜNYA" -> {
+                val r = w * 0.42f
+                val c = Offset(w / 2f, h / 2f)
+                drawCircle(color, radius = r, center = c, style = Stroke(stroke))
+                drawLine(color, Offset(w * 0.08f, h / 2f), Offset(w * 0.92f, h / 2f), strokeWidth = stroke * 0.7f)
+                drawLine(color, Offset(w / 2f, h * 0.08f), Offset(w / 2f, h * 0.92f), strokeWidth = stroke * 0.7f)
+                drawOval(color, topLeft = Offset(w * 0.26f, h * 0.08f), size = Size(w * 0.48f, h * 0.84f), style = Stroke(stroke * 0.7f))
+            }
+            "MÜZİK" -> {
+                drawCircle(color, radius = 2.dp.toPx(), center = Offset(w * 0.32f, h * 0.76f))
+                drawCircle(color, radius = 2.dp.toPx(), center = Offset(w * 0.72f, h * 0.66f))
+                drawLine(color, Offset(w * 0.40f, h * 0.76f), Offset(w * 0.40f, h * 0.24f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.80f, h * 0.66f), Offset(w * 0.80f, h * 0.14f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * 0.40f, h * 0.24f), Offset(w * 0.80f, h * 0.14f), strokeWidth = stroke * 1.5f, cap = StrokeCap.Round)
+            }
+            "DİNİ" -> {
+                drawArc(color, 60f, 250f, false, topLeft = Offset(w * 0.08f, h * 0.08f), size = Size(w * 0.84f, h * 0.84f), style = Stroke(stroke * 1.2f, cap = StrokeCap.Round))
+                drawCircle(color, radius = 1.dp.toPx(), center = Offset(w * 0.66f, h * 0.46f))
+            }
+            "YEREL" -> {
+                val cx = w / 2f
+                val cy = h * 0.38f
+                drawCircle(color, radius = w * 0.30f, center = Offset(cx, cy), style = Stroke(stroke))
+                drawCircle(color, radius = 1.dp.toPx(), center = Offset(cx, cy))
+                val path = Path().apply {
+                    moveTo(w * 0.26f, cy + h * 0.15f)
+                    lineTo(cx, h * 0.90f)
+                    lineTo(w * 0.74f, cy + h * 0.15f)
+                }
+                drawPath(path, color, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            "KKTC", "AZERBAYCAN", "ALMANYA / AVRUPA" -> {
+                val left = w * 0.18f
+                val top = h * 0.18f
+                val fw = w * 0.64f
+                val fh = h * 0.46f
+                drawLine(color, Offset(left, top), Offset(left, h * 0.88f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawRect(color, topLeft = Offset(left, top), size = Size(fw, fh), style = Stroke(stroke))
+                drawLine(color, Offset(left, top + fh / 2f), Offset(left + fw, top + fh / 2f), strokeWidth = stroke * 0.6f)
+            }
+            "7/24 DİZİ/FİLM" -> {
+                val left = w * 0.14f
+                val top = h * 0.18f
+                val fw = w * 0.72f
+                val fh = h * 0.64f
+                drawRoundRect(color, topLeft = Offset(left, top), size = Size(fw, fh), cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()), style = Stroke(stroke))
+                drawLine(color, Offset(left, top + fh * 0.35f), Offset(left + fw, top + fh * 0.35f), strokeWidth = stroke)
+                drawLine(color, Offset(left + fw * 0.33f, top), Offset(left + fw * 0.22f, top + fh * 0.35f), strokeWidth = stroke * 0.8f)
+                drawLine(color, Offset(left + fw * 0.66f, top), Offset(left + fw * 0.55f, top + fh * 0.35f), strokeWidth = stroke * 0.8f)
+            }
+            "RADYO" -> {
+                val left = w * 0.12f
+                val top = h * 0.32f
+                val rw = w * 0.76f
+                val rh = h * 0.54f
+                drawLine(color, Offset(left + rw * 0.2f, top), Offset(w * 0.75f, h * 0.12f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawRoundRect(color, topLeft = Offset(left, top), size = Size(rw, rh), cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()), style = Stroke(stroke))
+                drawCircle(color, radius = rh * 0.32f, center = Offset(left + rw * 0.36f, top + rh * 0.5f), style = Stroke(stroke * 0.8f))
+            }
+            else -> {
+                val rw = w * 0.84f
+                val rh = h * 0.64f
+                drawRoundRect(color, topLeft = Offset((w - rw) / 2f, h * 0.16f), size = Size(rw, rh), cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()), style = Stroke(stroke))
+            }
+        }
+    }
+}
+
 @Composable private fun CategoryTab(cat: String, s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, keyClick: (() -> Unit)? = null, click: () -> Unit) {
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     val shades = when (CategoryNormalizer.canonicalKey(cat)) {
@@ -817,7 +984,7 @@ private fun categorySymbol(cat: String) = when (CategoryNormalizer.canonicalKey(
     val language = LocalLanguage.current
     val label = presentationText(cat, language).let { if (language == "Türkçe") CategoryNormalizer.toTurkishUpper(it) else it.uppercase() }
     val horizontalPadding = if (vertical) 9.dp else if (theme.categoryTabPill) 12.dp else 14.dp
-    val textColor = if (isUlusal) {
+    val textColor = if (isUlusal && !theme.categoryTabPill) {
         Color(0xFFE00010)
     } else if (isFav && !theme.categoryTabPill) {
         Color(0xFFFFD700)
@@ -828,9 +995,11 @@ private fun categorySymbol(cat: String) = when (CategoryNormalizer.canonicalKey(
     Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).onFocusChanged { isTabFocused = it.isFocused }.clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) "live:category" else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), onFocused = { s.touchPanelInteraction() }, keyClick = keyClick, content = {
         Box(if (vertical) Modifier.fillMaxWidth() else Modifier) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                val symbol = categorySymbol(cat)
-                if (symbol != null) BasicText(symbol, Modifier.clearAndSetSemantics { }, style = TextStyle(fontSize = 12.sp))
-                else image(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", Modifier.size(12.dp, 13.dp))
+                if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) {
+                    image(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", Modifier.size(12.dp, 13.dp))
+                } else {
+                    CategoryTabIcon(cat, isMonochrome = theme.categoryTabPill, color = textColor)
+                }
                 Label(label, 10, textColor, bold = true, maxLines = if (vertical) Int.MAX_VALUE else 1)
             }
         }
@@ -944,7 +1113,12 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     val requester = remember(returns, focusKey) { returns?.registry?.requester(focusKey) { FocusRequester() } ?: FocusRequester() }
     var isCardFocused by remember { mutableStateOf(false) }
     val keySignal = LocalKeySignal.current
-    val number = if (s.category == "Favoriler" && !s.searching) "${s.visibleData.favorites.indexOf(ch.id) + 1}. " else ""
+    val number = if (vertical) {
+        val idx = s.data.channels.indexOfFirst { it.id == ch.id }
+        if (idx >= 0) "${idx + 1}. " else ""
+    } else if (s.category == "Favoriler" && !s.searching) {
+        "${s.visibleData.favorites.indexOf(ch.id) + 1}. "
+    } else ""
     val isMoving = s.moving == ch.id
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     val activeHighlightId = s.touchedFocusChannelId ?: s.selected
@@ -953,6 +1127,12 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     val strokeWidth = if (hasHighlightStroke) theme.cardSelectedStrokeWidthDp.dp else 0.dp
     val cardRadius = if (theme.isCardFlat) 0.dp else 8.dp
     val cardTint = if (theme.isCardFlat) Color.Transparent else theme.cardBackground
+    val verticalSelectedTint = when (theme.name) {
+        "Modern" -> Color(0xFF19394D)
+        "Altın" -> Color(0xFF423214)
+        "Sinema" -> Color(0xFF3D1014)
+        else -> Color(0xFF6A92AF)
+    }
 
     var drag by remember { mutableStateOf(0f) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
@@ -979,6 +1159,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         focusKey = focusKey,
         selected = ch.id == s.selected || isMoving,
         tint = cardTint,
+        selectedTint = if (vertical) verticalSelectedTint else Color(0xB3A75F19),
         radius = cardRadius,
         strokeWidth = strokeWidth,
         stroke = strokeColor,
@@ -1011,11 +1192,13 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
                     BasicText(
                         number + ch.name,
                         Modifier.weight(1f),
-                        style = TextStyle(color = if (ch.id == s.selected) Color.White else Color(0xFFDEDEDE), fontSize = 10.sp, fontWeight = if (ch.id == s.selected) FontWeight.Bold else FontWeight.Normal),
+                        style = TextStyle(color = if (ch.id == s.selected) Color.White else Color(0xFFE2E8F0), fontSize = 11.sp, fontWeight = if (ch.id == s.selected) FontWeight.Bold else FontWeight.Normal),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (ch.id in s.data.favorites) image("yildiz", Modifier.size(10.dp))
+                    if (ch.id in s.data.favorites) {
+                        Label("★", 11, Color(0xFFFFD54F), bold = true)
+                    }
                 }
             } else {
                 Box(Modifier.fillMaxSize()) {
@@ -1102,10 +1285,10 @@ private val settingIcons = mapOf(
 private fun SettingsTabIcon(
     index: Int,
     isSelected: Boolean,
+    plusColor: Color = Color(0xFFFFB300),
     modifier: Modifier = Modifier
 ) {
     val defaultColor = if (isSelected) Color.White else Color(0xFFB0B0B0)
-    val plusColor = if (isSelected) Color(0xFFFFB300) else Color(0xFFFF9E0B)
     val color = if (index == 5) plusColor else defaultColor
     val strokeWidth = 1.6f
 
@@ -1243,165 +1426,172 @@ private fun SettingsTabIcon(
 
 @Composable private fun Settings(s: PreviewState, image: @Composable (String, Modifier) -> Unit, appVersionName: String) {
     val contentScroll = rememberScrollState()
-    BoxWithConstraints(Modifier.fillMaxSize().background(ink)) {
-        val compact = maxWidth < 600.dp
-        Row(Modifier.fillMaxSize()) {
-            if (!compact) Column(Modifier.width(148.dp).fillMaxHeight().background(Color(0xFF0F1F3A))) {
-                Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("✕", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    sections.forEachIndexed { i, title -> Action(title, Modifier.fillMaxWidth().height(47.dp), focusKey = "settings:section:$i", tint = Color.Transparent, selected = s.section == i, selectedTint = Color(0xFF1A2D4F), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 9.dp), content = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            SettingsTabIcon(i, s.section == i)
-                            Label(
-                                s.text(title, sectionsEn[i]),
-                                11,
-                                color = if (i == 5) {
-                                    if (s.section == i) Color(0xFFFFD54F) else Color(0xFFFFB300)
-                                } else {
-                                    if (s.section == i) Color.White else Color(0xFFB0B0B0)
-                                },
-                                modifier = Modifier.weight(1f),
-                                bold = true,
-                                lineHeight = 14f,
-                                maxLines = 2
-                            )
-                        }
-                    }) { s.dismiss(); s.cancelOpacity(); s.section = i } }
-                }
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Label("Beleş TiVi · v$appVersionName", 9, Color(0xFF7A89A0), bold = true)
-                    Label("Kambak Yazılım © 2026", 8, Color(0xFF5A687D))
-                }
-            }
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                if (compact) LazyRow(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(sections.size) { i -> Action(sections[i], focusKey = "settings:section:$i", selected = s.section == i) { s.section = i } }; item { Action("✕", click = s::back) } }
-                if (s.dialog in sourceFormKinds || s.dialog == "categories") CompositionLocalProvider(LocalModalLayer provides true) {
-                    if (s.dialog == "categories") CategoryManagement(s, image, Modifier.weight(1f)) else SourceForm(s, image, Modifier.weight(1f))
-                } else Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(horizontal = 16.dp, vertical = 38.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (s.section != 1) Row(Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(3.dp).height(16.dp).background(amber)); Label(settingsSectionHeading(s.section), 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), true) }
-                    when (s.section) {
-                        0 -> {
-                            SettingsGroup("LİSTEM")
-                            SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
-                            SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "ikon_list", image) { s.sourceForm("supplement") }
-                            SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "ikon_canli", image) { s.refreshSource() }
-                            SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "ikon_tv", image) { s.dialog = "defaultSource" }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
-                            SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
-                            SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
-                            SettingTile("Stalker / MAC", "Portal adresi ve kayıtlı MAC ile bağlan", "ikon_sunucu", image) { s.sourceForm("stalker") }
-                            SettingTile("Dosyadan Yükle", "M3U dosyası seç", "ikon_dosya", image) { s.dialog = "file" }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("ÜLKE LİSTELERİ")
-                            SettingTile("Ülke Listeleri", s.countryListsSubtitle, "kategori_dunya", image) { s.sourceForm("countries") }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("EPG (PROGRAM REHBERİ)")
-                            SettingTile(
-                                "XMLTV EPG URL",
-                                s.data.pref("epgUrl").ifBlank { "Yerleşik örnek EPG (epg_sample.xml) aktif" },
-                                "ikon_saat",
-                                image
-                            ) { s.sourceForm("epg") }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL DÜZENİ")
-                            SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "ikon_category", image) { s.dialog = "categories" }
-                        }
-                        1 -> {
-                            SettingsGroup("UYGULAMA TEMASI"); SettingCard(s, "theme", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL BİLGİSİ"); SettingCard(s, "position", image); SettingCard(s, "size", image)
-                        }
-                        2 -> {
-                            SettingsGroup("ZAMANLAYICI"); SettingCard(s, "sleepTimer", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("VİDEO"); SettingCard(s, "quality", image); SettingCard(s, "format", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("SES & ALTYAZI")
-                            SettingCard(s, "audio", image); SettingCard(s, "subtitle", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("ALTYAZI GÖRÜNÜMÜ")
-                            SettingCard(s, "subtitleSize", image)
-                            SettingCard(s, "subtitleColor", image)
-                            SettingCard(s, "subtitleBgOpacity", image)
-                            SubtitlePreviewBox(s)
-                            Label(s.message("Kalite bir üst sınırdır. Bilgi alanında işlenen format ve gerçek ses/altyazı seçimi gösterilir; kaynakta olmayan dil uygulanamaz.", "Quality is a ceiling. Info shows the input format and actual audio/subtitle selection; unavailable languages cannot be applied.", "Qualität ist eine Obergrenze. Info zeigt das Eingabeformat und die tatsächliche Ton-/Untertitelauswahl; fehlende Sprachen sind nicht verfügbar."), 10, Color(0xFF69798F), Modifier.padding(top = 12.dp))
-                        }
-                        3 -> {
-                            SettingsGroup("DİL")
-                            SettingCard(s, "language", image)
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("BAŞLATMA & DAVRANIŞ")
-                            SettingTile("Favorilerden Başlat", "Açılışta doğrudan favori kanallardan birini aç", "kategori_favoriler", image, s.data.pref("startupFavorites"), true) { s.pref("startupFavorites", if (s.data.pref("startupFavorites") == "Açık") "Kapalı" else "Açık") }
-                            SettingTile("Açılışta Son İzlenen Kanala Git", "Uygulama açılış tercihi", "ikon_startup", image, s.data.pref("startup"), true) { s.pref("startup", if (s.data.pref("startup") == "Açık") "Kapalı" else "Açık") }
-                            SettingTile("Arka Planda Sesi Sürdür", "Uygulama arka plandayken ses çalmaya devam eder", "ikon_ses", image, s.data.pref("backgroundAudio"), true) { s.pref("backgroundAudio", if (s.data.pref("backgroundAudio") == "Açık") "Kapalı" else "Açık") }
-                            SettingTile("Resim İçinde Resim (PiP)", "Home veya arka plana geçişte otomatik PiP", "ikon_coklu", image, s.data.pref("autoPip"), true) { s.pref("autoPip", if (s.data.pref("autoPip") == "Açık") "Kapalı" else "Açık") }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("GEÇMİŞ")
-                            SettingTile("İzleme Geçmişi", "Son izlenen kanalları göster", "kategori_gecmis", image, s.data.pref("history"), true) { s.pref("history", if (s.data.pref("history") == "Açık") "Kapalı" else "Açık") }
-                            SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "ikon_cop", image, danger = true) { s.dialog = "clear" }
-                        }
-                        4 -> {
-                            SettingsGroup("TELEFONDAN AKTAR")
-                            SettingTile("Telefondan Aktar", "Yerel ağ üzerinden M3U / Xtream / Stalker gönder", "ikon_export", image) { s.openWebTransfer() }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("FAVORİLER")
-                            SettingTile("Favorileri Dışa Aktar", "Favori listesini yedekle", "ikon_export", image) { s.dialog = "export" }
-                            SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "ikon_import", image) { s.dialog = "import" }
-                        }
-                        5 -> {
-                            SettingsGroup("BELEŞ TİVİ +")
-                            SettingPlusCard(
-                                title = "Tüm Temalar Açık",
-                                subtitle = "Altın ve Sinema temaları ücretsiz kullanımda",
-                                badge = "AÇIK",
-                                click = { s.section = 1 }
-                            )
-                            SettingPlusCard(
-                                title = "Gelişmiş Çoklu Ekran",
-                                subtitle = "4 ekrana kadar eşzamanlı izleme",
-                                badge = "AKTİF",
-                                click = { s.dismiss(); s.categoryAction("multi") }
-                            )
-                            SettingPlusCard(
-                                title = "Sıfır Reklam, Kesintisiz Canlı TV",
-                                subtitle = "Tanıtım kutusu ve reklamlar yok, tam ekran akış",
-                                badge = "SINIRSIZ",
-                                click = { s.notice = "Beleş TiVi Clone'da tüm reklamlar kaldırılmıştır; kesintisiz yayın aktiftir." }
-                            )
-                            SettingPlusCard(
-                                title = "Telefondan Kolay Aktarım",
-                                subtitle = "Yerel ağ üzerinden M3U / Xtream / Stalker tek tıkla transfer",
-                                badge = "ÜCRETSİZ",
-                                click = { s.openWebTransfer() }
-                            )
-                            SettingPlusCard(
-                                title = "Özel Kaynak ve Ülke Listeleri",
-                                subtitle = "Xtream, Stalker, M3U ve KKTC/AZ/Dünya listeleri tam açık",
-                                badge = "TAM ERİŞİM",
-                                click = { s.section = 0 }
-                            )
-                        }
-                        6 -> {
-                            SettingsGroup("UYGULAMA")
-                            SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("AĞ VE YAYIN KONTROLÜ")
-                            SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "ikon_canli", image) { s.openNetworkDiagnostics() }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK & İLETİŞİM")
-                            SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
-                            SettingTile("Telegram Kanalı", "Topluluk ve duyurular", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
-                            Spacer(Modifier.height(20.dp)); SettingsGroup("DİĞER İŞLEMLER")
-                            SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "ikon_cache", image) { s.dialog = "cache" }
-                        }
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
+    CompositionLocalProvider(
+        LocalSettingsFocusStroke provides theme.settingsFocusStroke,
+        LocalSettingsFocusFill provides theme.settingsFocusFill,
+        LocalSettingsThemeAccent provides theme.settingsAccent
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(theme.settingsBg)) {
+            val compact = maxWidth < 600.dp
+            Row(Modifier.fillMaxSize()) {
+                if (!compact) Column(Modifier.width(148.dp).fillMaxHeight().background(theme.settingsPanelBg)) {
+                    Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("✕", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        sections.forEachIndexed { i, title -> Action(title, Modifier.fillMaxWidth().height(47.dp), focusKey = "settings:section:$i", tint = Color.Transparent, selected = s.section == i, selectedTint = theme.settingsSelectedTabBg, strokeWidth = 0.dp, padding = PaddingValues(horizontal = 9.dp), content = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SettingsTabIcon(i, s.section == i, plusColor = theme.settingsAccent)
+                                Label(
+                                    s.text(title, sectionsEn[i]),
+                                    11,
+                                    color = if (i == 5) {
+                                        if (s.section == i) theme.settingsAccent else theme.settingsAccent.copy(alpha = 0.85f)
+                                    } else {
+                                        if (s.section == i) Color.White else Color(0xFFB0B0B0)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    bold = true,
+                                    lineHeight = 14f,
+                                    maxLines = 2
+                                )
+                            }
+                        }) { s.dismiss(); s.cancelOpacity(); s.section = i } }
+                    }
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Label("Beleş TiVi · v$appVersionName", 9, Color(0xFF7A89A0), bold = true)
+                        Label("Kambak Yazılım © 2026", 8, Color(0xFF5A687D))
                     }
                 }
-                Row(
-                    Modifier.fillMaxWidth().height(48.dp).background(Color(0xFF0A1424)).padding(horizontal = 22.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(8.dp).background(Color(0xFF0ABB91), RoundedCornerShape(2.dp)))
-                        Label("Beleş TiVi Clone v$appVersionName", 10, Color.White, bold = true)
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    if (compact) LazyRow(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(sections.size) { i -> Action(sections[i], focusKey = "settings:section:$i", selected = s.section == i, selectedTint = theme.settingsSelectedTabBg) { s.section = i } }; item { Action("✕", click = s::back) } }
+                    if (s.dialog in sourceFormKinds || s.dialog == "categories") CompositionLocalProvider(LocalModalLayer provides true) {
+                        if (s.dialog == "categories") CategoryManagement(s, image, Modifier.weight(1f)) else SourceForm(s, image, Modifier.weight(1f))
+                    } else Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(horizontal = 16.dp, vertical = 38.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        if (s.section != 1) Row(Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(3.dp).height(16.dp).background(theme.settingsAccent)); Label(settingsSectionHeading(s.section), 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), true) }
+                        when (s.section) {
+                            0 -> {
+                                SettingsGroup("LİSTEM")
+                                SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "ikon_tv", image, s.profileName) { s.sourceForm("activeSources") }
+                                SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "ikon_list", image) { s.sourceForm("supplement") }
+                                SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "ikon_canli", image) { s.refreshSource() }
+                                SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "ikon_tv", image) { s.dialog = "defaultSource" }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
+                                SettingTile("M3U URL", "Özel liste adresi ile bağlan", "ikon_url", image) { s.sourceForm("m3u") }
+                                SettingTile("Xtream Codes", "Sunucu bilgileri ile bağlantı", "ikon_xtream", image) { s.sourceForm("xtream") }
+                                SettingTile("Stalker / MAC", "Portal adresi ve kayıtlı MAC ile bağlan", "ikon_sunucu", image) { s.sourceForm("stalker") }
+                                SettingTile("Dosyadan Yükle", "M3U dosyası seç", "ikon_dosya", image) { s.dialog = "file" }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("ÜLKE LİSTELERİ")
+                                SettingTile("Ülke Listeleri", s.countryListsSubtitle, "kategori_dunya", image) { s.sourceForm("countries") }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("EPG (PROGRAM REHBERİ)")
+                                SettingTile(
+                                    "XMLTV EPG URL",
+                                    s.data.pref("epgUrl").ifBlank { "Yerleşik örnek EPG (epg_sample.xml) aktif" },
+                                    "ikon_saat",
+                                    image
+                                ) { s.sourceForm("epg") }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL DÜZENİ")
+                                SettingTile("Kategorileri Yönet", "Sıralama ve görünürlük", "ikon_category", image) { s.dialog = "categories" }
+                            }
+                            1 -> {
+                                SettingsGroup("UYGULAMA TEMASI"); SettingCard(s, "theme", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL LİSTESİ"); SettingCard(s, "list", image); SettingCard(s, "opacity", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("KANAL BİLGİSİ"); SettingCard(s, "position", image); SettingCard(s, "size", image)
+                            }
+                            2 -> {
+                                SettingsGroup("ZAMANLAYICI"); SettingCard(s, "sleepTimer", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("VİDEO"); SettingCard(s, "quality", image); SettingCard(s, "format", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("SES & ALTYAZI")
+                                SettingCard(s, "audio", image); SettingCard(s, "subtitle", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("ALTYAZI GÖRÜNÜMÜ")
+                                SettingCard(s, "subtitleSize", image)
+                                SettingCard(s, "subtitleColor", image)
+                                SettingCard(s, "subtitleBgOpacity", image)
+                                SubtitlePreviewBox(s)
+                                Label(s.message("Kalite bir üst sınırdır. Bilgi alanında işlenen format ve gerçek ses/altyazı seçimi gösterilir; kaynakta olmayan dil uygulanamaz.", "Quality is a ceiling. Info shows the input format and actual audio/subtitle selection; unavailable languages cannot be applied.", "Qualität ist eine Obergrenze. Info zeigt das Eingabeformat und die tatsächliche Ton-/Untertitelauswahl; fehlende Sprachen sind nicht verfügbar."), 10, Color(0xFF69798F), Modifier.padding(top = 12.dp))
+                            }
+                            3 -> {
+                                SettingsGroup("DİL")
+                                SettingCard(s, "language", image)
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("BAŞLATMA & DAVRANIŞ")
+                                SettingTile("Favorilerden Başlat", "Açılışta doğrudan favori kanallardan birini aç", "kategori_favoriler", image, s.data.pref("startupFavorites"), true) { s.pref("startupFavorites", if (s.data.pref("startupFavorites") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Açılışta Son İzlenen Kanala Git", "Uygulama açılış tercihi", "ikon_startup", image, s.data.pref("startup"), true) { s.pref("startup", if (s.data.pref("startup") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Arka Planda Sesi Sürdür", "Uygulama arka plandayken ses çalmaya devam eder", "ikon_ses", image, s.data.pref("backgroundAudio"), true) { s.pref("backgroundAudio", if (s.data.pref("backgroundAudio") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("Resim İçinde Resim (PiP)", "Home veya arka plana geçişte otomatik PiP", "ikon_coklu", image, s.data.pref("autoPip"), true) { s.pref("autoPip", if (s.data.pref("autoPip") == "Açık") "Kapalı" else "Açık") }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("GEÇMİŞ")
+                                SettingTile("İzleme Geçmişi", "Son izlenen kanalları göster", "kategori_gecmis", image, s.data.pref("history"), true) { s.pref("history", if (s.data.pref("history") == "Açık") "Kapalı" else "Açık") }
+                                SettingTile("İzleme Geçmişini Temizle", "${s.data.history.size} kayıt", "ikon_cop", image, danger = true) { s.dialog = "clear" }
+                            }
+                            4 -> {
+                                SettingsGroup("TELEFONDAN AKTAR")
+                                SettingTile("Telefondan Aktar", "Yerel ağ üzerinden M3U / Xtream / Stalker gönder", "ikon_export", image) { s.openWebTransfer() }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("FAVORİLER")
+                                SettingTile("Favorileri Dışa Aktar", "Favori listesini yedekle", "ikon_export", image) { s.dialog = "export" }
+                                SettingTile("Favorileri İçe Aktar", "Yedekten geri yükle", "ikon_import", image) { s.dialog = "import" }
+                            }
+                            5 -> {
+                                SettingsGroup("BELEŞ TİVİ +")
+                                SettingPlusCard(
+                                    title = "Tüm Temalar Açık",
+                                    subtitle = "Altın ve Sinema temaları ücretsiz kullanımda",
+                                    badge = "AÇIK",
+                                    click = { s.section = 1 }
+                                )
+                                SettingPlusCard(
+                                    title = "Gelişmiş Çoklu Ekran",
+                                    subtitle = "4 ekrana kadar eşzamanlı izleme",
+                                    badge = "AKTİF",
+                                    click = { s.dismiss(); s.categoryAction("multi") }
+                                )
+                                SettingPlusCard(
+                                    title = "Sıfır Reklam, Kesintisiz Canlı TV",
+                                    subtitle = "Tanıtım kutusu ve reklamlar yok, tam ekran akış",
+                                    badge = "SINIRSIZ",
+                                    click = { s.notice = "Beleş TiVi Clone'da tüm reklamlar kaldırılmıştır; kesintisiz yayın aktiftir." }
+                                )
+                                SettingPlusCard(
+                                    title = "Telefondan Kolay Aktarım",
+                                    subtitle = "Yerel ağ üzerinden M3U / Xtream / Stalker tek tıkla transfer",
+                                    badge = "ÜCRETSİZ",
+                                    click = { s.openWebTransfer() }
+                                )
+                                SettingPlusCard(
+                                    title = "Özel Kaynak ve Ülke Listeleri",
+                                    subtitle = "Xtream, Stalker, M3U ve KKTC/AZ/Dünya listeleri tam açık",
+                                    badge = "TAM ERİŞİM",
+                                    click = { s.section = 0 }
+                                )
+                            }
+                            6 -> {
+                                SettingsGroup("UYGULAMA")
+                                SettingTile("Beleş TiVi Clone", "Android & Google TV · $appVersionName", "ikon_hakkinda", image) { }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("AĞ VE YAYIN KONTROLÜ")
+                                SettingTile("Bağlantıyı Kontrol Et", "Ağ, DNS ve canlı yayın erişim testi", "ikon_canli", image) { s.openNetworkDiagnostics() }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("DESTEK & İLETİŞİM")
+                                SettingTile("Destek", "Yardım ve iletişim", "ikon_contact", image) { s.notice = "Destek ve iletişim kanalları yakında aktif olacaktır." }
+                                SettingTile("Telegram Kanalı", "Topluluk ve duyurular", "ikon_telegram", image) { s.notice = "Telegram topluluk grubu yakında eklenecektir." }
+                                Spacer(Modifier.height(20.dp)); SettingsGroup("DİĞER İŞLEMLER")
+                                SettingTile("Önbelleği Temizle", "Liste güncellemeden ayrı işlem", "ikon_cache", image) { s.dialog = "cache" }
+                            }
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Label("Aktif: ${s.profileName.ifBlank { "M3U / Yerel TR Listesi" }}", 10, Color(0xFF94A2B7), bold = true)
-                        Label("•", 10, Color(0xFF69798F))
-                        Label("Kanal Sayısı: ${s.activeCount}", 10, Color(0xFF94A2B7), bold = true)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Label("🕒", 10, Color(0xFF8A99AD))
-                        Label(if (s.busy) "İşlem sürüyor…" else "Son Güncelleme: Güncel", 10, Color(0xFF8A99AD))
+                    Row(
+                        Modifier.fillMaxWidth().height(48.dp).background(theme.settingsBottomBarBg).padding(horizontal = 22.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(8.dp).background(if (theme.name == "Modern") Color(0xFF047857) else Color(0xFF0ABB91), RoundedCornerShape(2.dp)))
+                            Label("Beleş TiVi Clone v$appVersionName", 10, Color.White, bold = true)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Label("Aktif: ${s.profileName.ifBlank { "M3U / Yerel TR Listesi" }}", 10, Color(0xFF94A2B7), bold = true)
+                            Label("•", 10, Color(0xFF69798F))
+                            Label("Kanal Sayısı: ${s.activeCount}", 10, Color(0xFF94A2B7), bold = true)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Label("🕒", 10, Color(0xFF8A99AD))
+                            Label(if (s.busy) "İşlem sürüyor…" else "Son Güncelleme: Güncel", 10, Color(0xFF8A99AD))
+                        }
                     }
                 }
             }
@@ -1409,12 +1599,22 @@ private fun SettingsTabIcon(
     }
 }
 @Composable private fun SettingTile(title: String, subtitle: String, icon: String, image: @Composable (String, Modifier) -> Unit, value: String = "", toggle: Boolean = false, danger: Boolean = false, visibleTitle: String = title, click: () -> Unit) {
-    Action(title, Modifier.fillMaxWidth().height(58.dp), radius = 10.dp, strokeWidth = 0.dp, focusKey = "settings:$title", padding = PaddingValues(horizontal = 20.dp), content = {
+    val themeFocusStroke = LocalSettingsFocusStroke.current ?: amber
+    val themeAccent = LocalSettingsThemeAccent.current ?: amber
+    val cardBg = remember(themeFocusStroke) {
+        when (themeFocusStroke) {
+            Color(0xFF67E8F9) -> Color(0xFF131F32)
+            Color(0xFFFFC107) -> Color(0xFF242428)
+            Color(0xFFE50914) -> Color(0xFF1A1A20)
+            else -> Color(0xFF13233D)
+        }
+    }
+    Action(title, Modifier.fillMaxWidth().height(58.dp), radius = 10.dp, strokeWidth = 0.dp, tint = cardBg, focusKey = "settings:$title", padding = PaddingValues(horizontal = 20.dp), content = {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             image(icon, Modifier.size(21.dp, 23.dp))
             Column(Modifier.weight(1f)) { Label(visibleTitle, 12, if (danger) Color(0xFFF44747) else Color.White, bold = true, lineHeight = 18f, maxLines = 1); if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF69798F), lineHeight = 16f, maxLines = 1) }
             if (toggle) Box(Modifier.defaultMinSize(minWidth = 55.dp).height(28.dp).background(if (value == "Açık") Color(0xFF0ABB91) else Color(0xFF68798F), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Label("• $value", 10, bold = true) }
-            else { if (value.isNotEmpty()) Label(value, 10, amber, bold = true); Label("→", 13, Color(0xFF60728E)) }
+            else { if (value.isNotEmpty()) Label(value, 10, themeAccent, bold = true); Label("→", 13, Color(0xFF60728E)) }
         }
     }, click = click)
 }
@@ -1426,11 +1626,22 @@ private fun SettingPlusCard(
     badge: String,
     click: () -> Unit
 ) {
+    val themeFocusStroke = LocalSettingsFocusStroke.current ?: amber
+    val themeAccent = LocalSettingsThemeAccent.current ?: Color(0xFFFFB300)
+    val cardBg = remember(themeFocusStroke) {
+        when (themeFocusStroke) {
+            Color(0xFF67E8F9) -> Color(0xFF131F32)
+            Color(0xFFFFC107) -> Color(0xFF242428)
+            Color(0xFFE50914) -> Color(0xFF1A1A20)
+            else -> Color(0xFF13233D)
+        }
+    }
     Action(
         title,
         Modifier.fillMaxWidth().height(58.dp),
         radius = 10.dp,
         strokeWidth = 0.dp,
+        tint = cardBg,
         focusKey = "settings:plus:$title",
         padding = PaddingValues(horizontal = 20.dp),
         content = {
@@ -1451,19 +1662,19 @@ private fun SettingPlusCard(
                         quadraticTo(cx, cy, cx, cy - outerR)
                         close()
                     }
-                    drawPath(path = starPath, color = Color(0xFFFFB300))
+                    drawPath(path = starPath, color = themeAccent)
                 }
                 Column(Modifier.weight(1f)) {
                     Label(title, 12, Color.White, bold = true, lineHeight = 18f, maxLines = 1)
                     if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF8CA0BA), lineHeight = 16f, maxLines = 1)
                 }
                 Box(
-                    Modifier.background(Color(0xFF261D05), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                    Modifier.background(themeAccent.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .border(1.dp, themeAccent.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Label(badge, 9, Color(0xFFFFD54F), bold = true)
+                    Label(badge, 9, themeAccent, bold = true)
                 }
                 Label("→", 13, Color(0xFF60728E))
             }

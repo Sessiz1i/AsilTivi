@@ -30,10 +30,14 @@ class AppThemeTest {
         val modern = AppThemes.get("Modern")
         assertEquals("Modern", modern.name)
         assertEquals(Color(0xFF00BCD4), modern.accentColor)
-        assertEquals(Color(0xFF80DEEA), modern.headingTitleColor)
+        assertEquals(Color(0xFF67E8F9), modern.headingTitleColor)
         assertEquals(Color(0xFF00BCD4), modern.seekbarColor)
         assertFalse(modern.isCardFlat)
         assertTrue(modern.categoryTabPill)
+        assertEquals(Color(0xFF090F1D), modern.settingsBg)
+        assertEquals(Color(0xFF67E8F9), modern.settingsAccent)
+        assertEquals(Color(0xFF67E8F9), modern.settingsFocusStroke)
+        assertEquals(Color(0xFF19394D), modern.settingsFocusFill)
 
         val gold = AppThemes.get("Altın")
         assertEquals("Altın", gold.name)
@@ -42,6 +46,10 @@ class AppThemeTest {
         assertEquals(Color(0xFFFFC107), gold.seekbarColor)
         assertFalse(gold.isCardFlat)
         assertTrue(gold.categoryTabPill)
+        assertEquals(Color(0xFF141416), gold.settingsBg)
+        assertEquals(Color(0xFFFFC107), gold.settingsAccent)
+        assertEquals(Color(0xFFFFC107), gold.settingsFocusStroke)
+        assertEquals(Color(0xFF423214), gold.settingsFocusFill)
 
         val cinema = AppThemes.get("Sinema")
         assertEquals("Sinema", cinema.name)
@@ -50,5 +58,9 @@ class AppThemeTest {
         assertEquals(Color(0xFFE50914), cinema.seekbarColor)
         assertFalse(cinema.isCardFlat)
         assertTrue(cinema.categoryTabPill)
+        assertEquals(Color(0xFF0A0A0C), cinema.settingsBg)
+        assertEquals(Color(0xFFE50914), cinema.settingsAccent)
+        assertEquals(Color(0xFFE50914), cinema.settingsFocusStroke)
+        assertEquals(Color(0xFF3D1014), cinema.settingsFocusFill)
     }
 }

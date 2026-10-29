@@ -19,11 +19,12 @@ import kotlin.math.roundToInt
 /** Drag/tap commits on release. TV arrows draft, OK commits, Back/focus loss cancels. */
 @Composable
 internal fun OpacityControl(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     var focused by remember { mutableStateOf(false) }
     val value = s.opacityValue
-    Column(Modifier.fillMaxWidth().height(68.dp).background(Color(0xFF13233D), RoundedCornerShape(10.dp)).padding(horizontal = 20.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().height(68.dp).background(theme.settingsCardBg, RoundedCornerShape(10.dp)).padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            image("ikon_opacity", Modifier.size(21.dp, 23.dp)); Label("Şeffaflık", 12, modifier = Modifier.weight(1f), bold = true); Label("%$value", 10, Color(0xFFE67E22), bold = true)
+            image("ikon_opacity", Modifier.size(21.dp, 23.dp)); Label("Şeffaflık", 12, modifier = Modifier.weight(1f), bold = true); Label("%$value", 10, theme.settingsAccent, bold = true)
         }
         BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(29.dp)) {
             val requester = remember { FocusRequester() }
@@ -32,7 +33,7 @@ internal fun OpacityControl(s: PreviewState, image: @Composable (String, Modifie
             Canvas(Modifier.fillMaxSize().focusRequester(requester).onFocusChanged {
                 if (focused && !it.isFocused) s.cancelOpacity()
                 focused = it.isFocused
-            }.then(if (focused) Modifier.border(1.dp, Color(0xFFE67E22)) else Modifier)
+            }.then(if (focused) Modifier.border(2.dp, theme.settingsFocusStroke, RoundedCornerShape(4.dp)) else Modifier)
                 .semantics {
                     contentDescription = "Şeffaflık"
                     stateDescription = "%$value"
@@ -54,8 +55,8 @@ internal fun OpacityControl(s: PreviewState, image: @Composable (String, Modifie
                 val inset = 4.5.dp.toPx(); val track = (size.width - inset * 2).coerceAtLeast(0f)
                 val x = inset + track * value / 100f; val y = size.height / 2
                 drawLine(Color(0xFF44546B), Offset(inset, y), Offset(size.width - inset, y), 1.dp.toPx())
-                drawLine(Color(0xFF80CBC4), Offset(inset, y), Offset(x, y), 1.dp.toPx())
-                drawCircle(Color(0xFF80CBC4), inset, Offset(x, y))
+                drawLine(theme.settingsSlider, Offset(inset, y), Offset(x, y), 1.dp.toPx())
+                drawCircle(theme.settingsSlider, inset, Offset(x, y))
             }
         }
     }

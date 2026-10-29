@@ -21,6 +21,9 @@ import com.omer.belestiviclone.shared.preview.SavedMultiLayout
 import com.omer.belestiviclone.shared.preview.isVideoFormatSelected
 
 internal val LocalModalLayer = staticCompositionLocalOf { false }
+internal val LocalSettingsThemeAccent = staticCompositionLocalOf<Color?> { null }
+internal val LocalSettingsFocusStroke = staticCompositionLocalOf<Color?> { null }
+internal val LocalSettingsFocusFill = staticCompositionLocalOf<Color?> { null }
 private val referenceCard = Color(0xFF13233D)
 
 /** Uses the app's content rectangle and scaled density, never screenshot pixels as Android dp. */
@@ -44,6 +47,7 @@ internal fun ReferenceOverlay(s: PreviewState, title: String, quality: Boolean =
 
 @Composable
 internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, title: String) {
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     val quality = kind == "quality"
     val format = kind == "format"
     val selected = remember(kind) { FocusRequester() }
@@ -61,7 +65,8 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
         val placement = if (quality) Modifier.offset(x = maxWidth * (560f / 855f), y = maxHeight * (135f / 481f))
             else Modifier.align(Alignment.Center)
         Column(placement.width(width).heightIn(max = maxHeight - 12.dp).height(height)
-            .background(referenceCard, RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
+            .background(theme.settingsCardBg, RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
+            .border(1.dp, theme.settingsFocusStroke.copy(alpha = 0.25f), RoundedCornerShape(if (quality || format) 10.dp else 0.dp))
             .pointerInput(Unit) { detectTapGestures { } }
             .padding(horizontal = 20.dp, vertical = if (quality) 17.dp else 19.dp).focusGroup()) {
             Label(title, 9, Color(0xFF94A2B7), bold = true, lineHeight = 16f, letterSpacing = if (quality) 0f else 1f)
@@ -71,11 +76,14 @@ internal fun OptionPicker(s: PreviewState, kind: String, values: List<String>, t
                     val chosen = if (format) isVideoFormatSelected(s.data.pref(kind), value) else s.data.pref(kind) == value
                     Action(value, Modifier.fillMaxWidth().height(if (quality) 41.5.dp else 44.5.dp)
                         .then(if (chosen || (!format && s.data.pref(kind) !in values && index == 0)) Modifier.focusRequester(selected) else Modifier),
-                        tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, focusColor = Color(0xFFE67E22), enabled = !s.busy,
-                        padding = PaddingValues(horizontal = 2.dp), content = {
+                        tint = Color.Transparent, radius = 6.dp, strokeWidth = 0.dp,
+                        focusColor = theme.settingsFocusStroke,
+                        focusFill = theme.settingsFocusFill,
+                        enabled = !s.busy,
+                        padding = PaddingValues(horizontal = 4.dp), content = {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 Label(value, 12, Color(0xFFE9EEF5), bold = true)
-                                if (chosen) Label("✓", 20, Color(0xFFE67E22), Modifier.align(Alignment.CenterEnd).padding(end = 5.dp))
+                                if (chosen) Label("✓", 20, theme.settingsAccent, Modifier.align(Alignment.CenterEnd).padding(end = 5.dp))
                             }
                         }) { s.pref(kind, value) }
                 }
@@ -645,8 +653,9 @@ internal fun MultiWarning(s: PreviewState, image: @Composable (String, Modifier)
 
 @Composable
 internal fun SettingsGroup(title: String) {
+    val accent = LocalSettingsThemeAccent.current ?: Color(0xFFE67E22)
     Row(Modifier.height(26.dp), verticalAlignment = Alignment.Top) {
-        Box(Modifier.width(3.dp).height(16.dp).background(Color(0xFFE67E22)))
+        Box(Modifier.width(3.dp).height(16.dp).background(accent))
         Label(title, 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), bold = true, letterSpacing = 1f)
     }
 }
@@ -654,10 +663,11 @@ internal fun SettingsGroup(title: String) {
 @Composable
 internal fun CategoryManagement(s: PreviewState, image: @Composable (String, Modifier) -> Unit, modifier: Modifier) {
     val back = remember { FocusRequester() }
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 19.dp)) {
         Action("Kanallar Ve Listeler › KATEGORİ YÖNETİMİ · Geri", Modifier.fillMaxWidth().height(45.dp).focusRequester(back), strokeWidth = 0.dp, padding = PaddingValues(horizontal = 20.dp), content = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                Label("←", 12, Color(0xFFE67E22)); Label("Kanallar Ve Listeler ›", 10, Color(0xFF69798F), bold = true); Label("KATEGORİ YÖNETİMİ", 10, bold = true)
+                Label("←", 12, theme.settingsAccent); Label("Kanallar Ve Listeler ›", 10, Color(0xFF69798F), bold = true); Label("KATEGORİ YÖNETİMİ", 10, bold = true)
             }
         }, click = s::dismiss)
         Spacer(Modifier.height(32.dp)); SettingsGroup("HIZLI AKSİYONLAR")
