@@ -71,53 +71,88 @@ private val ZapNextBlue = Color(0xFF7FC4F0)
 /** Klasik temada görseldeki sarı; diğer temalarda temanın vurgu rengi. */
 internal fun zapAccent(theme: ThemeConfig): Color = if (theme.name == "Klasik") ZapGold else theme.accentColor
 
+/** Ayarlar > Görünüm > Kanal Bilgisi Konumu ("Sol", "Orta", "Sağ") değerini hizalamaya çevirir. */
+fun zapCardAlignment(positionPref: String): Alignment = when (positionPref.trim()) {
+    "Sol" -> Alignment.BottomStart
+    "Sağ" -> Alignment.BottomEnd
+    else -> Alignment.BottomCenter
+}
+
+/** Ayarlar > Görünüm > Kanal Bilgisi Boyutu ("Küçük", "Normal", "Büyük") çarpanını hesaplar. */
+fun zapCardScale(sizePref: String): Float = when (sizePref.trim()) {
+    "Küçük" -> 0.76f
+    "Büyük" -> 1.25f
+    else -> 1.0f
+}
+
+/** Ölçeklenmiş tasarım birimlerinde (855dp genişlik tabanlı) ZapCard genişliğini hesaplar. */
+fun zapCardWidthDp(sizePref: String, maxWidthDp: Float): Float {
+    val scale = zapCardScale(sizePref)
+    if (maxWidthDp < 600f) {
+        return ((maxWidthDp - 24f) * scale).coerceIn(200f, (maxWidthDp - 16f).coerceAtLeast(200f))
+    }
+    val base = when (sizePref.trim()) {
+        "Küçük" -> 300f
+        "Büyük" -> 510f
+        else -> 405f
+    }
+    return base.coerceAtMost((maxWidthDp - 32f).coerceAtLeast(260f))
+}
+
 @Composable
-internal fun ZapCard(model: ZapCardModel, theme: ThemeConfig, image: @Composable (String, Modifier) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(15.dp)
+internal fun ZapCard(
+    model: ZapCardModel,
+    theme: ThemeConfig,
+    image: @Composable (String, Modifier) -> Unit,
+    modifier: Modifier = Modifier,
+    scale: Float = 1f,
+) {
+    val s = scale.coerceIn(0.65f, 1.45f)
+    val shape = RoundedCornerShape((15f * s).dp)
     val accent = zapAccent(theme)
     Row(
         modifier
             .background(Color(0xE6121418), shape)
             .border(1.dp, Color(0x40FFFFFF), shape)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = (14f * s).dp, vertical = (12f * s).dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy((14f * s).dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Box(Modifier.size(84.dp, 60.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((3f * s).dp)) {
+            Box(Modifier.size((84f * s).dp, (60f * s).dp), contentAlignment = Alignment.Center) {
                 image(model.logo, Modifier.fillMaxSize())
             }
-            Label("${model.channelNumber}", 10, Color(0xFF9AA4AE), bold = true)
+            Label("${model.channelNumber}", (10f * s).toInt().coerceAtLeast(8), Color(0xFF9AA4AE), bold = true)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Label(model.channelName, 20, Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy((6f * s).dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((8f * s).dp)) {
+                Label(model.channelName, (20f * s).toInt().coerceAtLeast(13), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
                 if (model.qualityBadge != null) {
-                    Box(Modifier.background(ZapBadge, RoundedCornerShape(3.dp)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-                        Label(model.qualityBadge, 11, Color.White, bold = true, maxLines = 1)
+                    Box(Modifier.background(ZapBadge, RoundedCornerShape((3f * s).dp)).padding(horizontal = (7f * s).dp, vertical = (3f * s).dp)) {
+                        Label(model.qualityBadge, (11f * s).toInt().coerceAtLeast(8), Color.White, bold = true, maxLines = 1)
                     }
                 }
             }
             if (model.hasEpg) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label("Şimdi:", 13, accent, bold = true)
-                    Label(model.nowTitle, 13, Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
-                    Label(model.nowRange, 12, Color(0xFFCFD8DC), bold = true, maxLines = 1)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
+                    Label("Şimdi:", (13f * s).toInt().coerceAtLeast(9), accent, bold = true)
+                    Label(model.nowTitle, (13f * s).toInt().coerceAtLeast(9), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+                    Label(model.nowRange, (12f * s).toInt().coerceAtLeast(9), Color(0xFFCFD8DC), bold = true, maxLines = 1)
                 }
-                Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFF3A3F45), RoundedCornerShape(2.dp))) {
-                    Box(Modifier.fillMaxWidth(model.progress.coerceIn(0f, 1f)).fillMaxHeight().background(accent, RoundedCornerShape(2.dp)))
+                Box(Modifier.fillMaxWidth().height((4f * s).dp).background(Color(0xFF3A3F45), RoundedCornerShape((2f * s).dp))) {
+                    Box(Modifier.fillMaxWidth(model.progress.coerceIn(0f, 1f)).fillMaxHeight().background(accent, RoundedCornerShape((2f * s).dp)))
                 }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label("Sonra:", 13, ZapNextBlue, bold = true)
-                    Label(model.nextTitle, 13, Color(0xFFB0B8C0), Modifier.weight(1f), maxLines = 1)
-                    ZapClockIcon(Modifier.size(20.dp))
-                    Label(model.clock, 20, accent, bold = true)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
+                    Label("Sonra:", (13f * s).toInt().coerceAtLeast(9), ZapNextBlue, bold = true)
+                    Label(model.nextTitle, (13f * s).toInt().coerceAtLeast(9), Color(0xFFB0B8C0), Modifier.weight(1f), maxLines = 1)
+                    ZapClockIcon(Modifier.size((20f * s).dp))
+                    Label(model.clock, (20f * s).toInt().coerceAtLeast(13), accent, bold = true)
                 }
             } else {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label(ZapCardNoEpgText, 13, Color(0xFF9AA4AE), Modifier.weight(1f), maxLines = 1)
-                    ZapClockIcon(Modifier.size(20.dp))
-                    Label(model.clock, 20, accent, bold = true)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((6f * s).dp)) {
+                    Label(ZapCardNoEpgText, (13f * s).toInt().coerceAtLeast(9), Color(0xFF9AA4AE), Modifier.weight(1f), maxLines = 1)
+                    ZapClockIcon(Modifier.size((20f * s).dp))
+                    Label(model.clock, (20f * s).toInt().coerceAtLeast(13), accent, bold = true)
                 }
             }
         }

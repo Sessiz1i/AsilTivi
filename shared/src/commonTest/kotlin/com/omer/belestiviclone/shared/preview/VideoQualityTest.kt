@@ -56,7 +56,31 @@ class VideoQualityTest {
         assertEquals("1.5 Mbps (1500 kbps)", hevcFallback.bitrateLabel)
 
         assertEquals(7, LiveFormatOptions.size)
+        assertTrue(isVideoFormatSelected("Orijinal", "Otomatik (Orijinal)"))
         assertTrue(isVideoFormatSelected("Orijinal", "Otomatik (Orijinal yayın oranı)"))
-        assertTrue(isVideoFormatSelected("2.39:1 (Anamorfik sinema)", "2.39:1 (Anamorfik sinema)"))
+        assertTrue(isVideoFormatSelected("Sinema 2.39:1", "2.39:1 (Anamorfik sinema)"))
+        assertTrue(isVideoFormatSelected("2.39:1 (Anamorfik sinema)", "Sinema 2.39:1"))
+    }
+    @Test fun streamTechnicalInfoFormatsThreeV41CommaDecimalLines() {
+        val info = StreamTechnicalInfo(
+            width = 1920,
+            height = 1080,
+            frameRate = 25f,
+            videoCodec = "avc1.640028",
+            videoMimeType = "video/avc",
+            videoBitrate = 4_700_000,
+            audioCodec = "mp4a.40.2",
+            audioMimeType = "audio/mp4a-latm",
+            audioChannels = 2,
+            audioSampleRate = 48_000,
+            audioLanguage = "tr",
+            bufferedDurationMs = 12_400L,
+            liveOffsetMs = 18_200L,
+            isPlaying = true,
+        )
+        assertEquals("1920 × 1080 · 25 FPS · 4,7 Mbps · H.264", info.v41VideoLine)
+        assertEquals("Türkçe · AAC · 2 ch · 48,0 kHz", info.v41AudioLine)
+        assertEquals("Oynatılıyor · Tampon: 12,4 s · Gecikme: 18,2 s", info.v41PlaybackLine(paused = false))
+        assertEquals("Duraklatıldı · Tampon: 12,4 s · Gecikme: 18,2 s", info.v41PlaybackLine(paused = true))
     }
 }

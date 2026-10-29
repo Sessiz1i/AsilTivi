@@ -67,7 +67,9 @@ class MainActivity : ComponentActivity() {
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
         KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
-        KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_ZOOM_MODE)
+        KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_ZOOM_MODE) +
+        (KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9).toSet() +
+        (KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9).toSet()
 
     private fun immersive() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -95,6 +97,16 @@ class MainActivity : ComponentActivity() {
             if (event.keyCode == KeyEvent.KEYCODE_TV_ZOOM_MODE) {
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) s.openFormatMenu()
                 return true
+            }
+            val digit = tvDigitFromKeyCode(event.keyCode)
+            if (digit != null) {
+                val ime = ViewCompat.getRootWindowInsets(window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                if (s.normalLiveControls && !ime) {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        s.inputChannelDigit(digit)
+                    }
+                    return true
+                }
             }
         }
         val command = tvNavigationCommand(event.keyCode)
@@ -188,7 +200,8 @@ class MainActivity : ComponentActivity() {
                     captionBottomInsetPx = if (state.page == "live" && state.info) captionReservedBottomPx else 0,
                     onTechnicalInfo = { if (state.page == "live") state.technicalInfo = it },
                     isMultiScreen = state.page == "multi",
-                    liveSync = state.liveSyncRevision)
+                    liveSync = state.liveSyncRevision,
+                    seekBack = state.seekBackRevision)
             })
         }
     }
@@ -370,13 +383,38 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             format.averageBitrate > 0 -> format.averageBitrate
             else -> technicalInfo.audioBitrate
         }
+        val lang = format.language?.takeIf { it.isNotBlank() } ?: format.label?.takeIf { it.isNotBlank() }
         technicalInfo = technicalInfo.copy(
             audioCodec = format.codecs ?: technicalInfo.audioCodec,
             audioMimeType = format.sampleMimeType ?: technicalInfo.audioMimeType,
             audioChannels = ch,
             audioSampleRate = sr,
             audioBitrate = br,
+            audioLanguage = lang ?: technicalInfo.audioLanguage,
         )
+    }
+
+    fun pollLiveMetrics(): StreamTechnicalInfo {
+        if (released) return technicalInfo
+        val bufMs = exo.totalBufferedDuration.coerceAtLeast(
+            (exo.bufferedPosition - exo.currentPosition).coerceAtLeast(0L)
+        )
+        val rawOffset = exo.currentLiveOffset
+        val offsetMs = when {
+            rawOffset != C.TIME_UNSET && rawOffset > 0L -> rawOffset
+            exo.duration > 0L && exo.duration > exo.currentPosition -> (exo.duration - exo.currentPosition).coerceAtLeast(bufMs)
+            bufMs > 0L -> bufMs + 4200L
+            else -> 0L
+        }
+        val playing = exo.playWhenReady && exo.playbackState != Player.STATE_IDLE && exo.playbackState != Player.STATE_ENDED
+        if (bufMs != technicalInfo.bufferedDurationMs || offsetMs != technicalInfo.liveOffsetMs || playing != technicalInfo.isPlaying) {
+            technicalInfo = technicalInfo.copy(
+                bufferedDurationMs = bufMs,
+                liveOffsetMs = offsetMs,
+                isPlaying = playing,
+            )
+        }
+        return technicalInfo
     }
     private var audioTracks by mutableStateOf(emptyList<LanguageTrack>())
     private var textTracks by mutableStateOf(emptyList<LanguageTrack>())
@@ -624,6 +662,13 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             exo.play()
         }
     }
+    fun seekBackwardInLiveWindow() {
+        if (released) return
+        val target = (exo.currentPosition - 15_000L).coerceAtLeast(0L)
+        exo.seekTo(target)
+        requestedPause = false
+        exo.play()
+    }
     override fun release() {
         if (released) return
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
@@ -634,7 +679,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
 }
 
 @Composable
-internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false, liveSync: Int = 0) {
+internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boolean, retry: Int, format: String, modifier: Modifier, onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}, preferences: PlaybackPreferences = PlaybackPreferences(), onQuality: (String) -> Unit = {}, captionBottomInsetPx: Int = 0, onTechnicalInfo: (StreamTechnicalInfo) -> Unit = {}, isMultiScreen: Boolean = false, liveSync: Int = 0, seekBack: Int = 0) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val played by rememberUpdatedState(onPlayed)
@@ -645,6 +690,17 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
         if (liveSync > 0) {
             player.seekToDefaultPosition()
             player.play()
+        }
+    }
+    LaunchedEffect(seekBack) {
+        if (seekBack > 0) {
+            player.seekBackwardInLiveWindow()
+        }
+    }
+    LaunchedEffect(player, channel, paused) {
+        while (true) {
+            onTechnicalInfo(player.pollLiveMetrics())
+            kotlinx.coroutines.delay(500L)
         }
     }
     LaunchedEffect(preferences) { player.preferences(preferences) }

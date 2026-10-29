@@ -1,5 +1,7 @@
 package com.omer.belestiviclone.sharedui
 
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import com.omer.belestiviclone.shared.preview.*
 import kotlinx.coroutines.*
 import kotlin.test.*
@@ -84,5 +86,59 @@ class ZapCardTest {
         assertEquals("Gün Sonu", m.nextTitle)
         assertEquals("00:00", m.clock)
         assertEquals("ikon_tv", m.logo)
+    }
+
+    @Test fun zapCardPositionAndSizePreferencesMapToAlignmentScaleAndWidth() {
+        assertEquals(Alignment.BottomStart, zapCardAlignment("Sol"))
+        assertEquals(Alignment.BottomCenter, zapCardAlignment("Orta"))
+        assertEquals(Alignment.BottomEnd, zapCardAlignment("Sağ"))
+        assertEquals(0.76f, zapCardScale("Küçük"), 0.001f)
+        assertEquals(1.0f, zapCardScale("Normal"), 0.001f)
+        assertEquals(1.25f, zapCardScale("Büyük"), 0.001f)
+        assertTrue(zapCardWidthDp("Küçük", 900f) < zapCardWidthDp("Normal", 900f))
+        assertTrue(zapCardWidthDp("Büyük", 900f) > zapCardWidthDp("Normal", 900f))
+    }
+
+    @Test fun numberPadInputBuffersDigitsMatchesChannelAndCommitsWithZapCard() = runBlocking {
+        val s = PreviewState(Store(), this); s.load(); s.page = "live"; s.panel = false
+        val channels = s.data.filtered("Tümü", "").filter { !it.isAudioOrRadio }
+        assertTrue(channels.size >= 3)
+        // 1 basıldığında "ⓘ 1 › TRT 1"
+        s.inputChannelDigit(1, autoCommitAfterDelay = false)
+        assertEquals("1", s.numberInputBuffer)
+        assertEquals("ⓘ 1 › ${channels[0].name}", s.numberInputLabel)
+        // Eşleşmeyen numara girildiğinde "ⓘ 99 › ..."
+        s.clearNumberInput()
+        s.inputChannelDigit(9, autoCommitAfterDelay = false)
+        s.inputChannelDigit(9, autoCommitAfterDelay = false)
+        assertEquals("99", s.numberInputBuffer)
+        assertEquals("ⓘ 99 › ...", s.numberInputLabel)
+        val beforeUnmatched = s.selected
+        s.commitNumberInput()
+        assertEquals(beforeUnmatched, s.selected, "Eşleşmeyen numara kanalı değiştirmemeli")
+        assertEquals("", s.numberInputBuffer)
+        // Geçerli numara (3) girilip onaylandığında 3. kanala geçer ve ZapCard açılır
+        val beforeRev = s.zapCardRevision
+        s.inputChannelDigit(3, autoCommitAfterDelay = false)
+        assertEquals("ⓘ 3 › ${channels[2].name}", s.numberInputLabel)
+        s.commitNumberInput()
+        assertEquals(channels[2].id, s.selected)
+        assertEquals(beforeRev + 1, s.zapCardRevision)
+        assertFalse(s.panel)
+    }
+
+    @Test fun liveControlLabelsReflectPauseAndBehindLiveEdgeStates() = runBlocking {
+        val s = PreviewState(Store(), this); s.load(); s.page = "live"
+        assertEquals("Canlı" to "⏸ Duraklat", liveControlLabels(s.paused, s.isBehindLiveEdge))
+        s.togglePause()
+        assertTrue(s.paused)
+        assertEquals("|| Yayın Durduruldu" to "▶ Oynat", liveControlLabels(s.paused, s.isBehindLiveEdge))
+        s.seekInLiveWindow(0.5f)
+        assertFalse(s.paused)
+        assertTrue(s.isBehindLiveEdge)
+        assertEquals("● ⏩ Canlıya Dön" to "⏸ Duraklat", liveControlLabels(s.paused, s.isBehindLiveEdge))
+        s.syncLive()
+        assertFalse(s.isBehindLiveEdge)
+        assertEquals("Canlı" to "⏸ Duraklat", liveControlLabels(s.paused, s.isBehindLiveEdge))
     }
 }

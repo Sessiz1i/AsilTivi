@@ -112,11 +112,19 @@ data class PreviewData(
     }
     fun startup(last: OpaqueId?): OpaqueId? {
         if (preferences["startupFavorites"] == "Açık") {
-            val favoriteFirst = filtered("Favoriler", "").firstOrNull { it.available }?.id
+            val favoriteFirst = filtered("Favoriler", "").firstOrNull { it.available && !it.isAudioOrRadio }?.id
             if (favoriteFirst != null) return favoriteFirst
         }
-        return last?.takeIf { pref("startup") == "Açık" && channels.any { ch -> ch.id == it && ch.available } }
-            ?: filtered("Favoriler", "").firstOrNull { it.available }?.id ?: filtered("Tümü", "").firstOrNull()?.id
+        val validLastTv = if (pref("startup") == "Açık" && last != null) {
+            last.takeIf { id -> channels.any { ch -> ch.id == id && ch.available && !ch.isAudioOrRadio } }
+                ?: preferences["lastTvChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }
+                    ?.takeIf { id -> channels.any { ch -> ch.id == id && ch.available && !ch.isAudioOrRadio } }
+        } else null
+        return validLastTv
+            ?: filtered("Favoriler", "").firstOrNull { it.available && !it.isAudioOrRadio }?.id
+            ?: filtered("Tümü", "").firstOrNull { it.available && !it.isAudioOrRadio }?.id
+            ?: filtered("Favoriler", "").firstOrNull { it.available }?.id
+            ?: filtered("Tümü", "").firstOrNull()?.id
     }
 }
 interface PreviewStore {

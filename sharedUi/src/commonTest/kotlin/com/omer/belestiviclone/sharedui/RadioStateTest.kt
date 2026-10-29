@@ -3,6 +3,7 @@ package com.omer.belestiviclone.sharedui
 import com.omer.belestiviclone.shared.catalog.OpaqueId
 import com.omer.belestiviclone.shared.preview.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.*
 
 class RadioStateTest {
@@ -120,5 +121,36 @@ class RadioStateTest {
         // Üçüncü back: TV modunda çıkış onay diyaloğu açılır
         s.back()
         assertEquals("exit", s.dialog)
+    }
+
+    @Test
+    fun coldStartAfterClosingOnRadioStationOpensLastTvChannelInLiveMode() = runBlocking {
+        val tv1 = PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1")
+        val tv2 = PreviewChannel(OpaqueId(1, 2), "ATV", "Ulusal", "logo_atv")
+        val radio1 = PreviewChannel(OpaqueId(1, 10), "TRT FM", "Radyo", "logo_trt1", isRadio = true, groups = listOf("Radyo"))
+
+        var savedData = PreviewData(channels = listOf(tv1, tv2, radio1))
+        val store = object : PreviewStore {
+            override suspend fun load() = savedData
+            override suspend fun save(data: PreviewData) { savedData = data }
+        }
+
+        val firstSession = PreviewState(store, this)
+        firstSession.load()
+        firstSession.select(tv2.id)
+        firstSession.played(tv2.id); yield()
+        firstSession.enterRadioMode()
+        firstSession.select(radio1.id)
+        firstSession.played(radio1.id); yield()
+
+        // Son oynatılan (history.first()) radyo istasyonu oldu
+        assertEquals(radio1.id, savedData.history.first())
+        assertEquals(PreviewCodec.id(tv2.id), savedData.preferences["lastTvChannel"])
+
+        // Uygulama yeniden (soğuk) başlatıldığında Canlı TV modunda tv2 açılmalı, radyo açılmamalı
+        val coldStartSession = PreviewState(store, this)
+        coldStartSession.load()
+        assertFalse(coldStartSession.isRadioMode)
+        assertEquals(tv2.id, coldStartSession.selected)
     }
 }

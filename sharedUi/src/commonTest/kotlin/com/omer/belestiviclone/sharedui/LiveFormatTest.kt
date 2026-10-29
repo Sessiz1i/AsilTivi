@@ -31,24 +31,30 @@ class LiveFormatTest {
         val store = Store(); val s = PreviewState(store, this); s.load(); s.page = "live"
         s.openFormatMenu()
         assertEquals("format", s.dialog)
-        s.pref("format", "2.39:1 (Anamorfik sinema)"); yield()
+        // Dokunma (closeMenu = false) ile seçim şeridi açık tutar
+        s.selectLiveFormat("16:9", closeMenu = false); yield()
+        assertEquals("format", s.dialog)
+        assertEquals("16:9", s.data.pref("format"))
+        // Kumanda OK (closeMenu = true) ile seçim şeridi kapatır
+        s.selectLiveFormat("Sinema 2.39:1", closeMenu = true); yield()
         assertNull(s.dialog)
-        assertEquals("2.39:1 (Anamorfik sinema)", s.data.pref("format"))
+        assertEquals("Sinema 2.39:1", s.data.pref("format"))
         s.stepChannel(1)
-        assertEquals("2.39:1 (Anamorfik sinema)", s.data.pref("format"))
+        assertEquals("Sinema 2.39:1", s.data.pref("format"))
         val reopened = PreviewState(store, this); reopened.load()
-        assertEquals("2.39:1 (Anamorfik sinema)", reopened.data.pref("format"))
+        assertEquals("Sinema 2.39:1", reopened.data.pref("format"))
     }
-    @Test fun infoPanelTogglesClosesOnBackAndResetsTechnicalInfoOnChannelSwitch() = runBlocking {
-        val store = Store(); val s = PreviewState(store, this); s.load(); s.page = "live"
+    @Test fun infoPanelTogglesHidesMainOverlayClosesOnBackAndResetsTechnicalInfoOnChannelSwitch() = runBlocking {
+        val store = Store(); val s = PreviewState(store, this); s.load(); s.page = "live"; s.panel = true
         assertFalse(s.info)
         s.toggleInfo()
         assertTrue(s.info)
+        assertFalse(s.panel, "Bilgi kartı açıldığında arka ana overlay kapanmalı")
         s.technicalInfo = StreamTechnicalInfo(width = 1920, height = 1080, frameRate = 50f, videoCodec = "avc1", audioCodec = "mp4a.40.2", audioChannels = 2, audioSampleRate = 48000, videoBitrate = 3_500_000)
         assertEquals(1, s.channelNumber)
         s.back()
         assertFalse(s.info)
-        assertTrue(s.panel)
+        assertFalse(s.panel)
         s.stepChannel(1)
         assertEquals(StreamTechnicalInfo(), s.technicalInfo)
         assertEquals(2, s.channelNumber)

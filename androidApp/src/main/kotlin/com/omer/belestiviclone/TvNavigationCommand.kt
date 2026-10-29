@@ -16,3 +16,10 @@ internal fun tvNavigationCommand(keyCode: Int): TvNavigationCommand? = when (key
     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> TvNavigationCommand(0, true)
     else -> null
 }
+
+/** Kumanda 0..9 ve Numpad 0..9 tuşlarını rakama (0..9) çevirir. */
+internal fun tvDigitFromKeyCode(keyCode: Int): Int? = when (keyCode) {
+    in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
+    in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> keyCode - KeyEvent.KEYCODE_NUMPAD_0
+    else -> null
+}

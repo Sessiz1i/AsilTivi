@@ -45,25 +45,34 @@ data class VideoQualityObservation(val input: VideoTrackFormat? = null, val trac
 }
 
 val LiveFormatOptions = listOf(
-    "Otomatik (Orijinal yayın oranı)",
-    "Ekrana Yay (Stretch / Fill)",
-    "Yakınlaştır (Zoom / Crop)",
-    "16:9 (Geniş ekran)",
-    "4:3 (Klasik ekran)",
-    "1.85:1 (Geniş sinema)",
-    "2.39:1 (Anamorfik sinema)",
+    "Otomatik (Orijinal)",
+    "Ekrana yay",
+    "Yakınlaştır",
+    "16:9",
+    "4:3",
+    "Sinema 1.85:1",
+    "Sinema 2.39:1",
 )
 
 fun isVideoFormatSelected(stored: String, option: String): Boolean = when {
     stored == option -> true
-    stored in listOf("Orijinal", "Otomatik", "Otomatik (Orijinal)", "Sığdır (Fit)") && option.startsWith("Otomatik") -> true
-    stored in listOf("Ekrana Yay", "Ekrana yay") && option.startsWith("Ekrana Yay") -> true
-    stored in listOf("Tam Ekran (Kes)", "Yakınlaştır") && option.startsWith("Yakınlaştır") -> true
-    stored == "16:9" && option.startsWith("16:9") -> true
-    stored == "4:3" && option.startsWith("4:3") -> true
-    stored in listOf("1.85:1", "Sinema 1.85:1") && option.startsWith("1.85:1") -> true
-    stored in listOf("2.39:1", "Sinema 2.39:1") && option.startsWith("2.39:1") -> true
+    stored in listOf("Orijinal", "Otomatik", "Otomatik (Orijinal)", "Otomatik (Orijinal yayın oranı)", "Sığdır (Fit)") && option.startsWith("Otomatik") -> true
+    stored in listOf("Ekrana Yay", "Ekrana yay", "Ekrana Yay (Stretch / Fill)") && option.startsWith("Ekrana", ignoreCase = true) -> true
+    stored in listOf("Tam Ekran (Kes)", "Yakınlaştır", "Yakınlaştır (Zoom / Crop)") && option.startsWith("Yakınlaştır") -> true
+    stored in listOf("16:9", "16:9 (Geniş ekran)") && option.startsWith("16:9") -> true
+    stored in listOf("4:3", "4:3 (Klasik ekran)") && option.startsWith("4:3") -> true
+    stored in listOf("1.85:1", "Sinema 1.85:1", "1.85:1 (Geniş sinema)") && ("1.85:1" in option) -> true
+    stored in listOf("2.39:1", "Sinema 2.39:1", "2.39:1 (Anamorfik sinema)") && ("2.39:1" in option) -> true
     else -> false
+}
+
+/** Virgüle dayalı (TR yerel) tek ondalıklı sayı biçimlendirici (örn. 12.4 -> "12,4"). */
+fun formatCommaOneDecimal(value: Double): String {
+    if (!value.isFinite()) return "0,0"
+    val tenths = kotlin.math.round(value * 10.0).toLong()
+    val sign = if (tenths < 0) "-" else ""
+    val absTenths = kotlin.math.abs(tenths)
+    return "$sign${absTenths / 10},${absTenths % 10}"
 }
 
 data class StreamTechnicalInfo(
@@ -80,6 +89,10 @@ data class StreamTechnicalInfo(
     val audioBitrate: Int = 0,
     val measuredBitrate: Int = 0,
     val streamTitle: String? = null,
+    val audioLanguage: String? = null,
+    val bufferedDurationMs: Long = 0L,
+    val liveOffsetMs: Long = 0L,
+    val isPlaying: Boolean = true,
 ) {
     val resolutionBadge: String get() = when {
         width <= 0 || height <= 0 -> "CANLI"
@@ -109,6 +122,22 @@ data class StreamTechnicalInfo(
             raw.isBlank() -> "—"
             "avc" in raw || "h264" in raw || "h.264" in raw -> "H.264 / AVC"
             "hevc" in raw || "hvc" in raw || "hev1" in raw || "h265" in raw || "h.265" in raw -> "H.265 / HEVC"
+            "vp9" in raw -> "VP9"
+            "av01" in raw || "av1" in raw -> "AV1"
+            "mp2v" in raw || "mpeg2" in raw -> "MPEG-2"
+            "mp4v" in raw -> "MPEG-4"
+            !videoCodec.isNullOrBlank() -> videoCodec
+            !videoMimeType.isNullOrBlank() -> videoMimeType.substringAfter('/').uppercase()
+            else -> "—"
+        }
+    }
+
+    val shortVideoCodecLabel: String get() {
+        val raw = "${videoMimeType.orEmpty()} ${videoCodec.orEmpty()}".lowercase()
+        return when {
+            raw.isBlank() -> "—"
+            "avc" in raw || "h264" in raw || "h.264" in raw -> "H.264"
+            "hevc" in raw || "hvc" in raw || "hev1" in raw || "h265" in raw || "h.265" in raw -> "H.265"
             "vp9" in raw -> "VP9"
             "av01" in raw || "av1" in raw -> "AV1"
             "mp2v" in raw || "mpeg2" in raw -> "MPEG-2"
@@ -170,4 +199,47 @@ data class StreamTechnicalInfo(
 
     val summaryLine: String get() =
         "$resolutionLabel · $fpsLabel · $videoCodecLabel · $bitrateLabel"
+
+    /** Orijinal v4.1 1. teknik satır: "1920 × 1080 · 25 FPS · 4,7 Mbps · H.264" */
+    val v41VideoLine: String get() {
+        val resPart = if (width > 0 && height > 0) "$width × $height" else "—"
+        val fpsPart = if (frameRate <= 0f || !frameRate.isFinite()) "— FPS" else {
+            val rounded = kotlin.math.round(frameRate).toInt()
+            if (kotlin.math.abs(frameRate - rounded) < 0.05f) "$rounded FPS"
+            else "${formatCommaOneDecimal(frameRate.toDouble())} FPS"
+        }
+        val bps = effectiveBitrate
+        val brPart = when {
+            bps <= 0 -> "— Mbps"
+            bps >= 1_000_000 -> "${formatCommaOneDecimal(bps / 1_000_000.0)} Mbps"
+            else -> "${formatCommaOneDecimal(bps / 1_000_000.0)} Mbps"
+        }
+        return "$resPart · $fpsPart · $brPart · $shortVideoCodecLabel"
+    }
+
+    val audioLanguageLabel: String get() {
+        val lang = audioLanguage?.trim()?.lowercase().orEmpty()
+        return when {
+            lang.isEmpty() || lang == "und" || lang == "unknown" -> "—"
+            lang == "tr" || lang == "tur" || "türk" in lang || "turk" in lang -> "Türkçe"
+            lang == "en" || lang == "eng" || "english" in lang -> "İngilizce"
+            lang == "de" || lang == "deu" || lang == "ger" -> "Almanca"
+            else -> audioLanguage!!.trim()
+        }
+    }
+
+    /** Orijinal v4.1 2. teknik satır: "Türkçe · AAC · 2 ch · 48,0 kHz" */
+    val v41AudioLine: String get() {
+        val chPart = if (audioChannels > 0) "$audioChannels ch" else "— ch"
+        val srPart = if (audioSampleRate > 0) "${formatCommaOneDecimal(audioSampleRate / 1000.0)} kHz" else "— kHz"
+        return "$audioLanguageLabel · $audioCodecLabel · $chPart · $srPart"
+    }
+
+    /** Orijinal v4.1 3. teknik satır: "Oynatılıyor · Tampon: 12,4 s · Gecikme: 18,2 s" */
+    fun v41PlaybackLine(paused: Boolean = !isPlaying): String {
+        val stateLabel = if (paused || !isPlaying) "Duraklatıldı" else "Oynatılıyor"
+        val bufSec = formatCommaOneDecimal(bufferedDurationMs.coerceAtLeast(0L) / 1000.0)
+        val latSec = formatCommaOneDecimal(liveOffsetMs.coerceAtLeast(0L) / 1000.0)
+        return "$stateLabel · Tampon: $bufSec s · Gecikme: $latSec s"
+    }
 }

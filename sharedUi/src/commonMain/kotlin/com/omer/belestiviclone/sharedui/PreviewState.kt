@@ -66,11 +66,89 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var muted by mutableStateOf(false)
     var retry by mutableStateOf(0)
     var liveSyncRevision by mutableStateOf(0); private set
+    var seekBackRevision by mutableStateOf(0); private set
+    var isBehindLiveEdge by mutableStateOf(false)
+    var seekOffsetSeconds by mutableStateOf(0L); private set
     var channelSessionStartMs by mutableStateOf(System.currentTimeMillis()); private set
 
     fun syncLive() {
         paused = false
+        isBehindLiveEdge = false
+        seekOffsetSeconds = 0L
         liveSyncRevision++
+    }
+
+    fun togglePause() {
+        paused = !paused
+        if (!paused) {
+            isBehindLiveEdge = false
+            seekOffsetSeconds = 0L
+        }
+    }
+
+    fun seekInLiveWindow(fraction: Float) {
+        val clamped = fraction.coerceIn(0f, 1f)
+        if (clamped < 0.95f) {
+            paused = false
+            isBehindLiveEdge = true
+            seekOffsetSeconds = ((1f - clamped) * 60f).toLong().coerceAtLeast(5L)
+            seekBackRevision++
+        } else {
+            syncLive()
+        }
+    }
+
+    var numberInputBuffer by mutableStateOf(""); private set
+    private var numberInputJob: Job? = null
+
+    fun resolveChannelByNumber(number: Int): PreviewChannel? {
+        if (number <= 0) return null
+        val candidates = if (isRadioMode) {
+            radioChannels
+        } else {
+            visibleData.filtered(category, query)
+                .filter { !it.isAudioOrRadio }
+                .ifEmpty { visibleData.filtered("Tümü", "").filter { !it.isAudioOrRadio } }
+        }
+        return candidates.getOrNull(number - 1)
+    }
+
+    val numberInputTarget: PreviewChannel?
+        get() = numberInputBuffer.toIntOrNull()?.takeIf { it > 0 }?.let(::resolveChannelByNumber)
+
+    val numberInputLabel: String?
+        get() {
+            if (numberInputBuffer.isEmpty()) return null
+            val targetName = numberInputTarget?.name ?: "..."
+            return "ⓘ $numberInputBuffer › $targetName"
+        }
+
+    fun inputChannelDigit(digit: Int, autoCommitAfterDelay: Boolean = true) {
+        if (digit !in 0..9 || !normalLiveControls) return
+        numberInputBuffer = if (numberInputBuffer.length >= 4) digit.toString() else numberInputBuffer + digit
+        numberInputJob?.cancel()
+        if (autoCommitAfterDelay) {
+            numberInputJob = scope.launch {
+                delay(NumberInputTimeoutMs)
+                commitNumberInput()
+            }
+        }
+    }
+
+    fun commitNumberInput() {
+        numberInputJob?.cancel()
+        numberInputJob = null
+        val target = numberInputTarget
+        numberInputBuffer = ""
+        if (target != null) {
+            select(target.id)
+        }
+    }
+
+    fun clearNumberInput() {
+        numberInputJob?.cancel()
+        numberInputJob = null
+        numberInputBuffer = ""
     }
 
     fun livePlaybackProgress(nowEpochMs: Long = System.currentTimeMillis()): EpgLiveProgress {
@@ -269,14 +347,34 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     val normalLiveControls get() = loaded && page == "live" && dialog == null && !searching &&
         query.isEmpty() && moving == null && draft == null && multi == null && !busy
     val canRevealLiveControls get() = normalLiveControls && !panel
-    val liveHeadingVisible get() = page == "live" && panel
+    val liveHeadingVisible get() = page == "live" && panel && dialog != "format"
     fun revealLiveControls() { if (canRevealLiveControls) panel = true }
     fun openFormatMenu() {
         if (busy) return
-        dialog = if (dialog == "format") null else "format"
+        if (dialog == "format") {
+            dialog = null
+        } else {
+            if (page == "live") {
+                info = false
+                panel = true
+            }
+            dialog = "format"
+        }
+    }
+    fun selectLiveFormat(value: String, closeMenu: Boolean = false) {
+        commit(data.withPref("format", value)) {
+            if (closeMenu) dialog = null
+        }
     }
     fun toggleInfo() {
-        if (page == "live") info = !info
+        if (page == "live") {
+            val next = !info
+            info = next
+            if (next) {
+                panel = false
+                dialog = null
+            }
+        }
     }
     fun cycleLiveFormat() {
         if (!normalLiveControls) return
@@ -308,7 +406,11 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { sessionOnly = true; storage = "Yalnız bu oturumda"; notice = "Yerel kayıt açılamadı. Değişiklikler yalnız bu oturumda tutulacak." }
         demo = data
+        isRadioMode = false
         selected = data.startup(data.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
+        if (data.channels.find { it.id == selected }?.isAudioOrRadio == false) {
+            lastTvChannel = selected
+        }
         if (publicStore != null) {
             try { publicData = publicStore.load(); switchProfile(true) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -339,8 +441,12 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (busy) return
         if (isPublic) publicData = data else demo = data
         val next = if (public) publicData ?: return else demo
+        isRadioMode = false
         data = next; category = if (public) "Tümü" else "Favoriler"
         selected = next.startup(next.preferences["lastChannel"]?.let { runCatching { PreviewCodec.id(it) }.getOrNull() }) ?: selected
+        if (next.channels.find { it.id == selected }?.isAudioOrRadio == false) {
+            lastTvChannel = selected
+        }
         leaveLiveLayers(); panel = true; dialog = null; multi = null
         storage = "$profileName · yerel kayıt"
         page = "live"
@@ -400,7 +506,13 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             channelSessionStartMs = System.currentTimeMillis()
         }
         selected = id
+        val targetCh = data.channels.find { it.id == id }
+        if (targetCh != null && !targetCh.isAudioOrRadio) {
+            lastTvChannel = id
+        }
         paused = false
+        isBehindLiveEdge = false
+        seekOffsetSeconds = 0L
         if (page == "live" && !isRadioMode && !keepPanel) {
             panel = false
             showZapCard()
@@ -411,15 +523,21 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     /** Called by a real first-frame/audio-advancing event, never by focus or channel selection. */
     fun played(id: OpaqueId) {
-        if (busy || data.channels.none { it.id == id && it.available }) return
-        val next = data.withPref("lastChannel", PreviewCodec.id(id)).let {
+        val ch = data.channels.find { it.id == id && it.available } ?: return
+        if (busy) return
+        val tvFallback = if (!ch.isAudioOrRadio) id else lastTvChannel?.takeIf { tvId ->
+            data.channels.any { c -> c.id == tvId && c.available && !c.isAudioOrRadio }
+        }
+        val next = data.withPref("lastChannel", PreviewCodec.id(id)).let { d ->
+            if (tvFallback != null) d.withPref("lastTvChannel", PreviewCodec.id(tvFallback)) else d
+        }.let {
             if (it.pref("history") == "Açık") it.copy(history = listOf(id) + it.history.filter { old -> old != id }) else it
         }
         if (next != data) commit(next)
     }
     private fun leaveLiveLayers() {
         searching = false; query = ""; categoryMenu = false; info = false
-        moving = null; draft = null
+        moving = null; draft = null; clearNumberInput()
     }
     fun settings() { cancelOpacity(); leaveLiveLayers(); origin = page; page = "settings"; dialog = null }
     fun dismiss() {
@@ -876,3 +994,5 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
     }
 }
+
+const val NumberInputTimeoutMs = 2500L

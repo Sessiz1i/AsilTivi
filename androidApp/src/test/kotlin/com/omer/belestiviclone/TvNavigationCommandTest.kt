@@ -43,4 +43,12 @@ class TvNavigationCommandTest {
             assertNull(tvNavigationCommand(key))
         }
     }
+    @Test fun digitAndNumpadKeysMapToZeroThroughNine() {
+        for (d in 0..9) {
+            assertEquals(d, tvDigitFromKeyCode(KeyEvent.KEYCODE_0 + d))
+            assertEquals(d, tvDigitFromKeyCode(KeyEvent.KEYCODE_NUMPAD_0 + d))
+        }
+        assertNull(tvDigitFromKeyCode(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertNull(tvDigitFromKeyCode(KeyEvent.KEYCODE_A))
+    }
 }

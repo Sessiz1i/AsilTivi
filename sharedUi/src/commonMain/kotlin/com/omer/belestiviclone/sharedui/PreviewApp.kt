@@ -328,7 +328,11 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             }
             val liveProgress = currentEpg.liveProgress(nowEpochMs, s.channelSessionStartMs)
             val playerTimeText = liveProgress.elapsedLabel
-            val playerProgressFraction = liveProgress.progress
+            val playerProgressFraction = if (s.isBehindLiveEdge && s.seekOffsetSeconds > 0L) {
+                (liveProgress.progress - 0.18f).coerceIn(0.05f, 0.85f)
+            } else {
+                liveProgress.progress
+            }
 
             val barStartPadding = if (vertical) {
                 val pWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
@@ -359,16 +363,25 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 PlayerSeekBar(
                     progress = playerProgressFraction,
                     color = theme.seekbarColor,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onSeek = { fraction -> s.seekInLiveWindow(fraction) }
                 )
 
+                val isPaused = s.paused
+                val isBehind = !isPaused && s.isBehindLiveEdge
+                val (liveBtnLabel, _) = liveControlLabels(isPaused, s.isBehindLiveEdge)
+                val liveBtnHighlight = isPaused || isBehind
                 PlayerActionButton(
-                    label = "Canlı",
-                    iconContent = { Box(Modifier.size(7.dp).background(Color(0xFFE53935), CircleShape)) },
-                    click = {
-                        s.paused = false
-                        s.syncLive()
-                    }
+                    label = liveBtnLabel,
+                    textColor = if (liveBtnHighlight) Color(0xFFFFD54F) else Color.White,
+                    tint = if (liveBtnHighlight) Color(0x3DFFC107) else Color(0x2EFFFFFF),
+                    stroke = if (liveBtnHighlight) Color(0x99FFC107) else Color(0x3DFFFFFF),
+                    iconContent = {
+                        if (!liveBtnHighlight) {
+                            Box(Modifier.size(7.dp).background(Color(0xFFE53935), CircleShape))
+                        }
+                    },
+                    click = { s.syncLive() }
                 )
 
                 val isMuted = s.muted
@@ -378,11 +391,18 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     click = { s.muted = !s.muted }
                 )
 
-                val isPaused = s.paused
                 PlayerActionButton(
                     label = if (isPaused) "Oynat" else "Duraklat",
-                    iconContent = { BasicText(if (isPaused) "▶" else "⏸", style = TextStyle(fontSize = 10.sp, color = Color.White)) },
-                    click = { s.paused = !s.paused }
+                    textColor = if (isPaused) Color(0xFF66BB6A) else Color.White,
+                    tint = if (isPaused) Color(0x3D2E7D32) else Color(0x2EFFFFFF),
+                    stroke = if (isPaused) Color(0x994CAF50) else Color(0x3DFFFFFF),
+                    iconContent = {
+                        BasicText(
+                            if (isPaused) "▶" else "⏸",
+                            style = TextStyle(fontSize = 10.sp, color = if (isPaused) Color(0xFF66BB6A) else Color.White)
+                        )
+                    },
+                    click = { s.togglePause() }
                 )
             }
         }
@@ -391,8 +411,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 kotlinx.coroutines.delay(10_000)
                 s.info = false
             }
-            val align = when (s.data.pref("position")) { "Sol" -> Alignment.BottomStart; "Sağ" -> Alignment.BottomEnd; else -> Alignment.BottomCenter }
-            val factor = when (s.data.pref("size")) { "Küçük" -> .75f; "Büyük" -> 1.25f; else -> 1f }
+            val align = zapCardAlignment(s.data.pref("position"))
+            val factor = zapCardScale(s.data.pref("size"))
             ChannelInfoPanel(
                 s = s,
                 qualityInfo = qualityInfo,
@@ -402,8 +422,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 modifier = Modifier
                     .align(align)
                     .onGloballyPositioned { boundsObserver("channel-info", it.boundsInWindow()) }
-                    .padding(bottom = if (s.panel && !vertical) panelHeight + 18.dp else 20.dp, start = 16.dp, end = 16.dp)
-                    .width((435.dp * factor).coerceAtMost(maxWidth - 32.dp))
+                    .padding(bottom = if (s.panel && !vertical) panelHeight + 62.dp else 22.dp, start = 20.dp, end = 20.dp)
+                    .width((440.dp * factor).coerceAtMost(maxWidth - 32.dp))
             )
         }
         var zapVisible by remember { mutableStateOf(false) }
@@ -420,15 +440,57 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             val zapModel = remember(s.zapCardRevision, s.selected, s.epgRevision, s.technicalInfo) {
                 zapCardModel(s.channel, s.channelNumber, s.epgNowNext(s.channel, zapNow), s.technicalInfo, zapNow)
             }
-            val zapWidth = if (maxWidth < 600.dp) maxWidth - 24.dp else (maxWidth * .5f).coerceAtMost(640.dp)
-            ZapCard(zapModel, theme, image, Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp)
-                .onGloballyPositioned { boundsObserver("zap-card", it.boundsInWindow()) }.width(zapWidth))
+            val posPref = s.data.pref("position")
+            val sizePref = s.data.pref("size")
+            val zapAlign = zapCardAlignment(posPref)
+            val zapScale = zapCardScale(sizePref)
+            val zapWidth = zapCardWidthDp(sizePref, maxWidth.value).dp
+            ZapCard(
+                model = zapModel,
+                theme = theme,
+                image = image,
+                modifier = Modifier
+                    .align(zapAlign)
+                    .padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
+                    .onGloballyPositioned { boundsObserver("zap-card", it.boundsInWindow()) }
+                    .width(zapWidth),
+                scale = zapScale
+            )
+        }
+        val numLabel = s.numberInputLabel
+        if (numLabel != null && s.page == "live" && s.dialog == null && s.multi == null) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 36.dp)
+                    .onGloballyPositioned { boundsObserver("number-input-pill", it.boundsInWindow()) }
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xF01565C0), Color(0xF01E88E5))),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .border(1.5.dp, Color(0xB390CAF9), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 22.dp, vertical = 10.dp)
+            ) {
+                Label(numLabel, 15, Color.White, bold = true, maxLines = 1)
+            }
         }
         if (s.moving != null) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 25.dp).background(Color(0xFF243F66), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp)); Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
         }
     }
 }
+
+/** Oynatıcı alt barındaki Canlı ve Oynat/Duraklat buton metinlerini saf olarak hesaplar. */
+fun liveControlLabels(paused: Boolean, isBehindLiveEdge: Boolean): Pair<String, String> {
+    val liveText = when {
+        paused -> "|| Yayın Durduruldu"
+        isBehindLiveEdge -> "● ⏩ Canlıya Dön"
+        else -> "Canlı"
+    }
+    val playPauseText = if (paused) "▶ Oynat" else "⏸ Duraklat"
+    return liveText to playPauseText
+}
+
 @Composable
 private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: Long, factor: Float, image: @Composable (String, Modifier) -> Unit, modifier: Modifier) {
     val t = s.technicalInfo
@@ -442,10 +504,10 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
     val nextText = nextProg?.let { "${it.title} (${it.timeRangeLabel()})" } ?: "Program Bilgisi Bulunamadı"
     Column(
         modifier
-            .background(Color(0xE608111E), RoundedCornerShape(12.dp))
-            .border(1.dp, Color(0xFF2B3E58), RoundedCornerShape(12.dp))
-            .pointerInput(Unit) { detectTapGestures { s.info = false } }
-            .padding((12 * factor).dp),
+            .background(Color(0xEC0B1320), RoundedCornerShape((14 * factor).dp))
+            .border(1.dp, Color(0xFF2E4360), RoundedCornerShape((14 * factor).dp))
+            .pointerInput(Unit) { detectTapGestures { s.panel = true } }
+            .padding((13 * factor).dp),
         verticalArrangement = Arrangement.spacedBy((8 * factor).dp)
     ) {
         Row(
@@ -455,8 +517,8 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
         ) {
             Box(
                 Modifier
-                    .size((56 * factor).dp)
-                    .background(Color(0xFF13233D), RoundedCornerShape(10.dp))
+                    .size((58 * factor).dp)
+                    .background(Color(0xFF13233D), RoundedCornerShape((10 * factor).dp))
                     .padding((6 * factor).dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -470,21 +532,21 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
                 ) {
                     Box(
                         Modifier
-                            .background(Color(0xFF1E3557), RoundedCornerShape(5.dp))
+                            .background(Color(0xFF1E3557), RoundedCornerShape((5 * factor).dp))
                             .padding(horizontal = (6 * factor).dp, vertical = (2 * factor).dp)
                     ) {
-                        Label("#${s.channelNumber}", (10 * factor).toInt(), Color(0xFFFFD735), bold = true)
+                        Label("#${s.channelNumber}", (10 * factor).toInt().coerceAtLeast(8), Color(0xFFFFD735), bold = true)
                     }
-                    Label(s.channel?.name ?: "", (16 * factor).toInt(), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
+                    Label(s.channel?.name ?: "", (16 * factor).toInt().coerceAtLeast(12), Color.White, Modifier.weight(1f), bold = true, maxLines = 1)
                     if (!s.channel?.category.isNullOrEmpty()) {
-                        Label(s.channel?.category.orEmpty(), (9 * factor).toInt(), Color(0xFF86C9EF), bold = true, maxLines = 1)
+                        Label(s.channel?.category.orEmpty(), (9 * factor).toInt().coerceAtLeast(8), Color(0xFF86C9EF), bold = true, maxLines = 1)
                     }
                     Box(
                         Modifier
-                            .background(amber, RoundedCornerShape(5.dp))
+                            .background(amber, RoundedCornerShape((5 * factor).dp))
                             .padding(horizontal = (6 * factor).dp, vertical = (2 * factor).dp)
                     ) {
-                        Label(t.resolutionBadge, (9 * factor).toInt(), Color.White, bold = true)
+                        Label(t.resolutionBadge, (9 * factor).toInt().coerceAtLeast(8), Color.White, bold = true)
                     }
                 }
                 Row(
@@ -492,18 +554,18 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Label("Şimdi: $programTitle", (11 * factor).toInt(), Color(0xFFFFD735), Modifier.weight(1f), bold = true, maxLines = 1)
+                    Label("Şimdi: $programTitle", (11 * factor).toInt().coerceAtLeast(9), Color(0xFFFFD735), Modifier.weight(1f), bold = true, maxLines = 1)
                     Row(horizontalArrangement = Arrangement.spacedBy((4 * factor).dp), verticalAlignment = Alignment.CenterVertically) {
-                        Label(timeRangeText, (9 * factor).toInt(), Color(0xFFB0BEC5))
+                        Label(timeRangeText, (9 * factor).toInt().coerceAtLeast(8), Color(0xFFB0BEC5))
                         if (progressPercentText != null) {
-                            Label(progressPercentText, (9 * factor).toInt(), Color(0xFFFFD735), bold = true)
+                            Label(progressPercentText, (9 * factor).toInt().coerceAtLeast(8), Color(0xFFFFD735), bold = true)
                         }
                     }
                 }
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height((3 * factor).dp)
+                        .height((3.5f * factor).dp)
                         .background(Color(0xFF223651), RoundedCornerShape(2.dp))
                 ) {
                     Box(
@@ -513,36 +575,21 @@ private fun ChannelInfoPanel(s: PreviewState, qualityInfo: String, nowEpochMs: L
                             .background(Color(0xFFFFD735), RoundedCornerShape(2.dp))
                     )
                 }
-                if (!nowProg?.desc.isNullOrBlank()) {
-                    Label(nowProg?.desc.orEmpty(), (9 * factor).toInt(), Color(0xFFCBD5E1), maxLines = 1)
-                }
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Label("Sonra: $nextText", (10 * factor).toInt(), Color(0xFF86C9EF), Modifier.weight(1f), maxLines = 1)
-                    Label("Oran: ${s.data.pref("format").substringBefore(" (")}", (9 * factor).toInt(), Color(0xFF94A2B7))
+                    Label("Sonra: $nextText", (10 * factor).toInt().coerceAtLeast(8), Color(0xFF86C9EF), Modifier.weight(1f), maxLines = 1)
+                    Label(EpgDateTime.formatHhMm(nowEpochMs), (12 * factor).toInt().coerceAtLeast(9), Color(0xFFFFD735), bold = true)
                 }
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x33FFFFFF)))
-        Column(verticalArrangement = Arrangement.spacedBy((3 * factor).dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Label("Çözünürlük: ${t.resolutionLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
-                Label("Kare Hızı: ${t.fpsLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
-                Label("Video Codec: ${t.videoCodecLabel}", (9 * factor).toInt(), Color(0xFFE2E8F0), bold = true)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Label("Ses Formatı: ${t.audioFormatLabel}", (9 * factor).toInt(), Color(0xFFB8C7DC))
-                Label("Bitrate: ${t.bitrateLabel}", (9 * factor).toInt(), Color(0xFFFFD735), bold = true)
-            }
-            if (qualityInfo.isNotBlank()) {
-                val extraLine = qualityInfo.lineSequence().drop(2).joinToString(" · ")
-                if (extraLine.isNotBlank()) {
-                    Label(extraLine, (8 * factor).toInt(), Color(0xFF8A9AB0), maxLines = 1)
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy((3.5f * factor).dp)) {
+            Label(t.v41VideoLine, (10 * factor).toInt().coerceAtLeast(8), Color(0xFFE2E8F0), bold = true, maxLines = 1)
+            Label(t.v41AudioLine, (10 * factor).toInt().coerceAtLeast(8), Color(0xFFB8C7DC), maxLines = 1)
+            Label(t.v41PlaybackLine(s.paused), (10 * factor).toInt().coerceAtLeast(8), Color(0xFFFFD735), bold = true, maxLines = 1)
         }
     }
 }
@@ -560,12 +607,23 @@ private fun handleChooseCategory(s: PreviewState, cat: String) {
 }
 
 @Composable
-private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Modifier) {
+private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Modifier, onSeek: ((Float) -> Unit)? = null) {
     val clamped = progress.coerceIn(0f, 1f)
     Box(
         modifier = modifier
             .height(20.dp)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(
+                if (onSeek != null) {
+                    Modifier.pointerInput(onSeek) {
+                        detectTapGestures { offset ->
+                            if (size.width > 0) {
+                                onSeek((offset.x / size.width.toFloat()).coerceIn(0f, 1f))
+                            }
+                        }
+                    }
+                } else Modifier
+            ),
         contentAlignment = Alignment.CenterStart
     ) {
         Box(
@@ -603,19 +661,27 @@ private fun PlayerSeekBar(progress: Float, color: Color, modifier: Modifier = Mo
 }
 
 @Composable
-private fun PlayerActionButton(label: String, iconContent: @Composable () -> Unit, modifier: Modifier = Modifier, click: () -> Unit) {
+private fun PlayerActionButton(
+    label: String,
+    iconContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    textColor: Color = Color.White,
+    tint: Color = Color(0x2EFFFFFF),
+    stroke: Color = Color(0x3DFFFFFF),
+    click: () -> Unit
+) {
     Action(
         label = label,
         modifier = modifier.height(26.dp),
-        tint = Color(0x2EFFFFFF),
+        tint = tint,
         radius = 13.dp,
-        stroke = Color(0x3DFFFFFF),
+        stroke = stroke,
         strokeWidth = 1.dp,
         padding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
         content = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 iconContent()
-                Label(label, 10, Color.White, bold = true)
+                Label(label, 10, textColor, bold = true)
             }
         },
         click = click
@@ -1445,13 +1511,82 @@ private fun ExitDialog(s: PreviewState, image: @Composable (String, Modifier) ->
     }
 }
 @Composable
+private fun LiveFormatStrip(s: PreviewState) {
+    val selectedRequester = remember { FocusRequester() }
+    val boundsObserver = LocalBoundsObserver.current
+    val currentFormat = s.data.pref("format")
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { detectTapGestures { s.dismiss() } }
+            .semantics { paneTitle = "GÖRÜNTÜ ORANI" }
+    ) {
+        Row(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 56.dp, start = 50.dp, end = 18.dp)
+                .onGloballyPositioned { boundsObserver("format-strip", it.boundsInWindow()) }
+                .background(Color(0xEB0D1829), RoundedCornerShape(22.dp))
+                .border(1.dp, Color(0x664A6585), RoundedCornerShape(22.dp))
+                .pointerInput(Unit) { detectTapGestures { } }
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 9.dp, vertical = 6.dp)
+                .focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LiveFormatOptions.forEachIndexed { index, option ->
+                val chosen = isVideoFormatSelected(currentFormat, option)
+                val isInitialFocus = chosen || (LiveFormatOptions.none { isVideoFormatSelected(currentFormat, it) } && index == 0)
+                val visibleText = if (chosen) "✓ $option" else option
+                Action(
+                    label = option,
+                    modifier = Modifier
+                        .height(31.dp)
+                        .then(if (isInitialFocus) Modifier.focusRequester(selectedRequester) else Modifier),
+                    selected = chosen,
+                    enabled = !s.busy,
+                    tint = Color.Transparent,
+                    selectedTint = Color(0xFF284264),
+                    radius = 15.dp,
+                    stroke = if (chosen) Color(0xFF6B93C0) else Color.Transparent,
+                    strokeWidth = if (chosen) 1.dp else 0.dp,
+                    focusColor = Color(0xFFFFB300),
+                    padding = PaddingValues(horizontal = 11.dp, vertical = 5.dp),
+                    extraKey = { e ->
+                        if (!s.busy && e.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) {
+                            if (e.type == KeyEventType.KeyUp) {
+                                s.selectLiveFormat(option, closeMenu = true)
+                            }
+                            true
+                        } else false
+                    },
+                    content = {
+                        Label(
+                            visibleText,
+                            11,
+                            color = if (chosen) Color.White else Color(0xFFD6E0EE),
+                            bold = true,
+                            maxLines = 1
+                        )
+                    },
+                    click = { s.selectLiveFormat(option, closeMenu = false) }
+                )
+            }
+        }
+        LaunchedEffect(Unit) { runCatching { selectedRequester.requestFocus() } }
+    }
+}
+
+@Composable
 private fun Modal(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
     val kind = s.dialog ?: return
     if (kind == "exit") { ExitDialog(s, image); return }
     if (kind == "webTransfer") { WebTransferDialog(s, image); return }
     if (kind == "networkDiagnostics") { NetworkDiagnosticsDialog(s, image); return }
     if (kind in sourceFormKinds || kind == "categories") return
-    if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), if (kind == "format" && s.page == "live") "GÖRÜNTÜ ORANI" else optionHeading(kind)); return }
+    if (kind == "format" && s.page == "live") { LiveFormatStrip(s); return }
+    if (kind in choices) { OptionPicker(s, kind, choices.getValue(kind), optionHeading(kind)); return }
     if (kind == "warning") { MultiWarning(s, image); return }
     if (kind == "layout") { LayoutChooser(s, image); return }
     if (kind == "assign") { MultiChannelPicker(s, image); return }
