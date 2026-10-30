@@ -1196,6 +1196,23 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
             s.touchPanelInteraction()
         }
     }
+    var lockedScroll by remember(s.moving, vertical) {
+        mutableStateOf(listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset)
+    }
+    LaunchedEffect(s.moving, s.draft, vertical) {
+        val movingId = s.moving ?: return@LaunchedEffect
+        if (listState.firstVisibleItemIndex != lockedScroll.first ||
+            listState.firstVisibleItemScrollOffset != lockedScroll.second
+        ) {
+            listState.scrollToItem(lockedScroll.first, lockedScroll.second)
+        }
+        val movingIndex = values.indexOfFirst { it.id == movingId }
+        val visible = listState.layoutInfo.visibleItemsInfo
+        if (movingIndex >= 0 && visible.isNotEmpty() && visible.none { it.index == movingIndex }) {
+            listState.scrollToItem(movingIndex)
+            lockedScroll = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }
+    }
     LaunchedEffect(s.selected, values.size, s.panel, vertical) {
         val index = values.indexOfFirst { it.id == s.selected }
         if (!s.searching && s.moving == null && index >= 0) {
@@ -1280,7 +1297,10 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         else -> Color(0xFF6A92AF)
     }
 
-    var drag by remember { mutableStateOf(0f) }
+    var cardWindowOrigin by remember { mutableStateOf(Offset.Zero) }
+    var anchorWindowPos by remember { mutableStateOf(0f) }
+    val cardSpanPx = with(LocalDensity.current) { (if (vertical) 38.5.dp else 69.dp).toPx() }
+    val stepPx = with(LocalDensity.current) { (if (vertical) (38.5.dp + 5.dp) else (69.dp + 8.dp)).toPx() }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(s.dialog, s.moving, windowFocused, s.searching) { if (windowFocused && s.dialog == null && !s.searching && s.target == ch.id) requester.requestFocus() }
     LaunchedEffect(s.selected) {
@@ -1301,7 +1321,34 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
                     s.touchPanelInteraction()
                 }
             }
-            .then(if (isMoving) Modifier.pointerInput(ch.id, vertical) { detectDragGestures(onDragStart = { drag = 0f }, onDragEnd = { s.moveFinish() }, onDragCancel = { s.draft = null; s.moving = null }) { change, amount -> change.consume(); drag += if (vertical) amount.y else amount.x; if (abs(drag) > 45) { s.moveBy(if (drag > 0) 1 else -1); drag = 0f } } } else Modifier),
+            .onGloballyPositioned { cardWindowOrigin = it.boundsInWindow().topLeft }
+            .then(
+                if (isMoving) Modifier.pointerInput(ch.id, vertical, stepPx, cardSpanPx) {
+                    detectDragGestures(
+                        onDragStart = { _ ->
+                            anchorWindowPos = if (vertical) (cardWindowOrigin.y + cardSpanPx * 0.5f) else (cardWindowOrigin.x + cardSpanPx * 0.5f)
+                        },
+                        onDragEnd = { s.moveFinish() },
+                        onDragCancel = { s.draft = null; s.moving = null }
+                    ) { change, _ ->
+                        change.consume()
+                        s.touchPanelInteraction()
+                        val currentWindowPos = if (vertical) (cardWindowOrigin.y + change.position.y) else (cardWindowOrigin.x + change.position.x)
+                        val triggerThreshold = stepPx * 0.55f
+                        while (abs(currentWindowPos - anchorWindowPos) >= triggerThreshold && stepPx > 0f) {
+                            val delta = currentWindowPos - anchorWindowPos
+                            val dir = if (delta > 0f) 1 else -1
+                            val before = s.draft?.favorites
+                            s.moveBy(dir)
+                            if (s.draft?.favorites != before) {
+                                anchorWindowPos += dir * stepPx
+                            } else {
+                                break
+                            }
+                        }
+                    }
+                } else Modifier
+            ),
         focusKey = focusKey,
         selected = ch.id == s.selected || isMoving,
         tint = cardTint,

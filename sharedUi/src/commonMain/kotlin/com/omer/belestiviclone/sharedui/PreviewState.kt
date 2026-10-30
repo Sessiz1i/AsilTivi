@@ -880,20 +880,20 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         dialog = null
         if (isRadioMode) {
             radioCategory = "Favoriler"
-            touchPanelInteraction()
         }
+        touchPanelInteraction()
     }
 
     fun moveBy(delta: Int) {
         val id = moving ?: return
         val d = draft ?: return
-        if (isRadioMode) touchPanelInteraction()
+        touchPanelInteraction()
         draft = reorderFavoriteWithinGroup(d, id) { _, current -> current + delta }
     }
 
     fun moveFinish() {
         val next = draft ?: return
-        if (isRadioMode) touchPanelInteraction()
+        touchPanelInteraction()
         commit(next) {
             draft = null
             moving = null

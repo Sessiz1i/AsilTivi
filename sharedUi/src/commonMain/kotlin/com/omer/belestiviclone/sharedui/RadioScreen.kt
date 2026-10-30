@@ -32,9 +32,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -597,11 +599,31 @@ fun RadioScreen(
                     }
                 }
 
-                LaunchedEffect(s.selected, s.radioCategory, s.moving, s.visibleData.favorites) {
-                    val targetId = s.moving ?: s.selected
-                    val index = radioList.indexOfFirst { it.id == targetId }
-                    if (index >= 0) {
-                        listState.animateScrollToItem((index - 2).coerceAtLeast(0))
+                LaunchedEffect(s.selected, s.radioCategory) {
+                    if (s.moving == null) {
+                        val index = radioList.indexOfFirst { it.id == s.selected }
+                        if (index >= 0) {
+                            listState.animateScrollToItem((index - 2).coerceAtLeast(0))
+                        }
+                    }
+                }
+
+                var lockedScroll by remember(s.moving) {
+                    mutableStateOf(listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset)
+                }
+
+                LaunchedEffect(s.moving, s.draft) {
+                    val movingId = s.moving ?: return@LaunchedEffect
+                    if (listState.firstVisibleItemIndex != lockedScroll.first ||
+                        listState.firstVisibleItemScrollOffset != lockedScroll.second
+                    ) {
+                        listState.scrollToItem(lockedScroll.first, lockedScroll.second)
+                    }
+                    val movingIndex = radioList.indexOfFirst { it.id == movingId }
+                    val visible = listState.layoutInfo.visibleItemsInfo
+                    if (movingIndex >= 0 && visible.isNotEmpty() && visible.none { it.index == movingIndex }) {
+                        listState.scrollToItem(movingIndex)
+                        lockedScroll = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
                     }
                 }
 
@@ -697,7 +719,10 @@ private fun RadioStationCard(
         returns?.registry?.requester(focusKey) { FocusRequester() } ?: FocusRequester()
     }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
-    var drag by remember { mutableStateOf(0f) }
+    var cardWindowOrigin by remember { mutableStateOf(Offset.Zero) }
+    var anchorWindowPos by remember { mutableStateOf(0f) }
+    val cardSpanPx = with(LocalDensity.current) { 88.dp.toPx() }
+    val stepPx = with(LocalDensity.current) { (88.dp + 8.dp).toPx() }
 
     LaunchedEffect(s.dialog, s.moving, s.target, windowFocused) {
         if (windowFocused && s.dialog == null && (s.target == station.id || s.moving == station.id)) {
@@ -724,18 +749,30 @@ private fun RadioStationCard(
         modifier = Modifier
             .width(88.dp)
             .fillMaxHeight()
+            .onGloballyPositioned { cardWindowOrigin = it.boundsInWindow().topLeft }
             .then(
-                if (isMoving) Modifier.pointerInput(station.id) {
+                if (isMoving) Modifier.pointerInput(station.id, stepPx, cardSpanPx) {
                     detectDragGestures(
-                        onDragStart = { drag = 0f },
+                        onDragStart = { _ ->
+                            anchorWindowPos = cardWindowOrigin.x + cardSpanPx * 0.5f
+                        },
                         onDragEnd = { s.moveFinish() },
                         onDragCancel = { s.draft = null; s.moving = null }
-                    ) { change, amount ->
+                    ) { change, _ ->
                         change.consume()
-                        drag += amount.x
-                        if (kotlin.math.abs(drag) > 45f) {
-                            s.moveBy(if (drag > 0f) 1 else -1)
-                            drag = 0f
+                        s.touchPanelInteraction()
+                        val currentWindowPos = cardWindowOrigin.x + change.position.x
+                        val triggerThreshold = stepPx * 0.55f
+                        while (kotlin.math.abs(currentWindowPos - anchorWindowPos) >= triggerThreshold && stepPx > 0f) {
+                            val delta = currentWindowPos - anchorWindowPos
+                            val dir = if (delta > 0f) 1 else -1
+                            val before = s.draft?.favorites
+                            s.moveBy(dir)
+                            if (s.draft?.favorites != before) {
+                                anchorWindowPos += dir * stepPx
+                            } else {
+                                break
+                            }
                         }
                     }
                 } else Modifier
