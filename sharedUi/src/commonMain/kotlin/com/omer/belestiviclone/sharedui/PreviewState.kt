@@ -778,6 +778,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             channelSessionStartMs = System.currentTimeMillis()
         }
         selected = id
+        target = null
         val targetCh = data.channels.find { it.id == id }
         if (targetCh != null && !targetCh.isAudioOrRadio) {
             lastTvChannel = id
@@ -801,6 +802,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
                     touchPanelInteraction()
                 } else {
                     panel = false
+                    categoryMenu = false
                     showZapCard()
                 }
             }
@@ -825,7 +827,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     private fun leaveLiveLayers() {
         searching = false; query = ""; categoryMenu = false; info = false
-        moving = null; draft = null; clearNumberInput()
+        moving = null; draft = null; target = null; clearNumberInput()
     }
     fun settings() { cancelOpacity(); leaveLiveLayers(); origin = page; page = "settings"; dialog = null }
     fun dismiss() {
@@ -971,9 +973,9 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
                 showZapCard()
             }
             page == "live" && info -> info = false
-            page == "live" && isRadioMode && panel -> panel = false
+            page == "live" && isRadioMode && panel -> { panel = false; target = null }
             page == "live" && isRadioMode -> dialog = "exit"
-            page == "live" && panel -> panel = false
+            page == "live" && panel -> { panel = false; categoryMenu = false; target = null }
             page == "live" -> dialog = "exit"
         }
     }

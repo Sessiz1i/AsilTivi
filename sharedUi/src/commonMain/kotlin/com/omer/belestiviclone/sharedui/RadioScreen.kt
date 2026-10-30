@@ -590,8 +590,12 @@ fun RadioScreen(
                 }
 
                 // Yatay Kaydırılabilir Radyo İstasyon Kartları (11-radyo.png referansına uygun)
-                val listState = rememberLazyListState()
                 val radioList = s.filteredRadioChannels
+                val initialRadioIdx = remember(s.radioCategory) {
+                    val idx = radioList.indexOfFirst { it.id == s.selected }
+                    if (idx >= 0) (idx - 2).coerceAtLeast(0) else 0
+                }
+                val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialRadioIdx)
 
                 LaunchedEffect(listState.isScrollInProgress) {
                     if (listState.isScrollInProgress) {
@@ -599,11 +603,11 @@ fun RadioScreen(
                     }
                 }
 
-                LaunchedEffect(s.selected, s.radioCategory) {
-                    if (s.moving == null) {
+                LaunchedEffect(s.panel, s.selected, s.radioCategory) {
+                    if (s.panel && s.moving == null) {
                         val index = radioList.indexOfFirst { it.id == s.selected }
                         if (index >= 0) {
-                            listState.animateScrollToItem((index - 2).coerceAtLeast(0))
+                            listState.scrollToItem((index - 2).coerceAtLeast(0))
                         }
                     }
                 }
@@ -660,6 +664,7 @@ fun RadioScreen(
                             RadioStationCard(
                                 s = s,
                                 station = station,
+                                theme = theme,
                                 rankNumber = rankNumber,
                                 isSelected = isSelected,
                                 isFavorite = isFav,
@@ -705,6 +710,7 @@ fun RadioScreen(
 private fun RadioStationCard(
     s: PreviewState,
     station: PreviewChannel,
+    theme: ThemeConfig,
     rankNumber: Int? = null,
     isSelected: Boolean,
     isFavorite: Boolean,
@@ -724,8 +730,9 @@ private fun RadioStationCard(
     val cardSpanPx = with(LocalDensity.current) { 88.dp.toPx() }
     val stepPx = with(LocalDensity.current) { (88.dp + 8.dp).toPx() }
 
-    LaunchedEffect(s.dialog, s.moving, s.target, windowFocused) {
-        if (windowFocused && s.dialog == null && (s.target == station.id || s.moving == station.id)) {
+    val focusTargetId = s.moving ?: s.target ?: s.selected
+    LaunchedEffect(s.panel, s.dialog, s.moving, s.target, s.selected, s.radioCategory, windowFocused) {
+        if (windowFocused && s.panel && s.dialog == null && station.id == focusTargetId) {
             runCatching { requester.requestFocus() }
             withFrameNanos { }
             runCatching { requester.requestFocus() }
@@ -734,13 +741,13 @@ private fun RadioStationCard(
 
     val borderColor = when {
         isMoving -> Color(0xFFFFCF37)
-        isSelected -> amber
-        else -> Color(0xFF283A4E)
+        isSelected -> theme.cardSelectedStroke
+        else -> theme.settingsCardBorder
     }
     val bgColor = when {
         isMoving -> Color(0xCCA77919)
-        isSelected -> Color(0x99A75F19)
-        else -> Color(0xDD0D1B2A)
+        isSelected -> theme.focusFill.copy(alpha = 0.85f)
+        else -> if (theme.isCardFlat) Color(0xDD0D1B2A) else theme.cardBackground.copy(alpha = 0.88f)
     }
     val displayTitle = if (rankNumber != null) "$rankNumber. ${station.name}" else station.name
 
@@ -779,9 +786,11 @@ private fun RadioStationCard(
             ),
         selected = isSelected || isMoving,
         tint = bgColor,
+        selectedTint = bgColor,
         stroke = borderColor,
         strokeWidth = if (isMoving) 2.5.dp else if (isSelected) 2.dp else 1.dp,
-        focusColor = if (isMoving) Color(0xFFFFCF37) else Color.White,
+        focusColor = if (isMoving) Color(0xFFFFCF37) else theme.accentColor,
+        focusFill = if (isMoving) Color(0xCCA77919) else theme.focusFill,
         radius = 10.dp,
         padding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         long = onLongPress,
@@ -817,7 +826,7 @@ private fun RadioStationCard(
                     Label(
                         value = displayTitle,
                         size = 9,
-                        color = if (isMoving || isSelected) Color(0xFFFFD600) else Color.White,
+                        color = if (isMoving) Color(0xFFFFD600) else if (isSelected) theme.headingTitleColor else Color.White,
                         bold = isSelected || isMoving,
                         maxLines = 1
                     )

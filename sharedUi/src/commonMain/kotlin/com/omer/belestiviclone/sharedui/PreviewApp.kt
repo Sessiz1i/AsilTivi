@@ -119,7 +119,7 @@ internal fun Action(label: String, modifier: Modifier = Modifier, selected: Bool
                 true
             } else false
         }
-        .then(if (brush != null && !selected) Modifier.background(brush, RoundedCornerShape(radius)) else Modifier.background(if (selected) selectedTint else if (focused && effectiveFocusFill != null && !channelFocus) effectiveFocusFill else if (focused && channelFocus) Color(0x668A531B) else tint, RoundedCornerShape(radius)))
+        .then(if (brush != null && !selected) Modifier.background(brush, RoundedCornerShape(radius)) else Modifier.background(if (selected) selectedTint else if (focused && effectiveFocusFill != null && !channelFocus) effectiveFocusFill else if (focused && channelFocus) (effectiveFocusFill ?: Color(0x668A531B)) else tint, RoundedCornerShape(radius)))
         .then(if (strokeWidth > 0.dp || (focused && !horizontalFocus && !channelFocus)) Modifier.border(if (focused && !horizontalFocus && !channelFocus) 2.dp else strokeWidth, if (focused && !horizontalFocus && !channelFocus) effectiveFocusColor else stroke, RoundedCornerShape(radius)) else Modifier)
         .drawWithContent {
             drawContent()
@@ -328,11 +328,12 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             val canAutoDismiss = if (s.isRadioMode) {
                 s.panel && s.page == "live" && s.dialog == null && s.moving == null && !s.radioScreenDimmed
             } else {
-                s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.categoryMenu && !s.info
+                s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.info
             }
             if (canAutoDismiss) {
                 kotlinx.coroutines.delay(5000L)
                 s.panel = false
+                s.categoryMenu = false
             }
         }
         if (s.isRadioMode) {
@@ -346,6 +347,9 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             if (s.panel) {
                 val list = s.visibleData.filtered(s.category, s.query)
                 s.touchedFocusChannelId = if (list.any { it.id == s.selected }) s.selected else list.firstOrNull()?.id
+            } else {
+                s.categoryMenu = false
+                s.target = null
             }
         }
         val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
@@ -387,40 +391,117 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             if (vertical) {
                 val panelWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
                 val top = LiveSidebarTop.dp
-                val listHeight = (maxHeight - top - if (s.searching) 84.dp else 24.dp).coerceAtLeast(80.dp)
+                val bottomReserved = if (s.searching) 84.dp else 24.dp
+                val maxAvailHeight = (maxHeight - top - bottomReserved).coerceAtLeast(100.dp)
+                val densityCur = LocalDensity.current
+                val rowHPx = with(densityCur) { 38.dp.roundToPx() }
+                val rowGapPx = with(densityCur) { 5.dp.roundToPx() }
+                val padVPx = with(densityCur) { 8.dp.roundToPx() }
+                val boxPadVPx = padVPx * 2
+                val maxAvailPx = with(densityCur) { maxAvailHeight.roundToPx() }
+                val fullRows = ((maxAvailPx - boxPadVPx + rowGapPx) / (rowHPx + rowGapPx)).coerceAtLeast(2)
+                val snappedListHeightPx = boxPadVPx + (rowHPx * fullRows) + (rowGapPx * (fullRows - 1))
+                val snappedListHeight = with(densityCur) { snappedListHeightPx.toDp() }
                 val sidebarShape = RoundedCornerShape(12.dp)
-                val catListState = rememberLazyListState()
-                LaunchedEffect(catListState.isScrollInProgress) {
-                    if (catListState.isScrollInProgress) s.touchPanelInteraction()
+                if (s.categoryMenu) {
+                    val catItems = categories(s)
+                    val initialCatIdx = remember(s.category, catItems.size) {
+                        val idx = catItems.indexOfFirst {
+                            CategoryNormalizer.matches(it, s.category) ||
+                                (it == "FAVORİ TV" && s.category == "Favoriler") ||
+                                (it == "TÜMÜ" && s.category == "Tümü")
+                        }
+                        if (idx >= 0) (idx + 1 - 2).coerceAtLeast(0) else 0
+                    }
+                    val catListState = rememberLazyListState(initialFirstVisibleItemIndex = initialCatIdx)
+                    LaunchedEffect(catListState.isScrollInProgress) {
+                        if (catListState.isScrollInProgress) s.touchPanelInteraction()
+                    }
+                    LazyColumn(
+                        Modifier
+                            .onGloballyPositioned { boundsObserver("vertical-categories", it.boundsInWindow()) }
+                            .offset(13.dp, top)
+                            .width(128.dp)
+                            .height(snappedListHeight)
+                            .background(Color.Black.copy(alpha = opacity), sidebarShape)
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), sidebarShape)
+                            .clip(sidebarShape)
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        state = catListState,
+                        contentPadding = PaddingValues(0.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
+                        items(catItems) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
+                        item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
+                        item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                    }
                 }
-                LazyColumn(
-                    Modifier
-                        .offset(13.dp, top)
-                        .width(128.dp)
-                        .height(listHeight)
-                        .background(Color.Black.copy(alpha = opacity), sidebarShape)
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), sidebarShape)
-                        .clip(sidebarShape),
-                    state = catListState,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
-                    items(categories(s)) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
-                    item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
-                    item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                val channelPanelLeft = if (s.categoryMenu) 147.dp else 13.dp
+                val activeCatRaw = when {
+                    s.category.equals("Favoriler", ignoreCase = true) -> "FAVORİ TV"
+                    s.category.equals("Tümü", ignoreCase = true) -> "TÜMÜ"
+                    else -> s.category
+                }
+                val activeCatLabel = presentationText(activeCatRaw, LocalLanguage.current).let {
+                    if (LocalLanguage.current == "Türkçe") CategoryNormalizer.toTurkishUpper(it) else it.uppercase()
                 }
                 Column(
                     Modifier
                         .onGloballyPositioned { boundsObserver("vertical-panel", it.boundsInWindow()) }
-                        .offset(x = 147.dp, y = top)
+                        .offset(x = channelPanelLeft, y = top)
                         .width(panelWidth)
-                        .height(listHeight)
+                        .height(snappedListHeight)
                         .background(Color.Black.copy(alpha = opacity), sidebarShape)
                         .border(1.dp, Color.White.copy(alpha = 0.12f), sidebarShape)
                         .clip(sidebarShape)
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
-                    Channels(s, image, true, Modifier.fillMaxSize())
+                    Action(
+                        label = "Kategoriler: $activeCatLabel",
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        selected = s.categoryMenu,
+                        tint = theme.settingsPanelBg.copy(alpha = 0.92f),
+                        selectedTint = theme.focusFill,
+                        radius = 8.dp,
+                        stroke = if (s.categoryMenu) theme.accentColor else theme.settingsCardBorder,
+                        strokeWidth = 1.dp,
+                        focusColor = theme.accentColor,
+                        focusFill = theme.focusFill,
+                        padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        focusKey = "vertical:category-toggle",
+                        keyClick = {
+                            s.categoryMenu = !s.categoryMenu
+                            s.touchPanelInteraction()
+                        },
+                        content = {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    CategoryTabIcon(
+                                        activeCatRaw,
+                                        isMonochrome = theme.categoryTabPill,
+                                        color = theme.headingTitleColor
+                                    )
+                                    Label(activeCatLabel, 11, theme.headingTitleColor, bold = true, maxLines = 1)
+                                }
+                                Label(if (s.categoryMenu) "◂ Kategoriler" else "Kategoriler ▸", 10, Color(0xFFB0BEC5), bold = true)
+                            }
+                        },
+                        click = {
+                            s.categoryMenu = !s.categoryMenu
+                            s.touchPanelInteraction()
+                        }
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Channels(s, image, true, Modifier.fillMaxWidth().weight(1f))
                 }
                 if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
@@ -445,7 +526,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
 
             val barStartPadding = if (vertical) {
                 val pWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
-                val panelRightEdge = 147.dp + pWidth
+                val panelLeft = if (s.categoryMenu) 147.dp else 13.dp
+                val panelRightEdge = panelLeft + pWidth
                 panelRightEdge + 18.dp
             } else {
                 24.dp
@@ -1057,7 +1139,7 @@ private fun CategoryTabIcon(
     var isTabFocused by remember { mutableStateOf(false) }
     val favBorder = if (isFav && !theme.categoryTabPill) Color(0xFFFFD700) else Color.Transparent
     val selection = if (isTabFocused) {
-        Modifier.border(2.dp, Color(0xFFFFCF37), shape)
+        Modifier.border(2.dp, theme.accentColor, shape)
     } else if (isSelected) {
         Modifier.border(if (theme.categoryTabPill) 1.5.dp else 2.dp, theme.categoryTabSelectedStroke, shape)
     } else if (favBorder != Color.Transparent) {
@@ -1097,7 +1179,7 @@ private fun CategoryTabIcon(
     val returns = LocalFocusReturn.current
     val tabFocusKey = "cat:${CategoryNormalizer.canonicalKey(cat)}"
 
-    Action(cat, (if (vertical) Modifier.fillMaxWidth().heightIn(min = 30.dp) else Modifier.height(32.dp)).onFocusChanged { isTabFocused = it.isFocused }.clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, focusKey = tabFocusKey, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) tabFocusKey else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), onFocused = { s.touchPanelInteraction() }, keyClick = keyClick, extraKey = if (vertical) { e ->
+    Action(cat, (if (vertical) Modifier.fillMaxWidth().height(38.dp) else Modifier.height(32.dp)).onFocusChanged { isTabFocused = it.isFocused }.clip(shape).then(background).then(selection), tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, focusColor = theme.accentColor, channelFocus = true, focusKey = tabFocusKey, returnFocusKey = if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) tabFocusKey else null, padding = PaddingValues(horizontal = horizontalPadding, vertical = 3.dp), onFocused = { s.touchPanelInteraction() }, keyClick = keyClick, extraKey = if (vertical) { e ->
         if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) {
             val targetId = s.touchedFocusChannelId ?: s.selected
             val req = returns?.registry?.entryTarget("channel:${PreviewCodec.id(targetId)}", returns.active)
@@ -1112,7 +1194,7 @@ private fun CategoryTabIcon(
                 } else {
                     CategoryTabIcon(cat, isMonochrome = theme.categoryTabPill, color = textColor)
                 }
-                Label(label, 10, textColor, bold = true, maxLines = if (vertical) Int.MAX_VALUE else 1)
+                Label(label, 10, textColor, bold = true, maxLines = 1)
             }
         }
     }, click = click)
@@ -1189,7 +1271,11 @@ internal fun categories(s: PreviewState): List<String> {
 @Composable
 private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> Unit, vertical: Boolean, modifier: Modifier) {
     val values = s.visibleData.filtered(s.category, s.query)
-    val listState = key(vertical) { rememberLazyListState() }
+    val initialIdx = remember(vertical) {
+        val idx = values.indexOfFirst { it.id == s.selected }
+        if (idx >= 0) (idx - 2).coerceAtLeast(0) else 0
+    }
+    val listState = key(vertical) { rememberLazyListState(initialFirstVisibleItemIndex = initialIdx) }
     val returns = LocalFocusReturn.current
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
@@ -1237,8 +1323,18 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
                         runCatching { listState.scrollToItem(index, centerOffset) }
                     }
                 }
-            } else if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
-                listState.scrollToItem(index)
+            } else {
+                if (listState.layoutInfo.totalItemsCount == 0) {
+                    withFrameNanos { }
+                }
+                val visible = listState.layoutInfo.visibleItemsInfo
+                val vpStart = listState.layoutInfo.viewportStartOffset
+                val vpEnd = listState.layoutInfo.viewportEndOffset
+                val itemInfo = visible.find { it.index == index }
+                val fullyVisible = itemInfo != null && itemInfo.offset >= vpStart && (itemInfo.offset + itemInfo.size) <= vpEnd
+                if (!fullyVisible) {
+                    runCatching { listState.scrollToItem((index - 2).coerceAtLeast(0)) }
+                }
             }
         }
     }
@@ -1258,9 +1354,9 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
     val swipeThreshold = with(LocalDensity.current) { 44.dp.toPx() }
     val verticalModifier = if (s.moving == null) modifier.pointerInput(s.moving, swipeThreshold) {
         var distance = 0f
-        detectHorizontalDragGestures(onDragStart = { distance = 0f }, onDragCancel = { distance = 0f }, onDragEnd = { if (distance >= swipeThreshold) s.categoryMenu = true }) { change, amount -> change.consume(); distance += amount }
+        detectHorizontalDragGestures(onDragStart = { distance = 0f }, onDragCancel = { distance = 0f }, onDragEnd = { if (distance >= swipeThreshold) { s.categoryMenu = true; s.touchPanelInteraction() } }) { change, amount -> change.consume(); distance += amount }
     } else modifier
-    if (vertical) LazyColumn(verticalModifier.focusGroup(), state = listState, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { items(values, key = { PreviewCodec.id(it.id) }) { ChannelCard(s, it, image, true) } }
+    if (vertical) LazyColumn(verticalModifier.focusGroup(), state = listState, contentPadding = PaddingValues(0.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { items(values, key = { PreviewCodec.id(it.id) }) { ChannelCard(s, it, image, true) } }
     else LazyRow(modifier.focusGroup(), state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(values, key = { PreviewCodec.id(it.id) }) { ChannelCard(s, it, image, false) } }
 }
 @Composable
@@ -1299,12 +1395,16 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
 
     var cardWindowOrigin by remember { mutableStateOf(Offset.Zero) }
     var anchorWindowPos by remember { mutableStateOf(0f) }
-    val cardSpanPx = with(LocalDensity.current) { (if (vertical) 38.5.dp else 69.dp).toPx() }
-    val stepPx = with(LocalDensity.current) { (if (vertical) (38.5.dp + 5.dp) else (69.dp + 8.dp)).toPx() }
+    val cardSpanPx = with(LocalDensity.current) { (if (vertical) 38.dp else 69.dp).toPx() }
+    val stepPx = with(LocalDensity.current) { (if (vertical) (38.dp + 5.dp) else (69.dp + 8.dp)).toPx() }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(s.dialog, s.moving, windowFocused, s.searching) { if (windowFocused && s.dialog == null && !s.searching && s.target == ch.id) requester.requestFocus() }
-    LaunchedEffect(s.selected) {
-        if (windowFocused && s.dialog == null && !s.searching && s.selected == ch.id) requester.requestFocus()
+    LaunchedEffect(s.panel, s.selected, s.category, windowFocused) {
+        if (windowFocused && s.panel && s.dialog == null && !s.searching && s.moving == null && s.target == null && s.selected == ch.id) {
+            runCatching { requester.requestFocus() }
+            withFrameNanos { }
+            runCatching { requester.requestFocus() }
+        }
     }
     LaunchedEffect(s.categoryFirstCardFocusRevision) {
         if (s.categoryFirstCardFocusRevision > 0 && windowFocused && s.dialog == null && !s.searching && s.touchedFocusChannelId == ch.id) {
@@ -1313,7 +1413,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     }
     Action(
         number + ch.name,
-        (if (vertical) Modifier.fillMaxWidth().height(38.5.dp) else Modifier.width(69.dp).height(68.dp))
+        (if (vertical) Modifier.fillMaxWidth().height(38.dp) else Modifier.width(69.dp).height(68.dp))
             .onFocusChanged { focusState ->
                 isCardFocused = focusState.isFocused
                 if (focusState.isFocused) {
@@ -1352,11 +1452,12 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         focusKey = focusKey,
         selected = ch.id == s.selected || isMoving,
         tint = cardTint,
-        selectedTint = if (vertical) verticalSelectedTint else Color(0xB3A75F19),
+        selectedTint = if (vertical) verticalSelectedTint else if (theme.name == "Klasik") Color(0xB3A75F19) else theme.focusFill,
         radius = cardRadius,
         strokeWidth = strokeWidth,
         stroke = strokeColor,
-        focusColor = if (isMoving) Color(0xFFFFCF37) else if (vertical) theme.accentColor else Color.White,
+        focusColor = if (isMoving) Color(0xFFFFCF37) else theme.accentColor,
+        focusFill = if (isMoving) Color(0xCCA77919) else theme.focusFill,
         horizontalFocus = !vertical && !isMoving,
         channelFocus = !isMoving,
         padding = PaddingValues(0.dp),
@@ -1377,6 +1478,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
             }
             else if (vertical && !isMoving && e.key == Key.DirectionLeft && e.type == KeyEventType.KeyDown) {
                 s.categoryMenu = true
+                s.touchPanelInteraction()
                 val catKey = "cat:${CategoryNormalizer.canonicalKey(s.category)}"
                 val req = returns?.registry?.entryTarget(catKey, returns.active)
                 if (req != null) runCatching { req.requestFocus() }
