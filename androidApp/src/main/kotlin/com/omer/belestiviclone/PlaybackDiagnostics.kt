@@ -32,6 +32,10 @@ internal enum class PlaybackFailure(val message: String, val multiStreamMessage:
             "CodecException"
         )
 
+        fun isBehindLiveWindow(code: Int, causeChain: String? = null): Boolean =
+            code == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+                (causeChain != null && causeChain.contains("BehindLiveWindowException", ignoreCase = true))
+
         fun classify(code: Int, httpStatus: Int? = null, causeChain: String? = null): PlaybackFailure = when {
             httpStatus != null -> NETWORK
             code in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE -> NETWORK

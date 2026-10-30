@@ -39,6 +39,21 @@ class PlaybackDiagnosticsTest {
     @Test fun unknownFailureRemainsUnclassifiedPlayerFailure() {
         assertEquals(PlaybackFailure.PLAYER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_UNSPECIFIED))
     }
+    @Test fun behindLiveWindowIsRecognizedForSilentLiveRecovery() {
+        assertTrue(PlaybackFailure.isBehindLiveWindow(PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW))
+        assertTrue(
+            PlaybackFailure.isBehindLiveWindow(
+                PlaybackException.ERROR_CODE_UNSPECIFIED,
+                "ExoPlaybackException>BehindLiveWindowException"
+            )
+        )
+        assertFalse(
+            PlaybackFailure.isBehindLiveWindow(
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                "ExoPlaybackException>HttpDataSourceException"
+            )
+        )
+    }
     @Test fun staleSampleCallbackCannotMatchPublicAttemptOrRetry() {
         val sample = PlaybackAttempt.create("demo", "sample", "https://sample.invalid/video.mp4")
         val real = PlaybackAttempt.create("public", "channel", "https://public.invalid/live.m3u8?token=secret")

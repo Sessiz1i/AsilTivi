@@ -376,6 +376,9 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
     private val sourceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val probeDispatcher = Dispatchers.IO.limitedParallelism(1)
     private var sourceJob: Job? = null
+    private var recoveryJob: Job? = null
+    private var hasStartedPlayback = false
+    private var autoRecoveryCount = 0
     private var requestedPause = false
     private var playbackPreferences by mutableStateOf(PlaybackPreferences())
     private var qualityObservation by mutableStateOf(VideoQualityObservation())
@@ -580,15 +583,35 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, playbackState: Int) {
                 val active = observedAttempt(eventTime) ?: return
                 if (status == PlaybackStatus.ERROR && playbackState == Player.STATE_IDLE) return
+                if (playbackState == Player.STATE_READY) {
+                    hasStartedPlayback = true
+                    autoRecoveryCount = 0
+                    error = null
+                }
+                if (playbackState == Player.STATE_ENDED && channel?.video != true) {
+                    log(active, "auto-recover stage=LIVE_STATE_ENDED")
+                    error = null
+                    status = PlaybackStatus.LOADING
+                    exo.seekToDefaultPosition()
+                    exo.prepare()
+                    exo.playWhenReady = !requestedPause
+                    return
+                }
                 status = when (playbackState) { Player.STATE_BUFFERING -> PlaybackStatus.LOADING; Player.STATE_READY -> PlaybackStatus.READY; Player.STATE_ENDED -> PlaybackStatus.ENDED; else -> PlaybackStatus.IDLE }
                 log(active, "status=$status positionMs=${exo.currentPosition}")
             }
             override fun onAudioPositionAdvancing(eventTime: AnalyticsListener.EventTime, playoutStartSystemTimeMs: Long) {
                 observedAttempt(eventTime) ?: return
+                hasStartedPlayback = true
+                autoRecoveryCount = 0
+                error = null
                 if (exo.volume > 0f) channel?.id?.let(onPlayed)
             }
             override fun onRenderedFirstFrame(eventTime: AnalyticsListener.EventTime, output: Any, renderTimeMs: Long) {
                 val active = observedAttempt(eventTime) ?: return
+                hasStartedPlayback = true
+                autoRecoveryCount = 0
+                error = null
                 log(active, "first-frame positionMs=${exo.currentPosition}")
                 if (exo.volume > 0f) channel?.id?.let(onPlayed)
             }
@@ -600,7 +623,38 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                 val active = observedAttempt(eventTime) ?: return
                 val http = httpStatus(value)
                 val causes = causeClasses(value)
+                if (PlaybackFailure.isBehindLiveWindow(value.errorCode, causes)) {
+                    recoveryJob?.cancel()
+                    recoveryJob = null
+                    log(active, "auto-recover stage=BEHIND_LIVE_WINDOW code=${value.errorCodeName}")
+                    error = null
+                    status = PlaybackStatus.LOADING
+                    exo.seekToDefaultPosition()
+                    exo.prepare()
+                    exo.playWhenReady = !requestedPause
+                    return
+                }
                 val stage = PlaybackFailure.classify(value.errorCode, http, causes)
+                if (hasStartedPlayback && stage != PlaybackFailure.DECODER && autoRecoveryCount < 4) {
+                    autoRecoveryCount++
+                    val attemptStep = autoRecoveryCount
+                    error = null
+                    status = PlaybackStatus.LOADING
+                    log(active, "auto-recover stage=$stage step=$attemptStep code=${value.errorCodeName} http=${http ?: "unobserved"}")
+                    recoveryJob?.cancel()
+                    recoveryJob = sourceScope.launch {
+                        kotlinx.coroutines.delay(500L * attemptStep)
+                        if (released || attempt?.accepts(active.id) != true) return@launch
+                        if (attemptStep == 1) {
+                            exo.seekToDefaultPosition()
+                            exo.prepare()
+                            exo.playWhenReady = !requestedPause
+                        } else {
+                            selectInternal(channel, preserveRecoveryState = true)
+                        }
+                    }
+                    return
+                }
                 status = PlaybackStatus.ERROR
                 error = stage.displayMessage(channel?.name, isMultiScreen)
                 log(active, "status=ERROR stage=$stage code=${value.errorCodeName} codeNumber=${value.errorCode} exception=${value.javaClass.simpleName} causes=$causes http=${http ?: "unobserved"}")
@@ -608,22 +662,31 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         })
     }
     override fun select(channel: PreviewChannel?) {
+        selectInternal(channel, preserveRecoveryState = false)
+    }
+    private fun selectInternal(channel: PreviewChannel?, preserveRecoveryState: Boolean) {
         if (released) return
         sourceJob?.cancel()
+        recoveryJob?.cancel()
+        recoveryJob = null
+        if (!preserveRecoveryState) {
+            hasStartedPlayback = false
+            autoRecoveryCount = 0
+        }
         attempt = null // Ignore stop/clear and any callbacks from the previous media item.
         resetCueObserver();audioTracks=emptyList();textTracks=emptyList()
         this.channel = channel; error = null
         qualityObservation = VideoQualityObservation()
         technicalInfo = StreamTechnicalInfo()
         exo.stop(); exo.clearMediaItems()
-        status = PlaybackStatus.IDLE
+        status = if (preserveRecoveryState && channel != null) PlaybackStatus.LOADING else PlaybackStatus.IDLE
         val uri = playbackUri(channel)
         if (uri != null) {
             val profile = if (channel?.definition != null) "public:${PreviewCodec.id(PublicM3u.profile)}" else "demo"
             val active = PlaybackAttempt.create(profile, PreviewCodec.id(channel!!.id), uri)
             attempt = active
             resetCueObserver()
-            log(active, "select")
+            log(active, if (preserveRecoveryState) "select-recovery step=$autoRecoveryCount" else "select")
             sourceJob = sourceScope.launch {
                 var stage = PlaybackFailure.HEADERS
                 try {
@@ -646,6 +709,8 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     val http = DefaultHttpDataSource.Factory().apply {
                         effectiveHeaders["User-Agent"]?.let(::setUserAgent)
                         setAllowCrossProtocolRedirects(true)
+                        setConnectTimeoutMs(12_000)
+                        setReadTimeoutMs(12_000)
                         setDefaultRequestProperties(effectiveHeaders)
                     }
                     if (StreamType.needsProbe(effectiveUri, mime)) {
@@ -673,7 +738,20 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     if (released || attempt?.accepts(active.id) != true) return@launch
                     stage = PlaybackFailure.MEDIA_SOURCE
                     val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, http))
-                    val item = MediaItem.Builder().setUri(effectiveUri).setMimeType(mime).setMediaId(active.id).build()
+                        .setLoadErrorHandlingPolicy(androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(6))
+                    val itemBuilder = MediaItem.Builder().setUri(effectiveUri).setMimeType(mime).setMediaId(active.id)
+                    if (!channel.video) {
+                        itemBuilder.setLiveConfiguration(
+                            MediaItem.LiveConfiguration.Builder()
+                                .setTargetOffsetMs(15_000L)
+                                .setMinOffsetMs(8_000L)
+                                .setMaxOffsetMs(28_000L)
+                                .setMinPlaybackSpeed(0.96f)
+                                .setMaxPlaybackSpeed(1.04f)
+                                .build()
+                        )
+                    }
+                    val item = itemBuilder.build()
                     val source = factory.createMediaSource(item)
                     exo.setMediaSource(source)
                     stage = PlaybackFailure.PLAYER
@@ -684,6 +762,20 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     val causes = causeClasses(failure)
                     val classified = PlaybackFailure.classify(PlaybackException.ERROR_CODE_UNSPECIFIED, httpStatus(failure), causes)
                     val effectiveStage = if (classified == PlaybackFailure.DECODER) PlaybackFailure.DECODER else stage
+                    if (hasStartedPlayback && effectiveStage != PlaybackFailure.DECODER && autoRecoveryCount < 4) {
+                        autoRecoveryCount++
+                        val attemptStep = autoRecoveryCount
+                        error = null
+                        status = PlaybackStatus.LOADING
+                        log(active, "auto-recover stage=$effectiveStage step=$attemptStep exception=${failure.javaClass.simpleName}")
+                        recoveryJob?.cancel()
+                        recoveryJob = sourceScope.launch {
+                            kotlinx.coroutines.delay(500L * attemptStep)
+                            if (released || attempt?.accepts(active.id) != true) return@launch
+                            selectInternal(channel, preserveRecoveryState = true)
+                        }
+                        return@launch
+                    }
                     status = PlaybackStatus.ERROR
                     error = effectiveStage.displayMessage(channel.name, isMultiScreen)
                     log(active, "status=ERROR stage=$effectiveStage exception=${failure.javaClass.simpleName} causes=$causes")
@@ -721,6 +813,8 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
     override fun release() {
         if (released) return
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
+        recoveryJob?.cancel(); recoveryJob = null
+        hasStartedPlayback = false; autoRecoveryCount = 0
         cueListener?.let(exo::removeAnalyticsListener); cueListener = null
         audioTracks = emptyList(); textTracks = emptyList(); technicalInfo = StreamTechnicalInfo()
         sourceScope.cancel(); exo.release()
