@@ -349,6 +349,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 s.touchedFocusChannelId = if (list.any { it.id == s.selected }) s.selected else list.firstOrNull()?.id
             } else {
                 s.categoryMenu = false
+                s.searching = false
+                s.query = ""
                 s.target = null
             }
         }
@@ -391,7 +393,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
             if (vertical) {
                 val panelWidth = minOf(320.dp, maxWidth * if (maxWidth > maxHeight) (192f / 855f) else .52f)
                 val top = LiveSidebarTop.dp
-                val bottomReserved = if (s.searching) 84.dp else 24.dp
+                val bottomReserved = 24.dp
                 val maxAvailHeight = (maxHeight - top - bottomReserved).coerceAtLeast(100.dp)
                 val densityCur = LocalDensity.current
                 val rowHPx = with(densityCur) { 38.dp.roundToPx() }
@@ -415,9 +417,19 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                     }
                     val catListState = rememberLazyListState(initialFirstVisibleItemIndex = initialCatIdx)
                     LaunchedEffect(catListState.isScrollInProgress) {
-                        if (catListState.isScrollInProgress) s.touchPanelInteraction()
+                        if (catListState.isScrollInProgress) {
+                            s.touchPanelInteraction()
+                        } else if (catListState.firstVisibleItemScrollOffset != 0) {
+                            val stepPx = with(densityCur) { (38.dp + 5.dp).toPx() }
+                            val targetIdx = if (catListState.firstVisibleItemScrollOffset > stepPx / 2f) {
+                                catListState.firstVisibleItemIndex + 1
+                            } else {
+                                catListState.firstVisibleItemIndex
+                            }
+                            runCatching { catListState.animateScrollToItem(targetIdx, 0) }
+                        }
                     }
-                    LazyColumn(
+                    Column(
                         Modifier
                             .onGloballyPositioned { boundsObserver("vertical-categories", it.boundsInWindow()) }
                             .offset(13.dp, top)
@@ -426,15 +438,51 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                             .background(Color.Black.copy(alpha = opacity), sidebarShape)
                             .border(1.dp, Color.White.copy(alpha = 0.12f), sidebarShape)
                             .clip(sidebarShape)
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        state = catListState,
-                        contentPadding = PaddingValues(0.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
                     ) {
-                        item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
-                        items(catItems) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
-                        item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
-                        item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                        Action(
+                            label = "◂ Kategoriler",
+                            modifier = Modifier.fillMaxWidth().height(38.dp),
+                            selected = true,
+                            tint = theme.settingsPanelBg.copy(alpha = 0.92f),
+                            selectedTint = theme.focusFill,
+                            radius = 8.dp,
+                            stroke = theme.accentColor,
+                            strokeWidth = 1.dp,
+                            focusColor = theme.accentColor,
+                            focusFill = theme.focusFill,
+                            padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            focusKey = "vertical:categories-close",
+                            keyClick = {
+                                s.categoryMenu = false
+                                s.touchPanelInteraction()
+                            },
+                            content = {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Label("◂ Kategoriler", 11, theme.headingTitleColor, bold = true, maxLines = 1)
+                                }
+                            },
+                            click = {
+                                s.categoryMenu = false
+                                s.touchPanelInteraction()
+                            }
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        LazyColumn(
+                            Modifier.fillMaxWidth().weight(1f),
+                            state = catListState,
+                            contentPadding = PaddingValues(0.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            item { CategoryTab("Ara", s, image, true) { s.searching = true; s.categoryMenu = false } }
+                            items(catItems) { cat -> CategoryTab(cat, s, image, true, keyClick = { handleChooseCategory(s, cat, focusFirstCard = true) }) { handleChooseCategory(s, cat, focusFirstCard = false) } }
+                            item { CategoryTab("ÇOKLU EKRAN", s, image, true) { s.categoryAction("multi") } }
+                            item { CategoryTab("AYARLAR", s, image, true) { s.categoryAction("settings") } }
+                        }
                     }
                 }
                 val channelPanelLeft = if (s.categoryMenu) 147.dp else 13.dp
@@ -472,6 +520,7 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                         focusKey = "vertical:category-toggle",
                         keyClick = {
                             s.categoryMenu = !s.categoryMenu
+                            s.searching = false
                             s.touchPanelInteraction()
                         },
                         content = {
@@ -497,13 +546,13 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                         },
                         click = {
                             s.categoryMenu = !s.categoryMenu
+                            s.searching = false
                             s.touchPanelInteraction()
                         }
                     )
                     Spacer(Modifier.height(5.dp))
                     Channels(s, image, true, Modifier.fillMaxWidth().weight(1f))
                 }
-                if (s.searching) Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = 19.dp, vertical = 20.dp)) { Search(s) }
             } else Column(Modifier.align(Alignment.BottomCenter).onGloballyPositioned { boundsObserver("horizontal-panel", it.boundsInWindow()) }.padding(bottom = 11.dp).fillMaxWidth().height(panelHeight).background(Color.Black.copy(alpha = opacity))) {
                 val catRowState = rememberLazyListState()
                 LaunchedEffect(catRowState.isScrollInProgress) {
@@ -531,6 +580,17 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 panelRightEdge + 18.dp
             } else {
                 24.dp
+            }
+
+            if (vertical && s.searching) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(start = barStartPadding, end = 24.dp, bottom = 68.dp)
+                        .fillMaxWidth()
+                ) {
+                    Search(s)
+                }
             }
 
             Row(
@@ -1190,7 +1250,11 @@ private fun CategoryTabIcon(
         Box(if (vertical) Modifier.fillMaxWidth() else Modifier) {
             Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (cat in listOf("ÇOKLU EKRAN", "AYARLAR")) {
-                    image(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", Modifier.size(12.dp, 13.dp))
+                    if (theme.categoryTabPill) {
+                        TopBarActionIcon(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", color = textColor, modifier = Modifier.size(13.dp))
+                    } else {
+                        image(if (cat == "ÇOKLU EKRAN") "ikon_coklu" else "ikon_ayar", Modifier.size(12.dp, 13.dp))
+                    }
                 } else {
                     CategoryTabIcon(cat, isMonochrome = theme.categoryTabPill, color = textColor)
                 }
@@ -1264,7 +1328,9 @@ internal fun categories(s: PreviewState): List<String> {
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     Row(Modifier.fillMaxWidth().height(35.dp).background(Color(0x45D3D3D3)), verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(s.query, { s.query = it }, Modifier.weight(1f).focusRequester(focus).padding(horizontal = 10.dp).semantics { contentDescription = "Kategoride ara" }, textStyle = TextStyle(color = Color.White, fontSize = 12.sp), singleLine = true, cursorBrush = SolidColor(amber), decorationBox = { field -> if (s.query.isEmpty()) Label("Kategoride ara", 10, Color(0xFFC3C6CA)); field() })
-        Action("×", tint = Color.Transparent, strokeWidth = 0.dp) { s.query = "" }
+        Action("×", tint = Color.Transparent, strokeWidth = 0.dp) {
+            if (s.query.isNotEmpty()) s.query = "" else s.searching = false
+        }
     }
     LaunchedEffect(windowFocused) { if (windowFocused) focus.requestFocus() }
 }
@@ -1277,9 +1343,18 @@ private fun Channels(s: PreviewState, image: @Composable (String, Modifier) -> U
     }
     val listState = key(vertical) { rememberLazyListState(initialFirstVisibleItemIndex = initialIdx) }
     val returns = LocalFocusReturn.current
-    LaunchedEffect(listState.isScrollInProgress) {
+    val densityForSnap = LocalDensity.current
+    LaunchedEffect(listState.isScrollInProgress, vertical) {
         if (listState.isScrollInProgress) {
             s.touchPanelInteraction()
+        } else if (vertical && s.moving == null && listState.firstVisibleItemScrollOffset != 0) {
+            val stepPx = with(densityForSnap) { (38.dp + 5.dp).toPx() }
+            val targetIdx = if (listState.firstVisibleItemScrollOffset > stepPx / 2f) {
+                listState.firstVisibleItemIndex + 1
+            } else {
+                listState.firstVisibleItemIndex
+            }
+            runCatching { listState.animateScrollToItem(targetIdx, 0) }
         }
     }
     var lockedScroll by remember(s.moving, vertical) {
@@ -1488,7 +1563,6 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         content = {
             if (vertical) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.width(3.dp).fillMaxHeight().background(if (ch.id == s.selected) theme.accentColor else Color.Transparent))
                     image(ch.logo, Modifier.size(30.dp))
                     BasicText(
                         number + ch.name,
@@ -1743,7 +1817,7 @@ private fun SettingsTabIcon(
         BoxWithConstraints(Modifier.fillMaxSize().background(theme.settingsBg)) {
             val compact = maxWidth < 600.dp
             Row(Modifier.fillMaxSize()) {
-                if (!compact) Column(Modifier.width(148.dp).fillMaxHeight().background(theme.settingsPanelBg)) {
+                if (!compact) Column(Modifier.width(192.dp).fillMaxHeight().background(theme.settingsPanelBg)) {
                     Row(Modifier.height(74.dp).padding(horizontal = 19.dp), verticalAlignment = Alignment.CenterVertically) { Label("Ayarlar", 18, modifier = Modifier.weight(1f), bold = true); Action("✕", tint = Color.Transparent, strokeWidth = 0.dp, click = s::back) }
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         sections.forEachIndexed { i, title -> Action(
@@ -1798,7 +1872,6 @@ private fun SettingsTabIcon(
                     if (s.dialog in sourceFormKinds || s.dialog == "categories") CompositionLocalProvider(LocalModalLayer provides true) {
                         if (s.dialog == "categories") CategoryManagement(s, image, Modifier.weight(1f)) else SourceForm(s, image, Modifier.weight(1f))
                     } else Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(horizontal = 16.dp, vertical = 38.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (s.section != 1) Row(Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(3.dp).height(16.dp).background(theme.settingsAccent)); Label(settingsSectionHeading(s.section), 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), true) }
                         when (s.section) {
                             0 -> {
                                 SettingsGroup("LİSTEM")

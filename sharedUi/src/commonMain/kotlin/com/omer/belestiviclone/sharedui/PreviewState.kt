@@ -701,6 +701,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun chooseCategory(value: String, focusFirstCard: Boolean = false) {
         category = value
+        searching = false
         query = ""
         categoryMenu = false
         touchPanelInteraction()

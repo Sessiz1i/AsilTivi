@@ -131,24 +131,37 @@ internal fun TopBarActionIcon(
                 )
             }
             "ikon_ayar", "ayar", "ayarlar", "settings" -> {
-                // Ayarlar: Minimalist dişli çark
+                // Gerçek 8 dişli mekanik dişli çark (Cogwheel)
                 val cx = w / 2f
                 val cy = h / 2f
-                val innerR = w * 0.20f
-                val outerR = w * 0.40f
-                drawCircle(color = color, radius = innerR, center = Offset(cx, cy), style = Stroke(stroke * 0.9f))
-                for (i in 0 until 6) {
-                    val angle = (i * 60f) * (kotlin.math.PI / 180.0)
-                    val cos = kotlin.math.cos(angle).toFloat()
-                    val sin = kotlin.math.sin(angle).toFloat()
-                    drawLine(
-                        color = color,
-                        start = Offset(cx + (innerR + 1.dp.toPx()) * cos, cy + (innerR + 1.dp.toPx()) * sin),
-                        end = Offset(cx + outerR * cos, cy + outerR * sin),
-                        strokeWidth = stroke * 1.1f,
-                        cap = StrokeCap.Round
-                    )
+                val teeth = 8
+                val outerR = minOf(w, h) * 0.46f
+                val rootR = minOf(w, h) * 0.33f
+                val holeR = minOf(w, h) * 0.16f
+                val gearPath = Path().apply {
+                    fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
+                    val step = (2.0 * kotlin.math.PI) / teeth
+                    val halfToothOuter = step * 0.18
+                    val halfToothRoot = step * 0.28
+                    for (i in 0 until teeth) {
+                        val centerAngle = i * step
+                        val a1 = centerAngle - halfToothRoot
+                        val a2 = centerAngle - halfToothOuter
+                        val a3 = centerAngle + halfToothOuter
+                        val a4 = centerAngle + halfToothRoot
+                        val p1 = Offset(cx + (rootR * kotlin.math.cos(a1)).toFloat(), cy + (rootR * kotlin.math.sin(a1)).toFloat())
+                        val p2 = Offset(cx + (outerR * kotlin.math.cos(a2)).toFloat(), cy + (outerR * kotlin.math.sin(a2)).toFloat())
+                        val p3 = Offset(cx + (outerR * kotlin.math.cos(a3)).toFloat(), cy + (outerR * kotlin.math.sin(a3)).toFloat())
+                        val p4 = Offset(cx + (rootR * kotlin.math.cos(a4)).toFloat(), cy + (rootR * kotlin.math.sin(a4)).toFloat())
+                        if (i == 0) moveTo(p1.x, p1.y) else lineTo(p1.x, p1.y)
+                        lineTo(p2.x, p2.y)
+                        lineTo(p3.x, p3.y)
+                        lineTo(p4.x, p4.y)
+                    }
+                    close()
+                    addOval(androidx.compose.ui.geometry.Rect(cx - holeR, cy - holeR, cx + holeR, cy + holeR))
                 }
+                drawPath(gearPath, color = color)
             }
             "ikon_cikis", "cikis", "exit" -> {
                 // Çıkış: Kapı + dışarı bakan ok
