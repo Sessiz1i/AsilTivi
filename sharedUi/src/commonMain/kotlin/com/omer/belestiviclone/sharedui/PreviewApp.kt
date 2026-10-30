@@ -566,8 +566,52 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 Label(numLabel, 15, Color.White, bold = true, maxLines = 1)
             }
         }
-        if (s.moving != null) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 25.dp).background(Color(0xFF243F66), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp)); Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
+        if (s.moving != null) {
+            Row(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 25.dp)
+                    .background(Color(0xFF243F66), RoundedCornerShape(10.dp))
+                    .border(1.5.dp, Color(0xFFFFCF37), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp))
+                Label("Yönlerle taşı · OK uygula", 11, Color.White, bold = true)
+                Action(
+                    label = "◄",
+                    tint = Color(0xB8000000),
+                    radius = 7.dp,
+                    stroke = Color(0xFF647B9A),
+                    padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                    content = { Label("◄", 11, Color(0xFFFFCF37), bold = true) }
+                ) { s.moveBy(-1) }
+                Action(
+                    label = "►",
+                    tint = Color(0xB8000000),
+                    radius = 7.dp,
+                    stroke = Color(0xFF647B9A),
+                    padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                    content = { Label("►", 11, Color(0xFFFFCF37), bold = true) }
+                ) { s.moveBy(1) }
+                Action(
+                    label = "✓ Tamam",
+                    tint = Color(0xFF1F8B4C),
+                    radius = 7.dp,
+                    stroke = Color(0x884ADE80),
+                    padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    content = { Label("✓ Tamam", 10, Color.White, bold = true) }
+                ) { s.moveFinish() }
+                Action(
+                    label = "✕ İptal",
+                    tint = Color(0xB8000000),
+                    radius = 7.dp,
+                    stroke = Color(0xFF647B9A),
+                    padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    content = { Label("✕ İptal", 10, Color(0xFFE2E8F0), bold = true) }
+                ) { s.draft = null; s.moving = null }
+            }
         }
     }
 }
@@ -1231,11 +1275,17 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
     val requester = remember(returns, focusKey) { returns?.registry?.requester(focusKey) { FocusRequester() } ?: FocusRequester() }
     var isCardFocused by remember { mutableStateOf(false) }
     val keySignal = LocalKeySignal.current
+    val isFavoritesCategory = s.category.equals("Favoriler", ignoreCase = true) || s.category.equals("FAVORİ TV", ignoreCase = true)
     val number = if (vertical) {
-        val idx = s.data.channels.indexOfFirst { it.id == ch.id }
+        val idx = if (isFavoritesCategory && !s.searching) {
+            s.visibleData.filtered("Favoriler", "").indexOfFirst { it.id == ch.id }
+        } else {
+            s.data.channels.indexOfFirst { it.id == ch.id }
+        }
         if (idx >= 0) "${idx + 1}. " else ""
-    } else if (s.category == "Favoriler" && !s.searching) {
-        "${s.visibleData.favorites.indexOf(ch.id) + 1}. "
+    } else if (isFavoritesCategory && !s.searching) {
+        val favIdx = s.visibleData.filtered("Favoriler", "").indexOfFirst { it.id == ch.id }
+        if (favIdx >= 0) "${favIdx + 1}. " else ""
     } else ""
     val isMoving = s.moving == ch.id
     val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
@@ -1285,7 +1335,7 @@ private fun ChannelCard(s: PreviewState, ch: PreviewChannel, image: @Composable 
         horizontalFocus = !vertical && !isMoving,
         channelFocus = !isMoving,
         padding = PaddingValues(0.dp),
-        long = { s.target = ch.id; s.dialog = if (s.category == "Favoriler") "favorite" else "channel" },
+        long = { s.target = ch.id; s.dialog = if (isFavoritesCategory) "favorite" else "channel" },
         keyClick = {
             if (isMoving) s.moveFinish()
             else {
@@ -1915,7 +1965,7 @@ private fun SubtitlePreviewBox(s: PreviewState) {
 
 @Composable
 private fun ChannelMenu(s: PreviewState, image: @Composable (String, Modifier) -> Unit) {
-    val ch = s.data.channels.find { it.id == s.target } ?: return
+    val ch = s.data.channels.find { it.id == s.target } ?: s.radioChannels.find { it.id == s.target } ?: return
     val first = remember { FocusRequester() }
     val favorite = s.dialog == "favorite"
     val contentDensity = LocalDensity.current
@@ -1939,8 +1989,8 @@ private fun ChannelMenu(s: PreviewState, image: @Composable (String, Modifier) -
             row(if (ch.id in s.data.favorites) "Favorilerden kaldır" else "Favorilere ekle", if (ch.id in s.data.favorites) "ikon_menu_favoriden_cikar" else "ikon_menu_favori", Modifier.focusRequester(first)) { s.toggleFavoriteWithToast(ch.id) }
             if (favorite) {
                 row("Sırasını değiştir…", ":↔", click = s::moveStart)
-                row("En başa taşı", ":⇤") { s.commit(s.data.move(ch.id, 0)) { s.dismiss() } }
-                row("En sona taşı", ":⇥") { s.commit(s.data.move(ch.id, s.data.favorites.lastIndex)) { s.dismiss() } }
+                row("En başa taşı", ":⇤") { s.moveFavoriteToStart(ch.id) }
+                row("En sona taşı", ":⇥") { s.moveFavoriteToEnd(ch.id) }
             } else {
                 row("Kanalı gizle", "ikon_menu_gizle") { s.hideChannelWithToast(ch.id) }
                 row("Gizlenen kanalları geri getir", "ikon_menu_gerigetir") { s.commit(s.data.copy(hidden = emptySet())) { s.dismiss() } }

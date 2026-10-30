@@ -449,10 +449,10 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     var lastRadioChannel by mutableStateOf<OpaqueId?>(null); private set
     val radioChannels get() = data.channels.filter { it.available && it.isAudioOrRadio }.ifEmpty { PreviewFixture.radioChannels }
     val favoriteRadioChannels: List<PreviewChannel>
-        get() = data.favorites.mapNotNull { id -> radioChannels.find { it.id == id } }
+        get() = visibleData.favorites.mapNotNull { id -> radioChannels.find { it.id == id } }
     val filteredRadioChannels: List<PreviewChannel>
         get() = if (radioCategory == "Favoriler") favoriteRadioChannels else radioChannels
-    fun isRadioFavorite(id: OpaqueId?): Boolean = id != null && id in data.favorites
+    fun isRadioFavorite(id: OpaqueId?): Boolean = id != null && id in visibleData.favorites
     fun dimRadioScreen() {
         if (!isRadioMode) return
         radioScreenDimmed = true
@@ -824,9 +824,108 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         stopWebTransferServer()
         dialog = null; formPassword = ""; formUser = ""; formMac = ""; formSerial = ""; formDeviceId = ""; formDeviceId2 = ""; formAddress = ""; formName = ""; editing = null
     }
-    fun moveStart() { moving = target; draft = data; dialog = null }
-    fun moveBy(delta: Int) { val id = moving ?: return; val d = draft ?: return; draft = d.move(id, d.favorites.indexOf(id) + delta) }
-    fun moveFinish() { val next = draft ?: return; commit(next) { draft = null; moving = null } }
+    private fun reorderFavoriteWithinGroup(
+        source: PreviewData,
+        id: OpaqueId,
+        targetGroupIndexResolver: (groupSize: Int, currentGroupIndex: Int) -> Int
+    ): PreviewData {
+        if (id !in source.favorites) return source
+        val isRadioTarget = isRadioMode || (radioChannels.any { it.id == id } && source.channels.none { it.id == id && !it.isAudioOrRadio })
+        val groupFilter: (OpaqueId) -> Boolean = if (isRadioTarget) {
+            { favId -> radioChannels.any { it.id == favId } }
+        } else {
+            { favId -> source.channels.any { it.id == favId && !it.isAudioOrRadio } }
+        }
+        val groupPositions = mutableListOf<Int>()
+        val groupIds = mutableListOf<OpaqueId>()
+        source.favorites.forEachIndexed { idx, favId ->
+            if (groupFilter(favId)) {
+                groupPositions += idx
+                groupIds += favId
+            }
+        }
+        val currentGroupIndex = groupIds.indexOf(id)
+        if (currentGroupIndex < 0) {
+            val rawCurrent = source.favorites.indexOf(id)
+            val rawTarget = targetGroupIndexResolver(source.favorites.size, rawCurrent).coerceIn(0, source.favorites.lastIndex)
+            return source.move(id, rawTarget)
+        }
+        if (groupIds.size < 2) return source
+        val targetGroupIndex = targetGroupIndexResolver(groupIds.size, currentGroupIndex).coerceIn(0, groupIds.lastIndex)
+        if (targetGroupIndex == currentGroupIndex) return source
+        groupIds.removeAt(currentGroupIndex)
+        groupIds.add(targetGroupIndex, id)
+        val nextFavorites = source.favorites.toMutableList()
+        groupPositions.forEachIndexed { i, favPos ->
+            nextFavorites[favPos] = groupIds[i]
+        }
+        return source.copy(favorites = nextFavorites)
+    }
+
+    fun moveStart() {
+        val t = target ?: selected
+        target = t
+        moving = t
+        draft = data
+        dialog = null
+        if (isRadioMode) {
+            radioCategory = "Favoriler"
+            touchPanelInteraction()
+        }
+    }
+
+    fun moveBy(delta: Int) {
+        val id = moving ?: return
+        val d = draft ?: return
+        if (isRadioMode) touchPanelInteraction()
+        draft = reorderFavoriteWithinGroup(d, id) { _, current -> current + delta }
+    }
+
+    fun moveFinish() {
+        val next = draft ?: return
+        if (isRadioMode) touchPanelInteraction()
+        commit(next) {
+            draft = null
+            moving = null
+            showBottomToast("✅ Favori sıralaması güncellendi", ToastTone.Success)
+        }
+    }
+
+    fun moveFavoriteToStart(id: OpaqueId) {
+        val base = draft ?: data
+        val next = reorderFavoriteWithinGroup(base, id) { _, _ -> 0 }
+        if (isRadioMode) touchPanelInteraction()
+        commit(next) {
+            draft = null
+            moving = null
+            dismiss()
+            showBottomToast("✅ Favori sıralaması güncellendi", ToastTone.Success)
+        }
+    }
+
+    fun moveFavoriteToEnd(id: OpaqueId) {
+        val base = draft ?: data
+        val next = reorderFavoriteWithinGroup(base, id) { size, _ -> size - 1 }
+        if (isRadioMode) touchPanelInteraction()
+        commit(next) {
+            draft = null
+            moving = null
+            dismiss()
+            showBottomToast("✅ Favori sıralaması güncellendi", ToastTone.Success)
+        }
+    }
+
+    fun moveFavoriteStepImmediate(id: OpaqueId, delta: Int) {
+        if (moving == id && draft != null) {
+            moveBy(delta)
+            return
+        }
+        val next = reorderFavoriteWithinGroup(data, id) { _, current -> current + delta }
+        if (isRadioMode) touchPanelInteraction()
+        commit(next) {
+            showBottomToast("✅ Favori sıralaması güncellendi", ToastTone.Success)
+        }
+    }
     fun clearHistory() = commit(data.copy(history = emptyList())) {
         dialog = null; notice = message("İzleme geçmişi tamamen temizlendi!", "Watch history cleared!", "Wiedergabeverlauf gelöscht!"); returnAfterClear = true
         if (page != "settings") {

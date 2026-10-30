@@ -305,4 +305,84 @@ class RadioStateTest {
         assertEquals("⭐ TRT FM favorilerden çıkarıldı", s.bottomToastMessage)
         assertEquals(ToastTone.Warning, s.bottomToastTone)
     }
+
+    @Test
+    fun radioAndTvFavoriteReorderingWorksWithinRespectiveGroupsEvenWhenInterleaved() = runBlocking {
+        val tv1 = PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1")
+        val tv2 = PreviewChannel(OpaqueId(1, 2), "ATV", "Ulusal", "logo_atv")
+        val tv3 = PreviewChannel(OpaqueId(1, 3), "Show TV", "Ulusal", "logo_show")
+
+        val r1 = PreviewFixture.radioChannels[0] // TRT FM
+        val r2 = PreviewFixture.radioChannels[1] // Kral FM
+        val r3 = PreviewFixture.radioChannels[2] // Power FM
+
+        // TV ve Radyo favorileri karışık sırada dizilmiş olsun: [tv1, r1, tv2, r2, tv3, r3]
+        var savedData = PreviewData(
+            channels = listOf(tv1, tv2, tv3),
+            favorites = listOf(tv1.id, r1.id, tv2.id, r2.id, tv3.id, r3.id)
+        )
+        val store = object : PreviewStore {
+            override suspend fun load() = savedData
+            override suspend fun save(data: PreviewData) { savedData = data }
+        }
+
+        val s = PreviewState(store, this)
+        s.load()
+
+        // 1. Radyo modunda favori sıralama
+        s.enterRadioMode()
+        assertEquals(listOf(r1.id, r2.id, r3.id), s.favoriteRadioChannels.map { it.id })
+
+        // r2 (Kral FM) için sıralama başlat ve 1 adım sola (r1'in önüne) taşı
+        s.target = r2.id
+        s.moveStart()
+        assertEquals("Favoriler", s.radioCategory)
+        assertEquals(r2.id, s.moving)
+
+        s.moveBy(-1)
+        // Henüz commit edilmeden (draft/moving sırasında) favoriteRadioChannels anlık güncellenmeli!
+        assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
+        // TV favorilerinin sırası bozulmamalı
+        assertEquals(listOf(tv1.id, tv2.id, tv3.id), s.visibleData.filtered("FAVORİ TV", "").map { it.id })
+
+        s.moveFinish()
+        yield()
+        assertNull(s.moving)
+        assertNull(s.draft)
+        assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
+        assertEquals("✅ Favori sıralaması güncellendi", s.bottomToastMessage)
+
+        // r3 (Power FM) istasyonunu En Başa Taşı
+        s.moveFavoriteToStart(r3.id)
+        yield()
+        assertEquals(listOf(r3.id, r2.id, r1.id), s.favoriteRadioChannels.map { it.id })
+        assertEquals(listOf(tv1.id, tv2.id, tv3.id), s.visibleData.filtered("FAVORİ TV", "").map { it.id })
+
+        // r3 (Power FM) istasyonunu En Sona Taşı
+        s.moveFavoriteToEnd(r3.id)
+        yield()
+        assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
+
+        // 2. Canlı TV modunda (FAVORİ TV) favori sıralama
+        s.exitRadioMode()
+        s.category = "FAVORİ TV"
+        assertEquals(listOf(tv1.id, tv2.id, tv3.id), s.visibleData.filtered("FAVORİ TV", "").map { it.id })
+
+        // tv3 (Show TV) kanalını 1 adım sola taşı (arada r2 olsa bile doğrudan tv2'nin önüne geçmeli!)
+        s.target = tv3.id
+        s.moveStart()
+        s.moveBy(-1)
+        assertEquals(listOf(tv1.id, tv3.id, tv2.id), s.visibleData.filtered("FAVORİ TV", "").map { it.id })
+        s.moveFinish()
+        yield()
+        assertEquals(listOf(tv1.id, tv3.id, tv2.id), s.data.filtered("FAVORİ TV", "").map { it.id })
+        // Radyo favorilerinin sırası bozulmamalı
+        assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
+
+        // tv2 kanalını En Başa Taşı
+        s.moveFavoriteToStart(tv2.id)
+        yield()
+        assertEquals(listOf(tv2.id, tv1.id, tv3.id), s.data.filtered("FAVORİ TV", "").map { it.id })
+        assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
+    }
 }
