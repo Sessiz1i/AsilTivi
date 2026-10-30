@@ -62,7 +62,7 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
                             Label("Telefondan Aktar", 12, Color.White, bold = true)
                             Label("Uzun adresleri kumandayla yazmak yerine telefon kamerasıyla QR okutarak gönder", 9, Color(0xFF94A2B7))
                         }
-                        Label("›", 16, Color(0xFFE67E22), bold = true)
+                        MenuChevronIcon(color = Color(0xFFE67E22), modifier = Modifier.size(16.dp))
                     }
                 }
             ) {
@@ -346,7 +346,7 @@ private fun ActiveAndSavedSourcesSection(s: PreviewState, image: @Composable (St
                     }
                     Label("${source.maskedAddress()} · ${source.rows.size} kanal", 9, Color(0xFF94A2B7), maxLines = 1)
                 }
-                Label("›", 12, Color(0xFF60728E))
+                MenuChevronIcon(color = Color(0xFF8CA0BA), modifier = Modifier.size(16.dp))
             }
         }) { s.editing = i; s.dialog = "sourceMenu" }
     }

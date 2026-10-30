@@ -2036,7 +2036,7 @@ private fun SettingsTabIcon(
             )
             Column(Modifier.weight(1f)) { Label(visibleTitle, 12, if (danger) Color(0xFFF44747) else Color.White, bold = true, lineHeight = 18f, maxLines = 1); if (subtitle.isNotEmpty()) Label(subtitle, 10, Color(0xFF69798F), lineHeight = 16f, maxLines = 1) }
             if (toggle) Box(Modifier.defaultMinSize(minWidth = 55.dp).height(28.dp).background(if (value == "Açık") Color(0xFF0ABB91) else Color(0xFF68798F), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Label("• $value", 10, bold = true) }
-            else { if (value.isNotEmpty()) Label(value, 10, themeAccent, bold = true); Label("→", 13, Color(0xFF60728E)) }
+            else { if (value.isNotEmpty()) Label(value, 10, themeAccent, bold = true); MenuChevronIcon(color = if (danger) Color(0xFFF44747).copy(alpha = 0.85f) else Color(0xFF8CA0BA), modifier = Modifier.size(16.dp)) }
         }
     }, click = click)
 }
@@ -2098,7 +2098,7 @@ private fun SettingPlusCard(
                 ) {
                     Label(badge, 9, themeAccent, bold = true)
                 }
-                Label("→", 13, Color(0xFF60728E))
+                MenuChevronIcon(color = Color(0xFF8CA0BA), modifier = Modifier.size(16.dp))
             }
         },
         click = click
@@ -2258,7 +2258,7 @@ private fun ChannelMenu(s: PreviewState, image: @Composable (String, Modifier) -
                                         ChannelMenuIcon(iconKind, color = theme.accentColor, modifier = Modifier.size(15.dp))
                                     }
                                     Label(label, 11, Color.White, Modifier.weight(1f), bold = true)
-                                    Label("›", 14, theme.settingsMutedText, bold = true)
+                                    MenuChevronIcon(color = theme.settingsMutedText, modifier = Modifier.size(14.dp))
                                 }
                             }
                         },

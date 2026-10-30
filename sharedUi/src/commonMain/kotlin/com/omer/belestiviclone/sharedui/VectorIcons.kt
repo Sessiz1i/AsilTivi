@@ -1117,3 +1117,29 @@ fun ChannelMenuIcon(
         }
     }
 }
+
+/**
+ * Faz D12: Ayarlar ve menü kartlarının sağ kenarı için dikey/yatay tam merkezlenmiş,
+ * net ve zarif Canvas vektörel sağ ok / chevron bileşeni.
+ */
+@Composable
+fun MenuChevronIcon(
+    color: Color = Color(0xFF8CA0BA),
+    modifier: Modifier = Modifier.size(16.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.75f.dp.toPx()
+        val path = Path().apply {
+            moveTo(w * 0.34f, h * 0.22f)
+            lineTo(w * 0.66f, h * 0.50f)
+            lineTo(w * 0.34f, h * 0.78f)
+        }
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
