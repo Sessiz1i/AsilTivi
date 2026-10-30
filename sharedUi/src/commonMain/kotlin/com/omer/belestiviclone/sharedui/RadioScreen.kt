@@ -334,6 +334,7 @@ fun RadioScreen(
                 }
 
                 // İstasyon Adı ve Alt Bilgi
+                val isCurrentFavorite = s.isRadioFavorite(currentStation?.id)
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -342,6 +343,9 @@ fun RadioScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Label(currentStation?.name ?: "Radyo İstasyonu", 20, Color.White, bold = true)
+                        if (isCurrentFavorite) {
+                            Label("★", 16, Color(0xFFFFD600), bold = true)
+                        }
 
                         // Durum Rozeti (⏳ YÜKLENİYOR… / ● CANLI / ⚠️ YAYIN YOK / DURAKLADI)
                         val badgeBg = when {
@@ -450,14 +454,81 @@ fun RadioScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         TopBarActionIcon("ikon_audio", color = Color(0xFFFFD600), modifier = Modifier.size(16.dp))
-                        Label("RADYO İSTASYONLARI (${s.radioChannels.size})", 12, Color(0xFFFFD600), bold = true)
+                        Label("RADYO İSTASYONLARI", 12, Color(0xFFFFD600), bold = true)
+                        Spacer(Modifier.width(4.dp))
+                        val isAllTab = s.radioCategory == "Tümü"
+                        Action(
+                            label = "Tümü (${s.radioChannels.size})",
+                            selected = isAllTab,
+                            tint = Color(0xB8000000),
+                            selectedTint = Color(0x40FFD600),
+                            radius = 8.dp,
+                            stroke = if (isAllTab) Color(0xFFFFD600) else Color(0xFF344454),
+                            padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            focusKey = "radio:tab:all",
+                            content = {
+                                Label(
+                                    "Tümü (${s.radioChannels.size})",
+                                    10,
+                                    if (isAllTab) Color(0xFFFFD600) else Color.White,
+                                    bold = true
+                                )
+                            }
+                        ) {
+                            s.radioCategory = "Tümü"
+                            s.touchPanelInteraction()
+                        }
+
+                        val isFavTab = s.radioCategory == "Favoriler"
+                        Action(
+                            label = "★ Favoriler (${s.favoriteRadioChannels.size})",
+                            selected = isFavTab,
+                            tint = Color(0xB8000000),
+                            selectedTint = Color(0x40FFD600),
+                            radius = 8.dp,
+                            stroke = if (isFavTab) Color(0xFFFFD600) else Color(0xFF344454),
+                            padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            focusKey = "radio:tab:fav",
+                            content = {
+                                Label(
+                                    "★ Favoriler (${s.favoriteRadioChannels.size})",
+                                    10,
+                                    if (isFavTab) Color(0xFFFFD600) else Color.White,
+                                    bold = true
+                                )
+                            }
+                        ) {
+                            s.radioCategory = "Favoriler"
+                            s.touchPanelInteraction()
+                        }
                     }
 
-                    // Oynat/Duraklat / Ses Aç/Kapat Butonları
+                    // Favori Ekle/Çıkar / Oynat/Duraklat / Ses Aç/Kapat / Yenile Butonları
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val isStationFav = s.isRadioFavorite(currentStation?.id)
+                        Action(
+                            label = if (isStationFav) "★ Favorilerde" else "☆ Favori Ekle",
+                            selected = isStationFav,
+                            tint = Color(0xB8000000),
+                            selectedTint = Color(0x40FFD600),
+                            radius = 8.dp,
+                            stroke = if (isStationFav) Color(0xFFFFD600) else Color(0xFF344454),
+                            focusKey = "radio:action:favorite",
+                            content = {
+                                Label(
+                                    if (isStationFav) "★ Favorilerde" else "☆ Favori Ekle",
+                                    10,
+                                    if (isStationFav) Color(0xFFFFD600) else Color.White,
+                                    bold = true
+                                )
+                            }
+                        ) {
+                            currentStation?.id?.let { s.toggleFavoriteWithToast(it) }
+                        }
+
                         Action(
                             label = if (s.paused) "Oynat" else "Duraklat",
                             tint = Color(0xB8000000),
@@ -501,7 +572,7 @@ fun RadioScreen(
 
                 // Yatay Kaydırılabilir Radyo İstasyon Kartları (11-radyo.png referansına uygun)
                 val listState = rememberLazyListState()
-                val radioList = s.radioChannels
+                val radioList = s.filteredRadioChannels
 
                 LaunchedEffect(listState.isScrollInProgress) {
                     if (listState.isScrollInProgress) {
@@ -509,33 +580,56 @@ fun RadioScreen(
                     }
                 }
 
-                LaunchedEffect(s.selected) {
+                LaunchedEffect(s.selected, s.radioCategory) {
                     val index = radioList.indexOfFirst { it.id == s.selected }
                     if (index >= 0) {
                         listState.animateScrollToItem((index - 2).coerceAtLeast(0))
                     }
                 }
 
-                LazyRow(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(78.dp)
-                        .padding(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(radioList, key = { PreviewCodec.id(it.id) }) { station ->
-                        val isSelected = station.id == s.selected
-                        RadioStationCard(
-                            station = station,
-                            isSelected = isSelected,
-                            image = image,
-                            onClick = {
-                                s.touchPanelInteraction()
-                                s.select(station.id)
-                            }
+                if (s.radioCategory == "Favoriler" && radioList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(78.dp)
+                            .padding(horizontal = 20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Label(
+                            "Henüz favori radyo istasyonu eklenmedi. '☆ Favori Ekle' butonuyla veya istasyon kartına uzun basarak ekleyebilirsiniz.",
+                            11,
+                            Color(0xFFB0BEC5),
+                            bold = true
                         )
+                    }
+                } else {
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(78.dp)
+                            .padding(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(radioList, key = { PreviewCodec.id(it.id) }) { station ->
+                            val isSelected = station.id == s.selected
+                            val isFav = s.isRadioFavorite(station.id)
+                            RadioStationCard(
+                                station = station,
+                                isSelected = isSelected,
+                                isFavorite = isFav,
+                                image = image,
+                                onToggleFavorite = {
+                                    s.touchPanelInteraction()
+                                    s.toggleFavoriteWithToast(station.id)
+                                },
+                                onClick = {
+                                    s.touchPanelInteraction()
+                                    s.select(station.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -547,7 +641,9 @@ fun RadioScreen(
 private fun RadioStationCard(
     station: PreviewChannel,
     isSelected: Boolean,
+    isFavorite: Boolean,
     image: @Composable (String, Modifier) -> Unit,
+    onToggleFavorite: () -> Unit,
     onClick: () -> Unit
 ) {
     val borderColor = if (isSelected) amber else Color(0xFF283A4E)
@@ -564,28 +660,42 @@ private fun RadioStationCard(
         strokeWidth = if (isSelected) 2.dp else 1.dp,
         radius = 10.dp,
         padding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+        long = onToggleFavorite,
         focusKey = "radio:station:${PreviewCodec.id(station.id)}",
         content = {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceAround
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .padding(2.dp),
-                    contentAlignment = Alignment.Center
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceAround
                 ) {
-                    image(station.logo.ifEmpty { "ikon_audio" }, Modifier.fillMaxSize())
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .padding(2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        image(station.logo.ifEmpty { "ikon_audio" }, Modifier.fillMaxSize())
+                    }
+                    Label(
+                        value = station.name,
+                        size = 9,
+                        color = if (isSelected) Color(0xFFFFD600) else Color.White,
+                        bold = isSelected,
+                        maxLines = 1
+                    )
                 }
-                Label(
-                    value = station.name,
-                    size = 9,
-                    color = if (isSelected) Color(0xFFFFD600) else Color.White,
-                    bold = isSelected,
-                    maxLines = 1
-                )
+                if (isFavorite) {
+                    Label(
+                        value = "★",
+                        size = 10,
+                        color = Color(0xFFFFD600),
+                        bold = true,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 0.dp, end = 2.dp)
+                    )
+                }
             }
         },
         click = onClick

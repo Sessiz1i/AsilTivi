@@ -247,4 +247,62 @@ class RadioStateTest {
         assertEquals(PlaybackStatus.LOADING, s.playbackStatus)
         assertNull(s.playbackError)
     }
+
+    @Test
+    fun radioFavoriteToggleAndFilteringWorkForFixtureAndCatalogStations() = runBlocking {
+        // Yalnızca TV kanalı içeren bir katalogda (TiviListe.m3u gibi) radyo istasyonları PreviewFixture.radioChannels'dan gelir
+        val tv1 = PreviewChannel(OpaqueId(1, 1), "TRT 1", "Ulusal", "logo_trt1")
+        var savedData = PreviewData(channels = listOf(tv1), favorites = listOf(tv1.id))
+        val store = object : PreviewStore {
+            override suspend fun load() = savedData
+            override suspend fun save(data: PreviewData) { savedData = data }
+        }
+
+        val s = PreviewState(store, this)
+        s.load()
+        s.enterRadioMode()
+
+        assertEquals("Tümü", s.radioCategory)
+        assertEquals(12, s.filteredRadioChannels.size)
+        assertTrue(s.favoriteRadioChannels.isEmpty())
+
+        val trtFm = PreviewFixture.radioChannels[0] // 101: TRT FM
+        val kralFm = PreviewFixture.radioChannels[1] // 102: Kral FM
+        assertFalse(s.isRadioFavorite(trtFm.id))
+
+        // TRT FM ve Kral FM'i favorilere ekle
+        val beforeRev = s.panelInteractionRevision
+        s.toggleFavoriteWithToast(trtFm.id)
+        yield()
+        assertTrue(s.isRadioFavorite(trtFm.id))
+        assertEquals(1, s.favoriteRadioChannels.size)
+        assertEquals("TRT FM", s.favoriteRadioChannels.first().name)
+        assertEquals("✅ ⭐ TRT FM favorilere eklendi", s.bottomToastMessage)
+        assertEquals(ToastTone.Success, s.bottomToastTone)
+        assertTrue(s.panelInteractionRevision > beforeRev)
+
+        s.toggleFavoriteWithToast(kralFm.id)
+        yield()
+        assertTrue(s.isRadioFavorite(kralFm.id))
+        assertEquals(2, s.favoriteRadioChannels.size)
+
+        // Favoriler sekmesine geç
+        s.radioCategory = "Favoriler"
+        assertEquals(listOf(trtFm.id, kralFm.id), s.filteredRadioChannels.map { it.id })
+
+        // Favoriler sekmesinde stepChannel sadece favori radyo istasyonları arasında gezinir
+        s.select(trtFm.id)
+        s.stepChannel(1)
+        assertEquals(kralFm.id, s.selected)
+        s.stepChannel(1)
+        assertEquals(trtFm.id, s.selected) // 3. istasyona (Power FM) geçmez, başa sarar
+
+        // TRT FM'i favorilerden çıkar
+        s.toggleFavoriteWithToast(trtFm.id)
+        yield()
+        assertFalse(s.isRadioFavorite(trtFm.id))
+        assertEquals(1, s.favoriteRadioChannels.size)
+        assertEquals("⭐ TRT FM favorilerden çıkarıldı", s.bottomToastMessage)
+        assertEquals(ToastTone.Warning, s.bottomToastTone)
+    }
 }

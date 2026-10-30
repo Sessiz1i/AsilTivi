@@ -444,9 +444,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     var isRadioMode by mutableStateOf(false); private set
     var radioScreenDimmed by mutableStateOf(false); private set
+    var radioCategory by mutableStateOf("Tümü")
     var lastTvChannel by mutableStateOf<OpaqueId?>(null); private set
     var lastRadioChannel by mutableStateOf<OpaqueId?>(null); private set
     val radioChannels get() = data.channels.filter { it.available && it.isAudioOrRadio }.ifEmpty { PreviewFixture.radioChannels }
+    val favoriteRadioChannels: List<PreviewChannel>
+        get() = data.favorites.mapNotNull { id -> radioChannels.find { it.id == id } }
+    val filteredRadioChannels: List<PreviewChannel>
+        get() = if (radioCategory == "Favoriler") favoriteRadioChannels else radioChannels
+    fun isRadioFavorite(id: OpaqueId?): Boolean = id != null && id in data.favorites
     fun dimRadioScreen() {
         if (!isRadioMode) return
         radioScreenDimmed = true
@@ -582,7 +588,11 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             return
         }
         if (!normalLiveControls || delta !in listOf(-1, 1)) return
-        val candidates = if (isRadioMode) radioChannels else visibleData.filtered(category, query)
+        val candidates = if (isRadioMode) {
+            if (radioCategory == "Favoriler" && favoriteRadioChannels.isNotEmpty()) favoriteRadioChannels else radioChannels
+        } else {
+            visibleData.filtered(category, query)
+        }
         if (candidates.isEmpty()) return
         val current = candidates.indexOfFirst { it.id == selected }
         val next = if (current < 0) { if (delta > 0) 0 else candidates.lastIndex }
@@ -731,9 +741,15 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
     }
     fun toggleFavoriteWithToast(channelId: OpaqueId) {
-        val ch = data.channels.find { it.id == channelId } ?: return
+        val ch = data.channels.find { it.id == channelId } ?: radioChannels.find { it.id == channelId } ?: return
         val wasFavorite = channelId in data.favorites
+        if (isRadioMode) {
+            touchPanelInteraction()
+        }
         channelChange(data.toggleFavorite(channelId)) {
+            if (isRadioMode) {
+                touchPanelInteraction()
+            }
             if (!wasFavorite) {
                 showBottomToast("✅ ⭐ ${ch.name} favorilere eklendi", ToastTone.Success)
             } else {

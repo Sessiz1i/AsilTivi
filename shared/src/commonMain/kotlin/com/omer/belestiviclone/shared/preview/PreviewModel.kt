@@ -32,7 +32,7 @@ object PreviewFixture {
             name = "TRT FM",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-fm-radyo-kanali.f4fa31f.png",
-            definition = def("https://radio-trtfm.live.trt.com.tr/master.m3u8"),
+            definition = def("https://rd-trtfm.medya.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -59,7 +59,7 @@ object PreviewFixture {
             name = "TRT Radyo 1",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-1-radyo-kanali.1dc612f.png",
-            definition = def("https://radio-trtradyo1.live.trt.com.tr/master.m3u8"),
+            definition = def("https://rd-trtradyo1.medya.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -68,7 +68,7 @@ object PreviewFixture {
             name = "TRT Radyo 3",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-radyo-3-radyo-kanali.101a3cf.png",
-            definition = def("https://radio-trtradyo3.live.trt.com.tr/master.m3u8"),
+            definition = def("https://rd-trtradyo3.medya.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -77,7 +77,7 @@ object PreviewFixture {
             name = "TRT Nağme",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-nagme-radyo-kanali.287afc0.png",
-            definition = def("https://radio-trtnagme.live.trt.com.tr/master.m3u8"),
+            definition = def("https://rd-trtnagme.medya.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
@@ -86,7 +86,7 @@ object PreviewFixture {
             name = "TRT Türkü",
             category = "Radyo",
             logo = "https://www.trt.net.tr/_nuxt/img/trt-turku-radyo-kanali.7cd2153.png",
-            definition = def("https://radio-trtturku.live.trt.com.tr/master.m3u8"),
+            definition = def("https://rd-trtturku.medya.trt.com.tr/master.m3u8"),
             isRadio = true,
             groups = listOf("Radyo")
         ),
