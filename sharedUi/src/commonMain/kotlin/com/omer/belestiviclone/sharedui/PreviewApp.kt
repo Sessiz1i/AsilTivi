@@ -1994,35 +1994,118 @@ private fun ChannelMenu(s: PreviewState, image: @Composable (String, Modifier) -
     val first = remember { FocusRequester() }
     val favorite = s.dialog == "favorite"
     val contentDensity = LocalDensity.current
+    val theme = remember(s.data.pref("theme")) { AppThemes.get(s.data.pref("theme")) }
+    val menuShape = RoundedCornerShape(16.dp)
+    val isFav = ch.id in s.data.favorites
     Dialog(onDismissRequest = s::dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         CompositionLocalProvider(LocalDensity provides contentDensity) {
-        Column(Modifier.width(240.5.dp).background(Color(0xF5121212), RoundedCornerShape(13.dp)).border(1.dp, Color(0xFF414141), RoundedCornerShape(13.dp)).clip(RoundedCornerShape(13.dp)).focusGroup().semantics { paneTitle = ch.name }) {
-            Row(Modifier.fillMaxWidth().height(46.dp).padding(horizontal = 11.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                image(ch.logo, Modifier.size(29.dp, 30.dp)); Column(Modifier.weight(1f)) { Label(ch.name, 11, bold = true); Label(ch.category, 9, Color(0xFF9A9A9A)) }
-            }
-            @Composable fun row(label: String, icon: String, modifier: Modifier = Modifier, dismiss: Boolean = false, click: () -> Unit) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF303030)))
-                Action(label, modifier.fillMaxWidth().height(if (dismiss) 33.dp else 44.5.dp), enabled = !s.busy, tint = Color.Transparent, radius = 0.dp, strokeWidth = 0.dp, focusColor = Color(0xFFFFD600), horizontalFocus = true, padding = PaddingValues(horizontal = if (dismiss) 5.dp else 15.dp), content = {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (dismiss) Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally) else Arrangement.spacedBy(9.dp)) {
-                        if (icon.startsWith(":")) Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) { Label(icon.drop(1), 22, Color(0xFFB8B8B8)) }
-                        else image(icon, Modifier.size(if (dismiss) 9.dp else 26.dp))
-                        Label(label, 10, if (dismiss) Color(0xFF818181) else Color.White, if (dismiss) Modifier else Modifier.weight(1f), bold = !dismiss)
-                        if (!dismiss) Label("›", 15, Color(0xFF555555))
+            Column(
+                Modifier
+                    .width(268.dp)
+                    .background(theme.settingsPanelBg, menuShape)
+                    .border(1.dp, theme.settingsCardBorder, menuShape)
+                    .clip(menuShape)
+                    .padding(10.dp)
+                    .focusGroup()
+                    .semantics { paneTitle = ch.name },
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(theme.settingsCardBg, RoundedCornerShape(11.dp))
+                        .border(1.dp, theme.settingsCardBorder.copy(alpha = 0.7f), RoundedCornerShape(11.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .background(Color(0xFF0A1422), RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        image(ch.logo.ifEmpty { "ikon_tv" }, Modifier.fillMaxSize())
                     }
-                }, click = click)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Label(ch.name, 12, theme.headingTitleColor, bold = true, maxLines = 1)
+                        Label(ch.category.ifEmpty { if (ch.isAudioOrRadio) "Radyo" else "TV" }, 9, theme.settingsMutedText, maxLines = 1)
+                    }
+                    if (isFav) {
+                        Label("★", 13, Color(0xFFFFD600), bold = true)
+                    }
+                }
+                @Composable
+                fun row(label: String, iconKind: String, modifier: Modifier = Modifier, dismiss: Boolean = false, click: () -> Unit) {
+                    if (dismiss) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .height(1.dp)
+                                .background(theme.settingsCardBorder.copy(alpha = 0.5f))
+                        )
+                    }
+                    Action(
+                        label,
+                        modifier.fillMaxWidth().height(if (dismiss) 36.dp else 42.dp),
+                        enabled = !s.busy,
+                        tint = Color.Transparent,
+                        radius = 10.dp,
+                        strokeWidth = 0.dp,
+                        focusColor = theme.accentColor,
+                        focusFill = theme.focusFill,
+                        horizontalFocus = false,
+                        padding = PaddingValues(horizontal = 10.dp),
+                        content = {
+                            if (dismiss) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                                ) {
+                                    ChannelMenuIcon("cancel", color = theme.settingsMutedText, modifier = Modifier.size(12.dp))
+                                    Label(label, 10, theme.settingsMutedText, bold = true)
+                                }
+                            } else {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .size(28.dp)
+                                            .background(theme.settingsCardBg, RoundedCornerShape(7.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        ChannelMenuIcon(iconKind, color = theme.accentColor, modifier = Modifier.size(15.dp))
+                                    }
+                                    Label(label, 11, Color.White, Modifier.weight(1f), bold = true)
+                                    Label("›", 14, theme.settingsMutedText, bold = true)
+                                }
+                            }
+                        },
+                        click = click
+                    )
+                }
+                row(
+                    if (isFav) "Favorilerden kaldır" else "Favorilere ekle",
+                    if (isFav) "favorite_remove" else "favorite_add",
+                    Modifier.focusRequester(first)
+                ) { s.toggleFavoriteWithToast(ch.id) }
+                if (favorite) {
+                    row("Sırasını değiştir…", "reorder", click = s::moveStart)
+                    row("En başa taşı", "move_start") { s.moveFavoriteToStart(ch.id) }
+                    row("En sona taşı", "move_end") { s.moveFavoriteToEnd(ch.id) }
+                } else {
+                    row("Kanalı gizle", "hide") { s.hideChannelWithToast(ch.id) }
+                    row("Gizlenen kanalları geri getir", "unhide") { s.commit(s.data.copy(hidden = emptySet())) { s.dismiss() } }
+                }
+                row("Vazgeç", "cancel", dismiss = true, click = s::dismiss)
             }
-            row(if (ch.id in s.data.favorites) "Favorilerden kaldır" else "Favorilere ekle", if (ch.id in s.data.favorites) "ikon_menu_favoriden_cikar" else "ikon_menu_favori", Modifier.focusRequester(first)) { s.toggleFavoriteWithToast(ch.id) }
-            if (favorite) {
-                row("Sırasını değiştir…", ":↔", click = s::moveStart)
-                row("En başa taşı", ":⇤") { s.moveFavoriteToStart(ch.id) }
-                row("En sona taşı", ":⇥") { s.moveFavoriteToEnd(ch.id) }
-            } else {
-                row("Kanalı gizle", "ikon_menu_gizle") { s.hideChannelWithToast(ch.id) }
-                row("Gizlenen kanalları geri getir", "ikon_menu_gerigetir") { s.commit(s.data.copy(hidden = emptySet())) { s.dismiss() } }
-            }
-            row("Vazgeç", "ikon_menu_vazgec", dismiss = true, click = s::dismiss)
-        }
-        LaunchedEffect(Unit) { first.requestFocus() }
+            LaunchedEffect(Unit) { first.requestFocus() }
         }
     }
 }

@@ -62,5 +62,8 @@ class AppThemeTest {
         assertEquals(Color(0xFFE50914), cinema.settingsAccent)
         assertEquals(Color(0xFFE50914), cinema.settingsFocusStroke)
         assertEquals(Color(0xFF3D1014), cinema.settingsFocusFill)
+        assertEquals(Color(0xFF3D1014), cinema.focusFill)
+        assertEquals(Color(0xFF223654), modern.settingsCardBorder)
+        assertEquals(Color(0xFF8A9AB0), modern.settingsMutedText)
     }
 }

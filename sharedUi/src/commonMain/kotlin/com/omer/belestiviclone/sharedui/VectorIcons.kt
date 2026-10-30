@@ -993,3 +993,114 @@ internal fun SettingsRowIcon(
         }
     }
 }
+
+/**
+ * Faz D9: Uzun basma (ChannelMenu) penceresi satırları için tam ortalanmış,
+ * minimalist monokrom Canvas vektörel ikonlar.
+ */
+@Composable
+fun ChannelMenuIcon(
+    kind: String,
+    color: Color,
+    modifier: Modifier = Modifier.size(16.dp)
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val cx = w * 0.5f
+        val cy = h * 0.5f
+        val stroke = 1.4f.dp.toPx()
+
+        fun buildStarPath(scx: Float, scy: Float, outerR: Float): Path {
+            val innerR = outerR * 0.42f
+            return Path().apply {
+                for (i in 0 until 10) {
+                    val angle = (-90.0 + i * 36.0) * kotlin.math.PI / 180.0
+                    val r = if (i % 2 == 0) outerR else innerR
+                    val x = scx + (r * kotlin.math.cos(angle)).toFloat()
+                    val y = scy + (r * kotlin.math.sin(angle)).toFloat()
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+        }
+
+        when (kind) {
+            "favorite_add" -> {
+                val starPath = buildStarPath(w * 0.44f, cy, w * 0.34f)
+                drawPath(starPath, color = color, style = Stroke(stroke, join = StrokeJoin.Round))
+                val px = w * 0.79f
+                val py = h * 0.73f
+                val arm = w * 0.11f
+                drawLine(color, Offset(px - arm, py), Offset(px + arm, py), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(px, py - arm), Offset(px, py + arm), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "favorite_remove" -> {
+                val starPath = buildStarPath(w * 0.44f, cy, w * 0.34f)
+                drawPath(starPath, color = color, style = Stroke(stroke, join = StrokeJoin.Round))
+                val px = w * 0.78f
+                val py = h * 0.74f
+                val arm = w * 0.13f
+                drawLine(color, Offset(px - arm, py), Offset(px + arm, py), strokeWidth = stroke * 1.15f, cap = StrokeCap.Round)
+            }
+            "reorder" -> {
+                val xLeft = w * 0.14f
+                val xRight = w * 0.86f
+                val head = w * 0.19f
+                drawLine(color, Offset(xLeft, cy), Offset(xRight, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(xLeft + head, cy - head * 0.85f), Offset(xLeft, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(xLeft + head, cy + head * 0.85f), Offset(xLeft, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(xRight - head, cy - head * 0.85f), Offset(xRight, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(xRight - head, cy + head * 0.85f), Offset(xRight, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "move_start" -> {
+                val barX = w * 0.16f
+                val barHalf = h * 0.27f
+                val tipX = w * 0.31f
+                val endX = w * 0.86f
+                val head = w * 0.19f
+                drawLine(color, Offset(barX, cy - barHalf), Offset(barX, cy + barHalf), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(tipX, cy), Offset(endX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(tipX + head, cy - head * 0.85f), Offset(tipX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(tipX + head, cy + head * 0.85f), Offset(tipX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "move_end" -> {
+                val barX = w * 0.84f
+                val barHalf = h * 0.27f
+                val startX = w * 0.14f
+                val tipX = w * 0.69f
+                val head = w * 0.19f
+                drawLine(color, Offset(barX, cy - barHalf), Offset(barX, cy + barHalf), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(startX, cy), Offset(tipX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(tipX - head, cy - head * 0.85f), Offset(tipX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(tipX - head, cy + head * 0.85f), Offset(tipX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "hide" -> {
+                val eyePath = Path().apply {
+                    moveTo(w * 0.12f, cy)
+                    quadraticTo(cx, cy - h * 0.34f, w * 0.88f, cy)
+                    quadraticTo(cx, cy + h * 0.34f, w * 0.12f, cy)
+                    close()
+                }
+                drawPath(eyePath, color = color, style = Stroke(stroke, join = StrokeJoin.Round))
+                drawCircle(color = color, radius = w * 0.11f, center = Offset(cx, cy), style = Stroke(stroke * 0.9f))
+                drawLine(color, Offset(w * 0.20f, h * 0.80f), Offset(w * 0.80f, h * 0.20f), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            "unhide" -> {
+                val eyePath = Path().apply {
+                    moveTo(w * 0.12f, cy)
+                    quadraticTo(cx, cy - h * 0.34f, w * 0.88f, cy)
+                    quadraticTo(cx, cy + h * 0.34f, w * 0.12f, cy)
+                    close()
+                }
+                drawPath(eyePath, color = color, style = Stroke(stroke, join = StrokeJoin.Round))
+                drawCircle(color = color, radius = w * 0.12f, center = Offset(cx, cy), style = Stroke(stroke))
+            }
+            "cancel" -> {
+                val d = w * 0.25f
+                drawLine(color, Offset(cx - d, cy - d), Offset(cx + d, cy + d), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(cx + d, cy - d), Offset(cx - d, cy + d), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+        }
+    }
+}
