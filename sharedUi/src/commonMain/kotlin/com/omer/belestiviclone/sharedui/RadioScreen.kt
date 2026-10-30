@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -191,7 +193,7 @@ fun RadioScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 22.dp, end = 26.dp),
+                .padding(top = if (s.panel) 62.dp else 22.dp, end = 24.dp),
             horizontalAlignment = Alignment.End
         ) {
             Label(timeLabel, 26, Color.White, bold = true)
@@ -227,7 +229,7 @@ fun RadioScreen(
             Row(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 64.dp, end = 20.dp)
+                    .padding(top = 20.dp, end = 20.dp)
                     .onGloballyPositioned { boundsObserver("radio-top-actions", it.boundsInWindow()) }
                     .horizontalScroll(rememberScrollState())
                     .focusGroup(),
@@ -312,7 +314,7 @@ fun RadioScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = if (s.panel) (if (s.moving != null) 186.dp else 142.dp) else 34.dp),
+                .padding(bottom = if (s.panel) 142.dp else 34.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -511,41 +513,8 @@ fun RadioScreen(
                         }
                     }
 
-                    // Sırala / Favori Ekle/Çıkar / Oynat/Duraklat / Ses Aç/Kapat / Yenile Butonları
+                    // Favori Ekle/Çıkar / Oynat/Duraklat / Ses Aç/Kapat / Yenile Butonları
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val isReordering = s.moving != null
-                        if (s.radioCategory == "Favoriler" && s.favoriteRadioChannels.size >= 2) {
-                            Action(
-                                label = if (isReordering) "✓ Kaydet" else "⇅ Sırala",
-                                selected = isReordering,
-                                tint = if (isReordering) Color(0xFF1F8B4C) else Color(0xB8000000),
-                                selectedTint = Color(0xFF1F8B4C),
-                                radius = 8.dp,
-                                stroke = if (isReordering) Color(0x884ADE80) else Color(0xFFFFCF37),
-                                focusKey = "radio:action:reorder",
-                                content = {
-                                    Label(
-                                        if (isReordering) "✓ Kaydet" else "⇅ Sırala",
-                                        10,
-                                        if (isReordering) Color.White else Color(0xFFFFCF37),
-                                        bold = true
-                                    )
-                                }
-                            ) {
-                                s.touchPanelInteraction()
-                                if (isReordering) {
-                                    s.moveFinish()
-                                } else {
-                                    val targetId = currentStation?.id?.takeIf { s.isRadioFavorite(it) }
-                                        ?: s.favoriteRadioChannels.firstOrNull()?.id
-                                    if (targetId != null) {
-                                        s.target = targetId
-                                        s.moveStart()
-                                    }
-                                }
-                            }
-                        }
-
                         val isStationFav = s.isRadioFavorite(currentStation?.id)
                         Action(
                             label = if (isStationFav) "★ Favorilerde" else "☆ Favori Ekle",
@@ -564,6 +533,7 @@ fun RadioScreen(
                                 )
                             }
                         ) {
+                            s.touchPanelInteraction()
                             currentStation?.id?.let { s.toggleFavoriteWithToast(it) }
                         }
 
@@ -578,7 +548,10 @@ fun RadioScreen(
                                     Label(if (s.paused) "Oynat" else "Duraklat", 10, bold = true)
                                 }
                             }
-                        ) { s.paused = !s.paused }
+                        ) {
+                            s.touchPanelInteraction()
+                            s.paused = !s.paused
+                        }
 
                         Action(
                             label = if (s.muted) "Sesi Aç" else "Sessiz",
@@ -591,7 +564,10 @@ fun RadioScreen(
                                     Label(if (s.muted) "Sesi Aç" else "Sessiz", 10, bold = true)
                                 }
                             }
-                        ) { s.muted = !s.muted }
+                        ) {
+                            s.touchPanelInteraction()
+                            s.muted = !s.muted
+                        }
 
                         Action(
                             label = "Yeniden Dene",
@@ -604,90 +580,9 @@ fun RadioScreen(
                                     Label("Yenile", 10, bold = true)
                                 }
                             }
-                        ) { s.retry++ }
-                    }
-                }
-
-                // Radyo Favori Sıralama Çubuğu (s.moving != null iken)
-                val movingStation = s.moving?.let { mId -> s.radioChannels.find { it.id == mId } }
-                if (s.moving != null && movingStation != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .background(Color(0xF0162844), RoundedCornerShape(10.dp))
-                            .border(1.5.dp, Color(0xFFFFCF37), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Label(
-                            "⇅ Sıralama: ${movingStation.name}",
-                            11,
-                            Color(0xFFFFCF37),
-                            bold = true
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Action(
-                                label = "◄ Sola",
-                                tint = Color(0xB8000000),
-                                radius = 7.dp,
-                                stroke = Color(0xFF647B9A),
-                                padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:left",
-                                content = { Label("◄ Sola", 10, Color.White, bold = true) }
-                            ) { s.moveBy(-1) }
-                            Action(
-                                label = "Sağa ►",
-                                tint = Color(0xB8000000),
-                                radius = 7.dp,
-                                stroke = Color(0xFF647B9A),
-                                padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:right",
-                                content = { Label("Sağa ►", 10, Color.White, bold = true) }
-                            ) { s.moveBy(1) }
-                            Action(
-                                label = "⇤ En Başa",
-                                tint = Color(0xB8000000),
-                                radius = 7.dp,
-                                stroke = Color(0xFF647B9A),
-                                padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:start",
-                                content = { Label("⇤ En Başa", 10, Color(0xFFFFD600), bold = true) }
-                            ) { s.moveFavoriteToStart(movingStation.id) }
-                            Action(
-                                label = "En Sona ⇥",
-                                tint = Color(0xB8000000),
-                                radius = 7.dp,
-                                stroke = Color(0xFF647B9A),
-                                padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:end",
-                                content = { Label("En Sona ⇥", 10, Color(0xFFFFD600), bold = true) }
-                            ) { s.moveFavoriteToEnd(movingStation.id) }
-                            Action(
-                                label = "✓ Kaydet",
-                                tint = Color(0xFF1F8B4C),
-                                radius = 7.dp,
-                                stroke = Color(0x884ADE80),
-                                padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:save",
-                                content = { Label("✓ Kaydet", 10, Color.White, bold = true) }
-                            ) { s.moveFinish() }
-                            Action(
-                                label = "✕ İptal",
-                                tint = Color(0xB8000000),
-                                radius = 7.dp,
-                                stroke = Color(0xFF647B9A),
-                                padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                                focusKey = "radio:reorder:cancel",
-                                content = { Label("✕ İptal", 10, Color(0xFFE2E8F0), bold = true) }
-                            ) {
-                                s.draft = null
-                                s.moving = null
-                            }
+                            s.touchPanelInteraction()
+                            s.retry++
                         }
                     }
                 }
@@ -702,8 +597,9 @@ fun RadioScreen(
                     }
                 }
 
-                LaunchedEffect(s.selected, s.radioCategory) {
-                    val index = radioList.indexOfFirst { it.id == s.selected }
+                LaunchedEffect(s.selected, s.radioCategory, s.moving, s.visibleData.favorites) {
+                    val targetId = s.moving ?: s.selected
+                    val index = radioList.indexOfFirst { it.id == targetId }
                     if (index >= 0) {
                         listState.animateScrollToItem((index - 2).coerceAtLeast(0))
                     }
@@ -740,13 +636,13 @@ fun RadioScreen(
                             val isMoving = s.moving == station.id
                             val rankNumber = if (s.radioCategory == "Favoriler") idx + 1 else null
                             RadioStationCard(
+                                s = s,
                                 station = station,
                                 rankNumber = rankNumber,
                                 isSelected = isSelected,
                                 isFavorite = isFav,
                                 isMoving = isMoving,
                                 image = image,
-                                onMoveBy = { delta -> s.moveBy(delta) },
                                 onLongPress = {
                                     s.touchPanelInteraction()
                                     if (s.radioCategory == "Favoriler") {
@@ -757,17 +653,7 @@ fun RadioScreen(
                                     }
                                 },
                                 onClick = {
-                                    s.touchPanelInteraction()
-                                    if (s.moving != null) {
-                                        if (s.moving == station.id) {
-                                            s.moveFinish()
-                                        } else if (s.isRadioFavorite(station.id)) {
-                                            s.target = station.id
-                                            s.moving = station.id
-                                        }
-                                    } else {
-                                        s.select(station.id)
-                                    }
+                                    s.selectFromList(station.id)
                                 }
                             )
                         }
@@ -775,21 +661,52 @@ fun RadioScreen(
                 }
             }
         }
+
+        if (s.moving != null) {
+            Row(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 25.dp)
+                    .background(Color(0xFF243F66), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp))
+                Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
+            }
+        }
     }
 }
 
 @Composable
 private fun RadioStationCard(
+    s: PreviewState,
     station: PreviewChannel,
     rankNumber: Int? = null,
     isSelected: Boolean,
     isFavorite: Boolean,
     isMoving: Boolean = false,
     image: @Composable (String, Modifier) -> Unit,
-    onMoveBy: (Int) -> Unit = {},
     onLongPress: () -> Unit,
     onClick: () -> Unit
 ) {
+    val returns = LocalFocusReturn.current
+    val focusKey = "radio:station:${PreviewCodec.id(station.id)}"
+    val requester = remember(returns, focusKey) {
+        returns?.registry?.requester(focusKey) { FocusRequester() } ?: FocusRequester()
+    }
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    var drag by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(s.dialog, s.moving, s.target, windowFocused) {
+        if (windowFocused && s.dialog == null && (s.target == station.id || s.moving == station.id)) {
+            runCatching { requester.requestFocus() }
+            withFrameNanos { }
+            runCatching { requester.requestFocus() }
+        }
+    }
+
     val borderColor = when {
         isMoving -> Color(0xFFFFCF37)
         isSelected -> amber
@@ -806,7 +723,23 @@ private fun RadioStationCard(
         label = displayTitle,
         modifier = Modifier
             .width(88.dp)
-            .fillMaxHeight(),
+            .fillMaxHeight()
+            .then(
+                if (isMoving) Modifier.pointerInput(station.id) {
+                    detectDragGestures(
+                        onDragStart = { drag = 0f },
+                        onDragEnd = { s.moveFinish() },
+                        onDragCancel = { s.draft = null; s.moving = null }
+                    ) { change, amount ->
+                        change.consume()
+                        drag += amount.x
+                        if (kotlin.math.abs(drag) > 45f) {
+                            s.moveBy(if (drag > 0f) 1 else -1)
+                            drag = 0f
+                        }
+                    }
+                } else Modifier
+            ),
         selected = isSelected || isMoving,
         tint = bgColor,
         stroke = borderColor,
@@ -815,13 +748,20 @@ private fun RadioStationCard(
         radius = 10.dp,
         padding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         long = onLongPress,
+        keyClick = {
+            if (isMoving) s.moveFinish()
+            else {
+                runCatching { requester.requestFocus() }
+                onClick()
+            }
+        },
         extraKey = { e ->
             if (isMoving && e.type == KeyEventType.KeyDown && e.key in listOf(Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown)) {
-                onMoveBy(if (e.key in listOf(Key.DirectionLeft, Key.DirectionUp)) -1 else 1)
+                s.moveBy(if (e.key in listOf(Key.DirectionLeft, Key.DirectionUp)) -1 else 1)
                 true
             } else false
         },
-        focusKey = "radio:station:${PreviewCodec.id(station.id)}",
+        focusKey = focusKey,
         content = {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(
@@ -858,7 +798,15 @@ private fun RadioStationCard(
                 }
             }
         },
-        click = onClick
+        click = {
+            if (isMoving) {
+                s.moveFinish()
+            } else {
+                s.touchPanelInteraction()
+                runCatching { requester.requestFocus() }
+                onClick()
+            }
+        }
     )
 }
 

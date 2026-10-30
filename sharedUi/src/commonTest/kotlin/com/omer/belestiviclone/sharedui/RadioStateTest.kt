@@ -385,4 +385,20 @@ class RadioStateTest {
         assertEquals(listOf(tv2.id, tv1.id, tv3.id), s.data.filtered("FAVORİ TV", "").map { it.id })
         assertEquals(listOf(r2.id, r1.id, r3.id), s.favoriteRadioChannels.map { it.id })
     }
+
+    @Test
+    fun selectFromListInRadioModeKeepsPanelOpenAndRefreshesAutoDismissTimer() = runBlocking {
+        val r1 = PreviewFixture.radioChannels[0]
+        val r2 = PreviewFixture.radioChannels[1]
+        val s = PreviewState(DummyStore(), this)
+        s.load()
+        s.enterRadioMode()
+        assertTrue(s.panel)
+
+        val beforeRev = s.panelInteractionRevision
+        s.selectFromList(r2.id)
+        assertEquals(r2.id, s.selected)
+        assertTrue(s.panel)
+        assertTrue(s.panelInteractionRevision > beforeRev)
+    }
 }

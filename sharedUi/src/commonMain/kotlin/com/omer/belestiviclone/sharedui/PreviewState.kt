@@ -465,16 +465,19 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun enterRadioMode() {
         if (isRadioMode) return
+        leaveLiveLayers()
         lastTvChannel = selected
         isRadioMode = true
         radioScreenDimmed = false
         panel = true
+        touchPanelInteraction()
         val target = lastRadioChannel?.takeIf { id -> radioChannels.any { it.id == id } } ?: radioChannels.firstOrNull()?.id
         if (target != null && target != selected) select(target)
         notice = message("Radyo modu açıldı.", "Radio mode enabled.", "Radiomodus aktiviert.")
     }
     fun exitRadioMode() {
         if (!isRadioMode) return
+        leaveLiveLayers()
         lastRadioChannel = selected
         isRadioMode = false
         radioScreenDimmed = false
@@ -786,13 +789,20 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         paused = false
         isBehindLiveEdge = false
         seekOffsetSeconds = 0L
-        if (page == "live" && !isRadioMode) {
-            if (keepPanel) {
-                panel = true
-                touchPanelInteraction()
+        if (page == "live") {
+            if (isRadioMode) {
+                if (keepPanel) {
+                    panel = true
+                    touchPanelInteraction()
+                }
             } else {
-                panel = false
-                showZapCard()
+                if (keepPanel) {
+                    panel = true
+                    touchPanelInteraction()
+                } else {
+                    panel = false
+                    showZapCard()
+                }
             }
         }
         if (playbackUri(channel) == null) notice = if (channel?.available == false)

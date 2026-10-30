@@ -52,7 +52,7 @@ import kotlin.time.TimeSource
 private val amber = Color(0xFFE67E22)
 private val card = Color(0xFF13233D)
 private val ink = Color(0xFF0A1628)
-private class FocusReturn {
+internal class FocusReturn {
     val registry = FocusRegistry<FocusRequester>()
     var blockBackground by mutableStateOf(false)
     var capture = true
@@ -60,8 +60,8 @@ private class FocusReturn {
     var restore: FocusRequester? = null
     val active = mutableListOf<FocusRequester>()
 }
-private val LocalFocusReturn = staticCompositionLocalOf<FocusReturn?> { null }
-private val LocalKeySignal = staticCompositionLocalOf<(KeyEvent) -> KeyPressSignal> { { KeyPressSignal() } }
+internal val LocalFocusReturn = staticCompositionLocalOf<FocusReturn?> { null }
+internal val LocalKeySignal = staticCompositionLocalOf<(KeyEvent) -> KeyPressSignal> { { KeyPressSignal() } }
 private val LocalFocusObserver = staticCompositionLocalOf<(String) -> Unit> { {} }
 private val LocalNavigationObserver = staticCompositionLocalOf<(KeyEvent) -> Unit> { {} }
 internal val LocalBoundsObserver = staticCompositionLocalOf<(String, Rect) -> Unit> { { _, _ -> } }
@@ -168,7 +168,7 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
                             "home" -> "home:live"
                             "settings" -> "settings:section:${s.section}"
                             "multi" -> "multi:slot:${s.multi?.selected ?: 0}"
-                            else -> "channel:${PreviewCodec.id(s.selected)}"
+                            else -> if (s.isRadioMode) "radio:station:${PreviewCodec.id(s.moving ?: s.selected)}" else "channel:${PreviewCodec.id(s.moving ?: s.selected)}"
                         }
                         returns.registry.entryTarget(key, returns.active)
                     } else null
@@ -179,7 +179,24 @@ fun PreviewApp(s: PreviewState, appVersionName: String, image: @Composable (Stri
     }
     LaunchedEffect(s) { s.load() }
     CompositionLocalProvider(LocalFocusReturn provides returns, LocalEnglish provides (s.data.pref("language") == "English"), LocalLanguage provides s.data.pref("language"), LocalKeySignal provides platformKeySignal, LocalFocusObserver provides onFocusTarget, LocalNavigationObserver provides onNavigationKey, LocalBoundsObserver provides onLayoutBounds, LocalPanelInteraction provides s::touchPanelInteraction) {
-    Box(Modifier.fillMaxSize().onGloballyPositioned { onLayoutBounds("window-root", it.boundsInWindow()) }.background(Color.Black).safeDrawingPadding()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { onLayoutBounds("window-root", it.boundsInWindow()) }
+            .onKeyEvent { e ->
+                if (s.moving != null && s.dialog == null && s.page == "live") {
+                    if (e.type == KeyEventType.KeyDown && e.key in listOf(Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown)) {
+                        s.moveBy(if (e.key in listOf(Key.DirectionLeft, Key.DirectionUp)) -1 else 1)
+                        true
+                    } else if (e.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) {
+                        if (e.type == KeyEventType.KeyUp) s.moveFinish()
+                        true
+                    } else false
+                } else false
+            }
+            .background(Color.Black)
+            .safeDrawingPadding()
+    ) {
     BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { onLayoutBounds("safe-root", it.boundsInWindow()) }) {
     val density = LocalDensity.current
     val scale = minOf(maxWidth.value / 855f, maxHeight.value / 481f)
@@ -307,18 +324,23 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
         if (s.page != "live") {
             return@BoxWithConstraints
         }
+        LaunchedEffect(s.panel, s.selected, s.query, s.categoryMenu, s.moving, s.dialog, s.info, s.panelInteractionRevision, s.isRadioMode, s.radioCategory) {
+            val canAutoDismiss = if (s.isRadioMode) {
+                s.panel && s.page == "live" && s.dialog == null && s.moving == null && !s.radioScreenDimmed
+            } else {
+                s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.categoryMenu && !s.info
+            }
+            if (canAutoDismiss) {
+                kotlinx.coroutines.delay(5000L)
+                s.panel = false
+            }
+        }
         if (s.isRadioMode) {
             RadioScreen(s, image, Modifier.fillMaxSize())
             return@BoxWithConstraints
         }
         if (playbackUri(s.channel) == null) Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) { image(s.channel?.logo ?: "ikon_tv", Modifier.size(70.dp)); Label(if (s.channel?.available == false) s.message("Kanal etkin kaynaklarda erişilemiyor", "Channel unavailable in active sources", "Kanal in aktiven Quellen nicht verfügbar") else if (s.isPublic) "Oynatma tanımı desteklenmiyor" else "Yayın bağlantısı yok", 11) }
-        }
-        LaunchedEffect(s.panel, s.selected, s.query, s.categoryMenu, s.moving, s.dialog, s.info, s.panelInteractionRevision) {
-            if (s.panel && s.page == "live" && s.dialog == null && !s.searching && s.moving == null && !s.categoryMenu && !s.info) {
-                kotlinx.coroutines.delay(5000L)
-                s.panel = false
-            }
         }
         LaunchedEffect(s.panel, s.category, s.selected) {
             if (s.panel) {
@@ -566,52 +588,8 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 Label(numLabel, 15, Color.White, bold = true, maxLines = 1)
             }
         }
-        if (s.moving != null) {
-            Row(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 25.dp)
-                    .background(Color(0xFF243F66), RoundedCornerShape(10.dp))
-                    .border(1.5.dp, Color(0xFFFFCF37), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp))
-                Label("Yönlerle taşı · OK uygula", 11, Color.White, bold = true)
-                Action(
-                    label = "◄",
-                    tint = Color(0xB8000000),
-                    radius = 7.dp,
-                    stroke = Color(0xFF647B9A),
-                    padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                    content = { Label("◄", 11, Color(0xFFFFCF37), bold = true) }
-                ) { s.moveBy(-1) }
-                Action(
-                    label = "►",
-                    tint = Color(0xB8000000),
-                    radius = 7.dp,
-                    stroke = Color(0xFF647B9A),
-                    padding = PaddingValues(horizontal = 9.dp, vertical = 4.dp),
-                    content = { Label("►", 11, Color(0xFFFFCF37), bold = true) }
-                ) { s.moveBy(1) }
-                Action(
-                    label = "✓ Tamam",
-                    tint = Color(0xFF1F8B4C),
-                    radius = 7.dp,
-                    stroke = Color(0x884ADE80),
-                    padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    content = { Label("✓ Tamam", 10, Color.White, bold = true) }
-                ) { s.moveFinish() }
-                Action(
-                    label = "✕ İptal",
-                    tint = Color(0xB8000000),
-                    radius = 7.dp,
-                    stroke = Color(0xFF647B9A),
-                    padding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    content = { Label("✕ İptal", 10, Color(0xFFE2E8F0), bold = true) }
-                ) { s.draft = null; s.moving = null }
-            }
+        if (s.moving != null) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 25.dp).background(Color(0xFF243F66), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF647B9A), RoundedCornerShape(10.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            image("ikon_tasima_bilgi", Modifier.size(35.dp, 17.dp)); Label("Yönlerle taşı · OK uygula · Geri vazgeç", 11, bold = true)
         }
     }
 }
