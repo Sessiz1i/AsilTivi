@@ -4,3 +4,5 @@
 local.properties
 *.keystore
 *.jks
+androidApp/src/main/assets/github_sync.json
+uygulama/androidApp/src/main/assets/github_sync.json

@@ -17,6 +17,7 @@ class PlaybackDiagnosticsTest {
     }
     @Test fun decoderFailureIsNotReportedAsNetwork() {
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODER_INIT_FAILED))
+        assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODING_FAILED))
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED))
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED))
         assertEquals(PlaybackFailure.DECODER, PlaybackFailure.classify(PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED))
@@ -25,6 +26,13 @@ class PlaybackDiagnosticsTest {
             PlaybackFailure.classify(
                 PlaybackException.ERROR_CODE_UNSPECIFIED,
                 causeChain = "ExoPlaybackException>DecoderInitializationException>MediaCodecException"
+            )
+        )
+        assertEquals(
+            PlaybackFailure.DECODER,
+            PlaybackFailure.classify(
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                causeChain = "ExoPlaybackException>MediaCodecVideoDecoderException"
             )
         )
     }

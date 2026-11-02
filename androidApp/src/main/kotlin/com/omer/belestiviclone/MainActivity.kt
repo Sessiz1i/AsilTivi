@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import android.view.KeyEvent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.media3.common.VideoSize
@@ -35,6 +36,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -130,7 +132,9 @@ class MainActivity : ComponentActivity() {
             val eligible = command.eligible(s.normalLiveControls, s.panel, ime)
             val result = navigationPress.event(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount > 0, eligible)
             if (result.perform) {
-                if (command.delta == 0) s.revealLiveControls() else s.stepChannel(command.delta)
+                if (s.page == "live" && s.playbackError != null && command.delta == 0) {
+                    s.retryLive()
+                } else if (command.delta == 0) s.revealLiveControls() else s.stepChannel(command.delta)
                 if (BuildConfig.DEBUG) android.util.Log.i("BelesNav", "action=${if (command.delta == 0) "reveal" else "channel-step"} delta=${command.delta} selected=${PreviewCodec.id(s.selected)} panel=${s.panel}")
             }
             if (result.consumed) return true
@@ -381,7 +385,10 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         )
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
-    val exo = ExoPlayer.Builder(context)
+    val renderersFactory = DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+    val exo = ExoPlayer.Builder(context, renderersFactory)
         .setLoadControl(loadControl)
         .build()
     override var status by mutableStateOf(PlaybackStatus.IDLE); private set
@@ -396,6 +403,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
     private var hasStartedPlayback = false
     private var hasAppliedInitialLiveCushion = false
     private var autoRecoveryCount = 0
+    private var temporaryResolutionCapped = false
     private var requestedPause = false
     private var playbackPreferences by mutableStateOf(PlaybackPreferences())
     private var qualityObservation by mutableStateOf(VideoQualityObservation())
@@ -663,7 +671,12 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     return
                 }
                 val stage = PlaybackFailure.classify(value.errorCode, http, causes)
-                if (hasStartedPlayback && stage != PlaybackFailure.DECODER && autoRecoveryCount < 4) {
+                val canRecover = if (isMultiScreen) {
+                    hasStartedPlayback && stage != PlaybackFailure.DECODER && autoRecoveryCount < 4
+                } else {
+                    (hasStartedPlayback || stage == PlaybackFailure.DECODER) && autoRecoveryCount < 4
+                }
+                if (canRecover) {
                     autoRecoveryCount++
                     val attemptStep = autoRecoveryCount
                     error = null
@@ -678,6 +691,15 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                             exo.prepare()
                             exo.playWhenReady = !requestedPause
                         } else {
+                            if (stage == PlaybackFailure.DECODER) {
+                                temporaryResolutionCapped = true
+                                val builder = exo.trackSelectionParameters.buildUpon().setMaxVideoSize(1920, 1080)
+                                if (builder is androidx.media3.exoplayer.trackselection.DefaultTrackSelector.Parameters.Builder) {
+                                    builder.setExceedVideoConstraintsIfNecessary(false)
+                                }
+                                exo.trackSelectionParameters = builder.build()
+                                log(active, "auto-recover capping video to 1080p fallback for channel=${channel?.name}")
+                            }
                             selectInternal(channel, preserveRecoveryState = true)
                         }
                     }
@@ -701,6 +723,12 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
             hasStartedPlayback = false
             hasAppliedInitialLiveCushion = false
             autoRecoveryCount = 0
+            if (temporaryResolutionCapped) {
+                temporaryResolutionCapped = false
+                val selector = exo.trackSelector as? androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+                val base = selector?.parameters ?: exo.trackSelectionParameters
+                exo.trackSelectionParameters = VideoQualitySelection.parameters(base, playbackPreferences)
+            }
         }
         attempt = null // Ignore stop/clear and any callbacks from the previous media item.
         resetCueObserver();audioTracks=emptyList();textTracks=emptyList()
@@ -791,7 +819,12 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     val causes = causeClasses(failure)
                     val classified = PlaybackFailure.classify(PlaybackException.ERROR_CODE_UNSPECIFIED, httpStatus(failure), causes)
                     val effectiveStage = if (classified == PlaybackFailure.DECODER) PlaybackFailure.DECODER else stage
-                    if (hasStartedPlayback && effectiveStage != PlaybackFailure.DECODER && autoRecoveryCount < 4) {
+                    val canRecover = if (isMultiScreen) {
+                        hasStartedPlayback && effectiveStage != PlaybackFailure.DECODER && autoRecoveryCount < 4
+                    } else {
+                        (hasStartedPlayback || effectiveStage == PlaybackFailure.DECODER) && autoRecoveryCount < 4
+                    }
+                    if (canRecover) {
                         autoRecoveryCount++
                         val attemptStep = autoRecoveryCount
                         error = null
@@ -800,6 +833,15 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                         recoveryJob = sourceScope.launch {
                             kotlinx.coroutines.delay(500L * attemptStep)
                             if (released || attempt?.accepts(active.id) != true) return@launch
+                            if (attemptStep >= 2 && effectiveStage == PlaybackFailure.DECODER) {
+                                temporaryResolutionCapped = true
+                                val builder = exo.trackSelectionParameters.buildUpon().setMaxVideoSize(1920, 1080)
+                                if (builder is androidx.media3.exoplayer.trackselection.DefaultTrackSelector.Parameters.Builder) {
+                                    builder.setExceedVideoConstraintsIfNecessary(false)
+                                }
+                                exo.trackSelectionParameters = builder.build()
+                                log(active, "auto-recover capping video to 1080p fallback for channel=${channel.name}")
+                            }
                             selectInternal(channel, preserveRecoveryState = true)
                         }
                         return@launch
@@ -855,6 +897,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
         recoveryJob?.cancel(); recoveryJob = null
         hasStartedPlayback = false; hasAppliedInitialLiveCushion = false; autoRecoveryCount = 0
+        temporaryResolutionCapped = false
         cueListener?.let(exo::removeAnalyticsListener); cueListener = null
         audioTracks = emptyList(); textTracks = emptyList(); technicalInfo = StreamTechnicalInfo()
         sourceScope.cancel(); exo.release()
@@ -947,8 +990,36 @@ internal fun SampleVideo(channel: PreviewChannel?, paused: Boolean, muted: Boole
                     )
                 )
             }
+        } else if (err != null) {
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .clickable { player.select(channel) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BasicText(
+                    err,
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+                BasicText(
+                    "(Tekrar denemek için dokunun veya OK basın)",
+                    style = TextStyle(
+                        color = Color(0xFFD0D7DE),
+                        fontSize = 13.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+            }
         } else {
-            val text = err ?: when (player.status) { PlaybackStatus.LOADING -> "${channel?.name.orEmpty()} yükleniyor…"; PlaybackStatus.ENDED -> "${channel?.name.orEmpty()} bitti · Yeniden dene"; else -> "" }
+            val text = when (player.status) { PlaybackStatus.LOADING -> "${channel?.name.orEmpty()} yükleniyor…"; PlaybackStatus.ENDED -> "${channel?.name.orEmpty()} bitti · Yeniden dene"; else -> "" }
             if (text.isNotEmpty()) {
                 BasicText(text, Modifier.align(Alignment.Center).padding(16.dp), style = TextStyle(color = Color.White, fontSize = 20.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,

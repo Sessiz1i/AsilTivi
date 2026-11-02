@@ -360,6 +360,10 @@ private fun Live(s: PreviewState, image: @Composable (String, Modifier) -> Unit,
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTapGestures {
+                        if (s.playbackError != null) {
+                            s.retryLive()
+                            return@detectTapGestures
+                        }
                         if (s.info || s.dialog == "format") {
                             s.info = false
                             if (s.dialog == "format") s.dialog = null

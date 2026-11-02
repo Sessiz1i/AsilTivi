@@ -238,4 +238,15 @@ class PreviewStateTest {
         assertTrue(progress.progress in 0f..1f)
         assertTrue(progress.elapsedLabel.isNotEmpty())
     }
+    @Test fun retryLiveResetsErrorAndIncrementsRetry() = runBlocking {
+        val s = PreviewState(Store(), this)
+        s.load()
+        s.playbackError = "TRT 1 · Video veya ses çözümlenemedi."
+        s.playbackStatus = PlaybackStatus.ERROR
+        val initialRetry = s.retry
+        s.retryLive()
+        assertEquals(null, s.playbackError)
+        assertEquals(PlaybackStatus.LOADING, s.playbackStatus)
+        assertEquals(initialRetry + 1, s.retry)
+    }
 }

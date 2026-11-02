@@ -810,6 +810,12 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
             showBottomToast("Kanal gizlendi: ${ch.name}", ToastTone.Warning)
         }
     }
+    fun retryLive() {
+        technicalInfo = StreamTechnicalInfo()
+        playbackStatus = PlaybackStatus.LOADING
+        playbackError = null
+        retry++
+    }
     /** Kumanda numarası veya doğrudan seçim: canlı TV'de panel kapanır ve kanal değişim kartı gösterilir. */
     fun select(id: OpaqueId) = changeChannel(id, keepPanel = false)
     /** Alt veya yan kanal listesinden seçim: menü ve sol üst EPG başlığı açık kalır, altta ZapCard çıkmaz. */
