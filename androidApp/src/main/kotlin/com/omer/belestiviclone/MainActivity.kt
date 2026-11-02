@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -367,7 +368,22 @@ private val previewDrawables = mapOf(
 /** Android objects never cross into common code. Public channels retain their own exact URI. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AndroidPreviewPlayer(private val context: android.content.Context, private val isMultiScreen: Boolean = false, private val onPlayed: (com.omer.belestiviclone.shared.catalog.OpaqueId) -> Unit = {}) : PreviewPlayer {
-    val exo = ExoPlayer.Builder(context).build()
+    private val loadControl = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            /* minBufferMs = */ if (isMultiScreen) 25_000 else 50_000,
+            /* maxBufferMs = */ if (isMultiScreen) 45_000 else 90_000,
+            /* bufferForPlaybackMs = */ if (isMultiScreen) 4_000 else 6_500,
+            /* bufferForPlaybackAfterRebufferMs = */ if (isMultiScreen) 8_000 else 12_000,
+        )
+        .setBackBuffer(
+            /* backBufferDurationMs = */ if (isMultiScreen) 15_000 else 45_000,
+            /* retainBackBufferFromKeyframe = */ true,
+        )
+        .setPrioritizeTimeOverSizeThresholds(true)
+        .build()
+    val exo = ExoPlayer.Builder(context)
+        .setLoadControl(loadControl)
+        .build()
     override var status by mutableStateOf(PlaybackStatus.IDLE); private set
     override var error by mutableStateOf<String?>(null); private set
     private var channel: PreviewChannel? = null
@@ -378,6 +394,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
     private var sourceJob: Job? = null
     private var recoveryJob: Job? = null
     private var hasStartedPlayback = false
+    private var hasAppliedInitialLiveCushion = false
     private var autoRecoveryCount = 0
     private var requestedPause = false
     private var playbackPreferences by mutableStateOf(PlaybackPreferences())
@@ -584,6 +601,10 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                 val active = observedAttempt(eventTime) ?: return
                 if (status == PlaybackStatus.ERROR && playbackState == Player.STATE_IDLE) return
                 if (playbackState == Player.STATE_READY) {
+                    if (!hasAppliedInitialLiveCushion && channel?.video != true) {
+                        hasAppliedInitialLiveCushion = true
+                        applyLiveCushionIfTooClose()
+                    }
                     hasStartedPlayback = true
                     autoRecoveryCount = 0
                     error = null
@@ -591,13 +612,19 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                 if (playbackState == Player.STATE_ENDED && channel?.video != true) {
                     log(active, "auto-recover stage=LIVE_STATE_ENDED")
                     error = null
-                    status = PlaybackStatus.LOADING
+                    if (!hasStartedPlayback) status = PlaybackStatus.LOADING
+                    hasAppliedInitialLiveCushion = false
                     exo.seekToDefaultPosition()
                     exo.prepare()
                     exo.playWhenReady = !requestedPause
                     return
                 }
-                status = when (playbackState) { Player.STATE_BUFFERING -> PlaybackStatus.LOADING; Player.STATE_READY -> PlaybackStatus.READY; Player.STATE_ENDED -> PlaybackStatus.ENDED; else -> PlaybackStatus.IDLE }
+                status = when (playbackState) {
+                    Player.STATE_BUFFERING -> if (hasStartedPlayback) PlaybackStatus.READY else PlaybackStatus.LOADING
+                    Player.STATE_READY -> PlaybackStatus.READY
+                    Player.STATE_ENDED -> PlaybackStatus.ENDED
+                    else -> PlaybackStatus.IDLE
+                }
                 log(active, "status=$status positionMs=${exo.currentPosition}")
             }
             override fun onAudioPositionAdvancing(eventTime: AnalyticsListener.EventTime, playoutStartSystemTimeMs: Long) {
@@ -628,7 +655,8 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     recoveryJob = null
                     log(active, "auto-recover stage=BEHIND_LIVE_WINDOW code=${value.errorCodeName}")
                     error = null
-                    status = PlaybackStatus.LOADING
+                    if (!hasStartedPlayback) status = PlaybackStatus.LOADING
+                    hasAppliedInitialLiveCushion = false
                     exo.seekToDefaultPosition()
                     exo.prepare()
                     exo.playWhenReady = !requestedPause
@@ -639,13 +667,13 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     autoRecoveryCount++
                     val attemptStep = autoRecoveryCount
                     error = null
-                    status = PlaybackStatus.LOADING
                     log(active, "auto-recover stage=$stage step=$attemptStep code=${value.errorCodeName} http=${http ?: "unobserved"}")
                     recoveryJob?.cancel()
                     recoveryJob = sourceScope.launch {
                         kotlinx.coroutines.delay(500L * attemptStep)
                         if (released || attempt?.accepts(active.id) != true) return@launch
                         if (attemptStep == 1) {
+                            hasAppliedInitialLiveCushion = false
                             exo.seekToDefaultPosition()
                             exo.prepare()
                             exo.playWhenReady = !requestedPause
@@ -671,6 +699,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         recoveryJob = null
         if (!preserveRecoveryState) {
             hasStartedPlayback = false
+            hasAppliedInitialLiveCushion = false
             autoRecoveryCount = 0
         }
         attempt = null // Ignore stop/clear and any callbacks from the previous media item.
@@ -679,7 +708,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         qualityObservation = VideoQualityObservation()
         technicalInfo = StreamTechnicalInfo()
         exo.stop(); exo.clearMediaItems()
-        status = if (preserveRecoveryState && channel != null) PlaybackStatus.LOADING else PlaybackStatus.IDLE
+        status = if (preserveRecoveryState && channel != null) (if (hasStartedPlayback) PlaybackStatus.READY else PlaybackStatus.LOADING) else PlaybackStatus.IDLE
         val uri = playbackUri(channel)
         if (uri != null) {
             val profile = if (channel?.definition != null) "public:${PreviewCodec.id(PublicM3u.profile)}" else "demo"
@@ -696,7 +725,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     var effectiveHeaders = headers.associate { it.name to it.value }
                     var mime = channel.definition?.mimeType
                     if (WebStreamResolver.isWebPageUrl(effectiveUri)) {
-                        status = PlaybackStatus.LOADING
+                        if (!hasStartedPlayback) status = PlaybackStatus.LOADING
                         val resolved = withContext(probeDispatcher) {
                             WebStreamResolver.resolve(effectiveUri, effectiveHeaders)
                         }
@@ -714,7 +743,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                         setDefaultRequestProperties(effectiveHeaders)
                     }
                     if (StreamType.needsProbe(effectiveUri, mime)) {
-                        status = PlaybackStatus.LOADING
+                        if (!hasStartedPlayback) status = PlaybackStatus.LOADING
                         mime = withContext(probeDispatcher) {
                             // One bounded normal GET; original URI and stored headers are used again for playback.
                             val probe = DefaultHttpDataSource.Factory().apply {
@@ -743,11 +772,11 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                     if (!channel.video) {
                         itemBuilder.setLiveConfiguration(
                             MediaItem.LiveConfiguration.Builder()
-                                .setTargetOffsetMs(15_000L)
-                                .setMinOffsetMs(8_000L)
-                                .setMaxOffsetMs(28_000L)
-                                .setMinPlaybackSpeed(0.96f)
-                                .setMaxPlaybackSpeed(1.04f)
+                                .setTargetOffsetMs(38_000L) // Canlı kenardan ~38 sn geriden gel (6+ tam HLS segmenti yastık!)
+                                .setMinOffsetMs(24_000L)    // En az 24 sn geride kal, canlı kenara asla fazla yaklaşma
+                                .setMaxOffsetMs(75_000L)    // 75 sn'ye kadar geride kalmaya izin ver
+                                .setMinPlaybackSpeed(1.0f)  // Hızı asla düşürme/artırma, tamponu eritme!
+                                .setMaxPlaybackSpeed(1.0f)
                                 .build()
                         )
                     }
@@ -766,7 +795,6 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
                         autoRecoveryCount++
                         val attemptStep = autoRecoveryCount
                         error = null
-                        status = PlaybackStatus.LOADING
                         log(active, "auto-recover stage=$effectiveStage step=$attemptStep exception=${failure.javaClass.simpleName}")
                         recoveryJob?.cancel()
                         recoveryJob = sourceScope.launch {
@@ -794,8 +822,20 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         seekToDefaultPosition()
         play()
     }
+    private fun applyLiveCushionIfTooClose() {
+        if (released || channel?.video == true) return
+        val liveOffset = exo.currentLiveOffset.takeIf { it != C.TIME_UNSET && it > 0L }
+            ?: if (exo.duration > 0L && exo.duration > exo.currentPosition) exo.duration - exo.currentPosition else 0L
+        if (exo.isCurrentMediaItemLive && liveOffset in 1L..23_999L && exo.isCurrentMediaItemSeekable && exo.currentPosition > 22_000L) {
+            val targetPos = (exo.currentPosition - 22_000L).coerceAtLeast(0L)
+            exo.seekTo(targetPos)
+        }
+    }
     fun seekToDefaultPosition() {
-        if (!released) exo.seekToDefaultPosition()
+        if (released) return
+        hasAppliedInitialLiveCushion = false
+        exo.seekToDefaultPosition()
+        applyLiveCushionIfTooClose()
     }
     fun play() {
         if (!released) {
@@ -814,7 +854,7 @@ class AndroidPreviewPlayer(private val context: android.content.Context, private
         if (released) return
         released = true; attempt = null; cueGate.advance(null); captions = emptyList()
         recoveryJob?.cancel(); recoveryJob = null
-        hasStartedPlayback = false; autoRecoveryCount = 0
+        hasStartedPlayback = false; hasAppliedInitialLiveCushion = false; autoRecoveryCount = 0
         cueListener?.let(exo::removeAnalyticsListener); cueListener = null
         audioTracks = emptyList(); textTracks = emptyList(); technicalInfo = StreamTechnicalInfo()
         sourceScope.cancel(); exo.release()
