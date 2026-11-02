@@ -4,7 +4,8 @@ enum class TransferPayloadKind {
     M3U_URL,
     M3U_TEXT,
     XTREAM,
-    STALKER
+    STALKER,
+    GITHUB
 }
 
 data class TransferPayload(

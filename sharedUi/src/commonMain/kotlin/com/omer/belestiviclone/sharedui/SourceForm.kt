@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.omer.belestiviclone.shared.preview.CountryListsCatalog
 import com.omer.belestiviclone.shared.preview.SourceKind
 
-internal val sourceFormKinds = setOf("m3u", "supplement", "xtream", "stalker", "countries", "activeSources", "file", "epg")
+internal val sourceFormKinds = setOf("m3u", "supplement", "xtream", "stalker", "countries", "activeSources", "file", "epg", "githubSync")
 
 /** Same settings shell and footer; back drops the secret draft through PreviewState.dismiss. */
 @Composable
@@ -31,6 +31,7 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
         "supplement" -> s.message("Ek Liste", "Extra List", "Zusatzliste")
         "file" -> s.message("Cihazdan M3U Dosyası Yükle", "Load M3U File", "M3U-Datei laden")
         "epg" -> s.message("XMLTV EPG KAYNAĞI", "XMLTV EPG SOURCE", "XMLTV EPG-QUELLE")
+        "githubSync" -> s.message("GITHUB / UZAK LİSTE AYARLARI", "GITHUB / REMOTE LIST SETTINGS", "GITHUB / REMOTE-LISTENEINSTELLUNGEN")
         else -> s.message(if (s.editing == null) "YENİ LİSTE EKLE" else "LİSTEYİ DÜZENLE", if (s.editing == null) "ADD NEW LIST" else "EDIT LIST", if (s.editing == null) "NEUE LISTE" else "LISTE BEARBEITEN")
     }
     val scrollState = rememberScrollState()
@@ -46,7 +47,7 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
             Box(Modifier.width(3.dp).height(16.dp).background(Color(0xFFE67E22)))
             Label(if (kind == "file") s.message("DOSYA SEÇ", "CHOOSE FILE", "DATEI WÄHLEN") else title, 10, Color(0xFF94A2B7), Modifier.padding(start = 10.dp), true, letterSpacing = 1f)
         }
-        if (kind in setOf("m3u", "xtream", "stalker")) {
+        if (kind in setOf("m3u", "xtream", "stalker", "githubSync")) {
             Action(
                 label = "Telefondan Aktar",
                 modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
@@ -92,6 +93,91 @@ internal fun SourceForm(s: PreviewState, image: @Composable (String, Modifier) -
                 PrimarySubmitButton(s, kind, image)
                 Label(s.message("Boş bırakıp kaydederseniz yerleşik örnek EPG (epg_sample.xml) kullanılır.", "Leave blank and save to use the built-in sample EPG (epg_sample.xml).", "Leer lassen, um das integrierte Beispiel-EPG zu verwenden."), 10, Color(0xFF94A2B7), Modifier.padding(top = 8.dp))
                 if (s.data.pref("epgUrl").isNotBlank()) Action(s.message("VARSAYILAN ÖRNEK EPG'YE DÖN", "RESET TO SAMPLE EPG", "STANDARD-EPG WIEDERHERSTELLEN"), Modifier.fillMaxWidth(), enabled = !s.busy, click = s::clearEpgUrl)
+            }
+            "githubSync" -> {
+                Field(
+                    s.formAddress,
+                    "GITHUB DEPO (KULLANICI/DEPO) VEYA M3U URL",
+                    "ikon_url",
+                    image,
+                    placeholder = "Örn: omerolgun/tiviliste veya https://..."
+                ) { s.formAddress = it }
+                Field(
+                    s.formName,
+                    "DAL VE DOSYA YOLU (BRANCH / PATH)",
+                    "ikon_dosya",
+                    image,
+                    placeholder = "main/TiviListe.m3u"
+                ) { s.formName = it }
+                Field(
+                    s.formPassword,
+                    "GITHUB PERSONAL ACCESS TOKEN (PRIVATE REPO İÇİN)",
+                    "ikon_sifre",
+                    image,
+                    password = true,
+                    placeholder = "github_pat_... veya ghp_..."
+                ) { s.formPassword = it }
+                val autoOpen = s.formUser != "Kapalı"
+                Action(
+                    label = "Açılışta Otomatik Güncelle",
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    tint = Color(0xFF13233D),
+                    stroke = Color(0xFF223858),
+                    strokeWidth = 1.dp,
+                    radius = 10.dp,
+                    padding = PaddingValues(horizontal = 16.dp),
+                    content = {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) {
+                                Label("Açılışta Otomatik Güncelle", 12, Color.White, bold = true)
+                                Label("Uygulama açıldığında arka planda GitHub'dan en güncel TiviListe.m3u kontrol edilir", 9, Color(0xFF94A2B7))
+                            }
+                            Box(
+                                Modifier
+                                    .defaultMinSize(minWidth = 62.dp)
+                                    .height(28.dp)
+                                    .background(if (autoOpen) Color(0xFF0ABB91) else Color(0xFF68798F), RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Label(if (autoOpen) "• Açık" else "• Kapalı", 10, Color.White, bold = true)
+                            }
+                        }
+                    }
+                ) {
+                    s.formUser = if (autoOpen) "Kapalı" else "Açık"
+                }
+                Spacer(Modifier.height(9.dp))
+                Action(
+                    label = "KAYDET VE ŞİMDİ GITHUB'DAN GÜNCELLE",
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    tint = Color(0xFFE67E22),
+                    strokeWidth = 0.dp,
+                    enabled = !s.busy,
+                    content = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SettingsRowIcon("githubsync", color = Color.White, modifier = Modifier.size(16.dp))
+                            Label("KAYDET VE ŞİMDİ GITHUB'DAN GÜNCELLE", 11, Color.White, bold = true)
+                        }
+                    }
+                ) { s.saveGitHubSyncConfig(fetchNow = true) }
+                Spacer(Modifier.height(4.dp))
+                Action(
+                    label = "SADECE AYARLARI KAYDET",
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    tint = Color(0xFF1E3557),
+                    strokeWidth = 0.dp,
+                    enabled = !s.busy,
+                    content = {
+                        Label("SADECE AYARLARI KAYDET", 10, Color(0xFFFFD735), bold = true)
+                    }
+                ) { s.saveGitHubSyncConfig(fetchNow = false) }
+                Label(
+                    "Private (Özel) GitHub deponuz için 'Contents: Read-only' yetkili Fine-Grained Token girmeniz yeterlidir. Favorileriniz ve kanal sıralamanız güncelleme sırasında korunur.",
+                    10,
+                    Color(0xFF94A2B7),
+                    Modifier.padding(top = 8.dp)
+                )
+                if (s.busy) Action(s.message("İPTAL", "CANCEL", "ABBRECHEN"), Modifier.fillMaxWidth(), enabled = !s.committingSource, click = s::cancelSource)
             }
             "stalker" -> {
                 Field(s.formName, s.message("PORTAL ADI (İSTEĞE BAĞLI)", "PORTAL NAME (OPTIONAL)", "PORTALNAME (OPTIONAL)"), "ikon_liste_adi", image, placeholder = s.message("Örn: MAG Portalım", "Example: My MAG Portal", "Beispiel: Mein MAG-Portal")) { s.formName = it }

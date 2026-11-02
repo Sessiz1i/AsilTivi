@@ -1878,6 +1878,14 @@ private fun SettingsTabIcon(
                                 SettingTile("Aktif Listem", "Beleş TiVi Varsayılan Listesi", "activesources", image, s.profileName, iconKey = "activesources") { s.sourceForm("activeSources") }
                                 SettingTile("Ek Liste Ekle", s.data.library?.extra?.name ?: "Beleş TiVi listesine ek bir liste birleştir", "supplement", image, iconKey = "supplement") { s.sourceForm("supplement") }
                                 SettingTile("Listeyi Güncelle", "En güncel kanal listelerini indir", "refresh", image, iconKey = "refresh") { s.refreshSource() }
+                                val ghRepo = s.data.pref("githubRepo")
+                                val ghSubtitle = if (ghRepo.isNotBlank()) {
+                                    val lockBadge = if (s.data.pref("githubToken").isNotBlank()) "🔒 Private" else "🌐 Public"
+                                    "$lockBadge · $ghRepo · Otomatik: ${s.data.pref("autoUpdateList")}"
+                                } else {
+                                    "GitHub Private depo adresini ve erişim anahtarını (Token) yapılandır"
+                                }
+                                SettingTile("GitHub / Uzak Liste Ayarları", ghSubtitle, "githubsync", image, iconKey = "githubsync") { s.sourceForm("githubSync") }
                                 SettingTile("Varsayılan Listeye Geri Dön", "Varsayılan listeye geri dön", "defaultsource", image, iconKey = "defaultsource") { s.dialog = "defaultSource" }
                                 Spacer(Modifier.height(20.dp)); SettingsGroup("KENDİ LİSTENİ EKLE")
                                 SettingTile("M3U URL", "Özel liste adresi ile bağlan", "m3u", image, iconKey = "m3u") { s.sourceForm("m3u") }

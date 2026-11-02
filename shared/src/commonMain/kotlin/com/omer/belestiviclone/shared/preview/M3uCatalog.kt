@@ -1,14 +1,67 @@
-﻿package com.omer.belestiviclone.shared.preview
+package com.omer.belestiviclone.shared.preview
 
 import com.omer.belestiviclone.shared.catalog.*
 
 data class M3uResult(val rawRecords: Int, val rows: List<ChannelContribution>, val skipped: Map<String, Int>)
+data class RemoteM3uRequest(val url: String, val headers: Map<String, String>)
 
 /** One bounded public source. Credentials and complete playback definitions never enter logs. */
 object PublicM3u {
     const val url = "https://raw.githubusercontent.com/impresents/my-iptv-list/refs/heads/main/TiviListe.m3u"
     val source = SourceId(OpaqueId(0x411535243, 1))
     val profile = OpaqueId(0x411505246, 1)
+
+    fun buildRemoteRequest(
+        repoOrUrl: String,
+        branchAndPath: String = "main/TiviListe.m3u",
+        token: String = ""
+    ): RemoteM3uRequest? {
+        val cleanRepo = repoOrUrl.trim()
+        if (cleanRepo.isEmpty()) return null
+        val cleanToken = token.trim()
+        val cleanPath = branchAndPath.trim().trimStart('/').ifEmpty { "main/TiviListe.m3u" }
+
+        if (cleanRepo.startsWith("http://", ignoreCase = true) || cleanRepo.startsWith("https://", ignoreCase = true)) {
+            val resolvedUrl = if (cleanRepo.contains("github.com/", ignoreCase = true) && cleanRepo.contains("/blob/")) {
+                cleanRepo
+                    .replace(Regex("https?://(www\\.)?github\\.com/", RegexOption.IGNORE_CASE), "https://raw.githubusercontent.com/")
+                    .replaceFirst("/blob/", "/")
+            } else {
+                cleanRepo
+            }
+            val headers = if (cleanToken.isNotEmpty()) {
+                mapOf(
+                    "Authorization" to "Bearer $cleanToken",
+                    "Accept" to "application/vnd.github.raw+json",
+                    "User-Agent" to "BelesTiViClone/1.0"
+                )
+            } else {
+                mapOf("User-Agent" to "BelesTiViClone/1.0")
+            }
+            return RemoteM3uRequest(resolvedUrl, headers)
+        }
+
+        val repoSlug = cleanRepo.trim('/').removeSuffix(".git")
+        val branch = cleanPath.substringBefore('/').ifEmpty { "main" }
+        val filePath = cleanPath.substringAfter('/', "TiviListe.m3u").trimStart('/').ifEmpty { "TiviListe.m3u" }
+
+        return if (cleanToken.isNotEmpty()) {
+            RemoteM3uRequest(
+                url = "https://api.github.com/repos/$repoSlug/contents/$filePath?ref=$branch",
+                headers = mapOf(
+                    "Authorization" to "Bearer $cleanToken",
+                    "Accept" to "application/vnd.github.raw+json",
+                    "X-GitHub-Api-Version" to "2022-11-28",
+                    "User-Agent" to "BelesTiViClone/1.0"
+                )
+            )
+        } else {
+            RemoteM3uRequest(
+                url = "https://raw.githubusercontent.com/$repoSlug/$branch/$filePath",
+                headers = mapOf("User-Agent" to "BelesTiViClone/1.0")
+            )
+        }
+    }
     fun extractEpgUrl(text: String): String? {
         val header = text.removePrefix("\uFEFF").lineSequence().map { it.trim() }.firstOrNull { it.startsWith("#EXTM3U", ignoreCase = true) } ?: return null
         fun headerAttr(name: String) = Regex("(?:^|\\s)${Regex.escape(name)}=\"([^\"]*)\"", RegexOption.IGNORE_CASE).find(header)?.groupValues?.get(1)?.trim().orEmpty()

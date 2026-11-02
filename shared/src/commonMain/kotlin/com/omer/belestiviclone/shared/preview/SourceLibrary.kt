@@ -97,7 +97,15 @@ class SourceOperations(private val allocate: () -> OpaqueId) {
     fun default(data: PreviewData, text: String): PreviewData {
         val library = bootstrap(data)
         val source = parsed(PublicM3u.source, "TiviListesi", SourceKind.DEFAULT, PublicM3u.url, text)
-        return rebuild(data, library.copy(records = library.records.filter { it.id != source.id } + source, active = source.id))
+        val rebuilt = rebuild(data, library.copy(records = library.records.filter { it.id != source.id } + source, active = source.id))
+        val activeByName = rebuilt.channels.filter { it.available }.associateBy { it.name.trim().lowercase() }
+        val unavailableById = rebuilt.channels.filter { !it.available }.associateBy { it.id }
+        val remappedFavorites = rebuilt.favorites.map { favId ->
+            val oldCh = unavailableById[favId]
+            val replacement = oldCh?.let { activeByName[it.name.trim().lowercase()] }
+            replacement?.id ?: favId
+        }.distinct()
+        return if (remappedFavorites == rebuilt.favorites) rebuilt else rebuilt.copy(favorites = remappedFavorites)
     }
     fun saveXtream(
         data: PreviewData,

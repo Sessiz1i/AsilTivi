@@ -640,6 +640,49 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         }
         page = "live"
         loaded = true
+        autoSyncGitHubListOnStartup()
+    }
+
+    fun autoSyncGitHubListOnStartup() {
+        val loader = sourceLoader ?: return
+        if (activeSourceKind != SourceKind.DEFAULT) return
+        if (data.pref("autoUpdateList") == "Kapalı") return
+        val repo = data.pref("githubRepo").trim()
+        if (repo.isBlank()) return
+        val req = PublicM3u.buildRemoteRequest(
+            repoOrUrl = repo,
+            branchAndPath = data.pref("githubPath"),
+            token = data.pref("githubToken")
+        ) ?: return
+        val initialProfileId = data.profileId
+        scope.launch {
+            try {
+                val m3uText = withContext(Dispatchers.Default) {
+                    loader.fetch(req.url, req.headers)
+                }
+                if (busy || data.profileId != initialProfileId || activeSourceKind != SourceKind.DEFAULT) return@launch
+                val currentData = data
+                val next = withContext(Dispatchers.Default) {
+                    sources.default(currentData, m3uText)
+                }
+                val oldActiveUris = currentData.channels.filter { it.available }.map { it.name to playbackUri(it) }
+                val newActiveUris = next.channels.filter { it.available }.map { it.name to playbackUri(it) }
+                if (oldActiveUris != newActiveUris) {
+                    withContext(NonCancellable) {
+                        if (isPublic) publicStore?.save(next) else if (!sessionOnly) store.save(next)
+                        data = next
+                        showBottomToast(
+                            "✅ Kanal listesi GitHub'dan güncellendi (${next.channels.count { it.available }} kanal)",
+                            ToastTone.Success
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // İnternet yoksa veya GitHub erişilemezse sessizce geç, mevcut listeyi ve yayını bozma
+            }
+        }
     }
     fun switchProfile(public: Boolean) {
         if (busy) return
@@ -992,6 +1035,16 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun sourceForm(type: String, index: Int? = null) {
         if (busy) return
+        if (type == "githubSync") {
+            editing = null
+            formAddress = data.pref("githubRepo")
+            formName = data.pref("githubPath").ifBlank { "main/TiviListe.m3u" }
+            formPassword = data.pref("githubToken")
+            formUser = data.pref("autoUpdateList").ifBlank { "Açık" }
+            formMac = ""
+            dialog = "githubSync"
+            return
+        }
         if (type == "epg") {
             editing = null; formName = ""; formAddress = data.pref("epgUrl")
             formUser = ""; formPassword = ""; formMac = ""; dialog = "epg"
@@ -1065,6 +1118,54 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         if (busy) return
         formAddress = ""
         saveEpgUrl()
+    }
+    fun saveGitHubSyncConfig(fetchNow: Boolean = true) {
+        if (busy) return
+        val repo = formAddress.trim()
+        val path = formName.trim().ifBlank { "main/TiviListe.m3u" }
+        val token = formPassword.trim()
+        val autoUpdate = if (formUser == "Kapalı") "Kapalı" else "Açık"
+        val updatedData = data
+            .withPref("githubRepo", repo)
+            .withPref("githubPath", path)
+            .withPref("githubToken", token)
+            .withPref("autoUpdateList", autoUpdate)
+        if (!fetchNow || repo.isBlank()) {
+            commit(updatedData) {
+                dismiss()
+                showBottomToast(
+                    if (repo.isBlank()) "✅ GitHub uzak liste ayarları temizlendi"
+                    else "✅ GitHub uzak liste ayarları kaydedildi",
+                    ToastTone.Success
+                )
+            }
+            return
+        }
+        val loader = sourceLoader
+        val req = PublicM3u.buildRemoteRequest(repo, path, token)
+        if (loader == null || req == null) {
+            commit(updatedData) {
+                dismiss()
+                showBottomToast("✅ GitHub uzak liste ayarları kaydedildi", ToastTone.Success)
+            }
+            return
+        }
+        sourceOperation(
+            onCommitted = { next ->
+                showBottomToast(
+                    "✅ GitHub'dan güncel kanal listesi indirildi (${next.channels.count { it.available }} kanal)",
+                    ToastTone.Success
+                )
+            }
+        ) { before ->
+            val updatedBefore = before
+                .withPref("githubRepo", repo)
+                .withPref("githubPath", path)
+                .withPref("githubToken", token)
+                .withPref("autoUpdateList", autoUpdate)
+            val m3uText = loader.fetch(req.url, req.headers)
+            sources.default(updatedBefore, m3uText)
+        }
     }
     fun saveSource() {
         when (dialog) {
@@ -1220,7 +1321,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
         generation++; sourceJob?.cancel(); sourceJob = null; busy = false
         notice = message("İptal edildi. Önceki kaynak korundu.", "Canceled. Previous source preserved.", "Abgebrochen. Vorherige Quelle beibehalten.")
     }
-    private fun sourceOperation(prepare: suspend (PreviewData) -> PreviewData) {
+    private fun sourceOperation(onCommitted: ((PreviewData) -> Unit)? = null, prepare: suspend (PreviewData) -> PreviewData) {
         if (busy || sessionOnly && !isPublic) return
         val before = data; val public = isPublic; val ticket = ++generation
         busy = true; notice = message("Yükleniyor… Önceki kaynak korunuyor.", "Loading… Previous source preserved.", "Laden… Vorherige Quelle bleibt erhalten.")
@@ -1239,6 +1340,7 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
                     dismiss()
                     val skipped = next.library?.main?.skippedCount ?: 0
                     notice = message("${next.channels.count { it.available }} içerik yüklendi; $skipped giriş atlandı.", "${next.channels.count { it.available }} items loaded; $skipped skipped.", "${next.channels.count { it.available }} Einträge geladen; $skipped übersprungen.")
+                    onCommitted?.invoke(next)
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { if (ticket == generation) sourceError(error) }
@@ -1267,11 +1369,33 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
     }
     fun restoreDefault() { sourceOperation { before -> sources.default(before, requireNotNull(sourceLoader).defaultText()) } }
     fun refreshSource() {
-        sourceOperation { before ->
+        val usingGitHub = activeSourceKind == SourceKind.DEFAULT && data.pref("githubRepo").isNotBlank()
+        sourceOperation(
+            onCommitted = { next ->
+                val count = next.channels.count { it.available }
+                if (usingGitHub) {
+                    showBottomToast("✅ GitHub'dan güncel kanal listesi indirildi ($count kanal)", ToastTone.Success)
+                } else {
+                    showBottomToast("✅ Kanal listesi güncellendi ($count kanal)", ToastTone.Success)
+                }
+            }
+        ) { before ->
             val library = sources.bootstrap(before); val main = library.main
             val loader = requireNotNull(sourceLoader)
             var next = when (main.kind) {
-                SourceKind.DEFAULT -> sources.default(before, loader.fetch(PublicM3u.url))
+                SourceKind.DEFAULT -> {
+                    val req = PublicM3u.buildRemoteRequest(
+                        repoOrUrl = before.pref("githubRepo"),
+                        branchAndPath = before.pref("githubPath"),
+                        token = before.pref("githubToken")
+                    )
+                    val m3uText = if (req != null) {
+                        loader.fetch(req.url, req.headers)
+                    } else {
+                        loader.defaultText()
+                    }
+                    sources.default(before, m3uText)
+                }
                 SourceKind.URL -> sources.save(before, main.name, main.address, loader.fetch(main.address), main.id)
                 SourceKind.COUNTRY -> {
                     val preset = CountryListsCatalog.presets.firstOrNull { it.remoteUrl == main.address }
@@ -1363,6 +1487,17 @@ class PreviewState(private val store: PreviewStore, private val scope: Coroutine
                     lastStalkerSession = session
                     sources.saveStalker(before, name, payload.portalUrl, payload.mac, m3uText)
                 }
+            }
+            TransferPayloadKind.GITHUB -> {
+                val repo = payload.url.trim()
+                val path = payload.name.trim().ifBlank { "main/TiviListe.m3u" }
+                val token = payload.password.trim()
+                val autoUpdate = if (payload.username == "Kapalı") "Kapalı" else "Açık"
+                formAddress = repo
+                formName = path
+                formPassword = token
+                formUser = autoUpdate
+                saveGitHubSyncConfig(fetchNow = repo.isNotBlank() && loader != null)
             }
         }
     }

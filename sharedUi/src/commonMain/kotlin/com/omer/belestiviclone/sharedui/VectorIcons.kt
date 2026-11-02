@@ -619,6 +619,23 @@ internal fun SettingsRowIcon(
                 val y2 = center.y + r * kotlin.math.sin(rad2)
                 drawLine(color = color, start = Offset(x2, y2), end = Offset(x2 - 3.dp.toPx(), y2 + 2.dp.toPx()), strokeWidth = stroke, cap = StrokeCap.Round)
             }
+            "githubsync" -> {
+                // GitHub / Uzak Liste Senkronizasyonu: Bulut + İndirme/Senkron oku
+                val cloudPath = Path().apply {
+                    moveTo(w * 0.25f, h * 0.66f)
+                    cubicTo(w * 0.10f, h * 0.66f, w * 0.10f, h * 0.42f, w * 0.26f, h * 0.40f)
+                    cubicTo(w * 0.30f, h * 0.20f, w * 0.62f, h * 0.18f, w * 0.68f, h * 0.36f)
+                    cubicTo(w * 0.88f, h * 0.36f, w * 0.90f, h * 0.66f, w * 0.74f, h * 0.66f)
+                }
+                drawPath(cloudPath, color = color, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                val arrowX = w * 0.50f
+                val arrowTop = h * 0.42f
+                val arrowBottom = h * 0.82f
+                drawLine(color = color, start = Offset(arrowX, arrowTop), end = Offset(arrowX, arrowBottom), strokeWidth = stroke, cap = StrokeCap.Round)
+                val head = w * 0.14f
+                drawLine(color = color, start = Offset(arrowX - head, arrowBottom - head), end = Offset(arrowX, arrowBottom), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color = color, start = Offset(arrowX + head, arrowBottom - head), end = Offset(arrowX, arrowBottom), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
             "defaultsource" -> {
                 // Varsayılan Listeye Geri Dön: Geriye dönen kavisli ok
                 val r = w * 0.38f

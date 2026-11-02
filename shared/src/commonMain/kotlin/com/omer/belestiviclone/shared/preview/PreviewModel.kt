@@ -185,7 +185,11 @@ data class PreviewData(
         "epgUrl" to "",
         "savedMultiLayouts" to "",
         "lastMultiLayout" to "",
-        "radioBg" to "Varsayılan"
+        "radioBg" to "Varsayılan",
+        "githubRepo" to "",
+        "githubPath" to "main/TiviListe.m3u",
+        "githubToken" to "",
+        "autoUpdateList" to "Açık"
     ),
     val sources: List<String> = listOf("Örnek kayıt"),
     val channels: List<PreviewChannel> = PreviewFixture.channels,
@@ -196,6 +200,8 @@ data class PreviewData(
         val raw = preferences[key].orEmpty()
         return if (key == "theme" && (raw == "Beleş TiVi Klasik" || raw.isBlank())) "Klasik"
         else if (key == "radioBg" && raw.isBlank()) "Varsayılan"
+        else if (key == "githubPath" && raw.isBlank()) "main/TiviListe.m3u"
+        else if (key == "autoUpdateList" && raw.isBlank()) "Açık"
         else raw
     }
     fun withPref(key: String, value: String) = copy(preferences = preferences + (key to value))
