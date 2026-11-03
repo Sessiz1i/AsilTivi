@@ -174,19 +174,6 @@ class AndroidWebTransferServer(
                         mac = mac
                     )
                 }
-                "github" -> {
-                    val repo = (json["url"] ?: json["repo"] ?: "").trim()
-                    val path = (json["name"] ?: json["path"] ?: "main/TiviListe.m3u").trim().ifEmpty { "main/TiviListe.m3u" }
-                    val token = (json["password"] ?: json["token"] ?: "").trim()
-                    val autoUpdate = (json["username"] ?: json["autoUpdate"] ?: "Açık").trim().ifEmpty { "Açık" }
-                    TransferPayload(
-                        TransferPayloadKind.GITHUB,
-                        name = path,
-                        url = repo,
-                        username = autoUpdate,
-                        password = token
-                    )
-                }
                 else -> error("Bilinmeyen aktarım türü: $type")
             }
 
@@ -435,7 +422,6 @@ class AndroidWebTransferServer(
             <div class="tab active" onclick="switchTab('m3u')">M3U Listesi</div>
             <div class="tab" onclick="switchTab('xtream')">Xtream Codes</div>
             <div class="tab" onclick="switchTab('stalker')">Stalker / MAC</div>
-            <div class="tab" onclick="switchTab('github')">GitHub Private</div>
         </div>
 
         <!-- M3U Form -->
@@ -498,35 +484,17 @@ class AndroidWebTransferServer(
             <button class="submit-btn" onclick="sendStalker()">TV'ye Gönder</button>
         </div>
 
-        <!-- GitHub Private Form -->
-        <div id="tab-github" class="tab-content" style="display:none;">
-            <div class="form-group">
-                <label>GitHub Depo (kullanici/depo veya URL)</label>
-                <input type="text" id="github-repo" placeholder="Örn: omerolgun/tiviliste">
-            </div>
-            <div class="form-group">
-                <label>Dal ve Dosya Yolu (Branch / Path)</label>
-                <input type="text" id="github-path" value="main/TiviListe.m3u" placeholder="main/TiviListe.m3u">
-            </div>
-            <div class="form-group">
-                <label>GitHub Token (Private Repo İçin)</label>
-                <input type="password" id="github-token" placeholder="github_pat_... veya ghp_...">
-            </div>
-            <button class="submit-btn" onclick="sendGitHub()">TV'ye Gönder ve Güncelle</button>
-        </div>
-
         <div id="status" class="status-box"></div>
     </div>
 
     <script>
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach((t, idx) => {
-                t.classList.toggle('active', (tabId === 'm3u' && idx === 0) || (tabId === 'xtream' && idx === 1) || (tabId === 'stalker' && idx === 2) || (tabId === 'github' && idx === 3));
+                t.classList.toggle('active', (tabId === 'm3u' && idx === 0) || (tabId === 'xtream' && idx === 1) || (tabId === 'stalker' && idx === 2));
             });
             document.getElementById('tab-m3u').style.display = tabId === 'm3u' ? 'block' : 'none';
             document.getElementById('tab-xtream').style.display = tabId === 'xtream' ? 'block' : 'none';
             document.getElementById('tab-stalker').style.display = tabId === 'stalker' ? 'block' : 'none';
-            document.getElementById('tab-github').style.display = tabId === 'github' ? 'block' : 'none';
             hideStatus();
         }
 
@@ -612,18 +580,6 @@ class AndroidWebTransferServer(
                 return;
             }
             postData({ type: 'stalker', name: name, portal: portal, mac: mac });
-        }
-
-        function sendGitHub() {
-            const repo = document.getElementById('github-repo').value.trim();
-            const path = document.getElementById('github-path').value.trim() || 'main/TiviListe.m3u';
-            const token = document.getElementById('github-token').value.trim();
-
-            if (!repo) {
-                showStatus("Lütfen GitHub depo adını (kullanici/depo) veya URL'yi girin.", false);
-                return;
-            }
-            postData({ type: 'github', url: repo, name: path, password: token, username: 'Açık' });
         }
     </script>
 </body>

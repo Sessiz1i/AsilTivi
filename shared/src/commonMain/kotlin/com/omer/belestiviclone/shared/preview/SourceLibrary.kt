@@ -38,6 +38,20 @@ interface SourceLoader {
     suspend fun fetch(address: String): String
     suspend fun fetch(address: String, headers: Map<String, String>): String = fetch(address)
     suspend fun defaultText(): String
+    suspend fun fetchLatestDefault(preferences: Map<String, String> = emptyMap()): String {
+        val repo = preferences["githubRepo"].orEmpty().trim()
+        if (repo.isNotEmpty()) {
+            val req = PublicM3u.buildRemoteRequest(
+                repoOrUrl = repo,
+                branchAndPath = preferences["githubPath"].orEmpty(),
+                token = preferences["githubToken"].orEmpty()
+            )
+            if (req != null) {
+                runCatching { return fetch(req.url, req.headers) }
+            }
+        }
+        return defaultText()
+    }
 }
 class SourceProblem(val code: String) : IllegalArgumentException(code)
 

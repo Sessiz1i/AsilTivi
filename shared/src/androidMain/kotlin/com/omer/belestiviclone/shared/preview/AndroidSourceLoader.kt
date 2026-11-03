@@ -1,4 +1,4 @@
-﻿package com.omer.belestiviclone.shared.preview
+package com.omer.belestiviclone.shared.preview
 
 import android.content.Context
 import java.net.HttpURLConnection
@@ -8,6 +8,43 @@ import kotlinx.coroutines.*
 class AndroidSourceLoader(private val context: Context) : SourceLoader {
     override suspend fun defaultText(): String = withContext(Dispatchers.IO) {
         context.assets.open("TiviListe.m3u").use { it.boundedText(4 * 1024 * 1024) }
+    }
+    override suspend fun fetchLatestDefault(preferences: Map<String, String>): String = withContext(Dispatchers.IO) {
+        val assetCfg = readAssetSyncConfig()
+        val repo = preferences["githubRepo"].orEmpty().trim().ifEmpty { assetCfg["repo"].orEmpty().trim() }
+        val path = preferences["githubPath"].orEmpty().trim().ifEmpty {
+            assetCfg["path"].orEmpty().trim().ifEmpty {
+                val br = assetCfg["branch"].orEmpty().trim().ifEmpty { "main" }
+                "$br/TiviListe.m3u"
+            }
+        }
+        val token = preferences["githubToken"].orEmpty().trim().ifEmpty { assetCfg["token"].orEmpty().trim() }
+        if (repo.isNotEmpty()) {
+            val req = PublicM3u.buildRemoteRequest(repoOrUrl = repo, branchAndPath = path, token = token)
+            if (req != null) {
+                try {
+                    val remoteText = fetch(req.url, req.headers)
+                    if (remoteText.trimStart().removePrefix("\uFEFF").startsWith("#EXTM3U", ignoreCase = true)) {
+                        return@withContext remoteText
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Uzak sunucuya ulaşılamazsa yerleşik TiviListe.m3u dosyasına düş
+                }
+            }
+        }
+        defaultText()
+    }
+    private fun readAssetSyncConfig(): Map<String, String> = try {
+        val raw = context.assets.open("github_sync.json").use { it.boundedText(64 * 1024) }
+        val map = mutableMapOf<String, String>()
+        Regex("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"").findAll(raw).forEach { m ->
+            map[m.groupValues[1]] = m.groupValues[2]
+        }
+        map
+    } catch (_: Exception) {
+        emptyMap()
     }
     override suspend fun fetch(address: String): String = fetch(address, emptyMap())
     override suspend fun fetch(address: String, headers: Map<String, String>): String = withContext(Dispatchers.IO) {

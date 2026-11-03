@@ -168,7 +168,7 @@ class F6SourcesStateTest {
         assertEquals("https://raw.githubusercontent.com/omerolgun/tiviliste/main/TiviListe.m3u", blobReq.url)
         assertEquals("Bearer ghp_secret", blobReq.headers["Authorization"])
 
-        // 2. Test saveGitHubSyncConfig & favorite preservation across URL update
+        // 2. Test startup auto-sync & "Listeyi Güncelle" (refreshSource) favorite preservation across URL update
         var remoteM3u = """
             #EXTM3U
             #EXTINF:0 CUID="1" tvg-name="TRT 1" group-title="ULUSAL",TRT 1
@@ -189,22 +189,18 @@ class F6SourcesStateTest {
             }
         }
         val store = FakeStore()
+        store.value = store.value
+            .withPref("githubRepo", "omerolgun/tiviliste")
+            .withPref("githubPath", "main/TiviListe.m3u")
+            .withPref("githubToken", "github_pat_testtoken")
         val state = PreviewState(store, this, sourceLoader = loader)
         state.load()
-
-        state.sourceForm("githubSync")
-        assertEquals("githubSync", state.dialog)
-        state.formAddress = "omerolgun/tiviliste"
-        state.formName = "main/TiviListe.m3u"
-        state.formPassword = "github_pat_testtoken"
-        state.formUser = "Açık"
-        state.saveGitHubSyncConfig(fetchNow = true)
         settle(state)
 
-        assertNull(state.dialog)
         assertEquals("https://api.github.com/repos/omerolgun/tiviliste/contents/TiviListe.m3u?ref=main", lastRequestedUrl)
         assertEquals("Bearer github_pat_testtoken", lastAuthHeader)
         assertEquals(2, state.data.filtered("Tümü", "").size)
+        assertEquals("✅ Kanal listesi güncellendi (2 kanal)", state.bottomToastMessage)
 
         // Add Flash Haber to favorites, then simulate fixing its stream URL on GitHub
         val oldFlash = state.data.filtered("Tümü", "").first { it.name == "Flash Haber" }
@@ -223,6 +219,7 @@ class F6SourcesStateTest {
         state.refreshSource()
         settle(state)
 
+        assertEquals("✅ Kanal listesi güncellendi (2 kanal)", state.bottomToastMessage)
         val favChannels = state.data.filtered("Favoriler", "")
         val updatedFlash = favChannels.firstOrNull { it.name == "Flash Haber" }
         assertNotNull(updatedFlash)
