@@ -78,7 +78,7 @@ https://turkmedya-live.ercdn.net/tv4/tv4.m3u8
 #EXTINF:0 CUID="39" tvg-name="TRT 2" tvg-logo="https://itv224186.tmp.tivibu.com.tr:6430/images/poster/20250801839153.png" group-title="Ulusal",TRT 2
 https://tv-trt2.medya.trt.com.tr/master.m3u8
 #EXTINF:0 CUID="40" tvg-name="Akit TV" tvg-logo="https://upload.wikimedia.org/wikipedia/tr/c/cf/Akit_TV.png" group-title="Haber",Akit TV
-https://raw.githubusercontent.com/sunarproje/yt/main/streams/akit.m3u8
+https://www.akittv.com.tr/canli-izle
 #EXTINF:0 CUID="41" tvg-name="GZT" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/GZT_logo.svg/960px-GZT_logo.svg.png" group-title="Ulusal",GZT
 https://gzttv-live.lg.mncdn.com/gzttv-live/gzttv/chunklist.m3u8
 #EXTINF:0 CUID="42" tvg-name="Bi Kanal" tvg-logo="https://static.ssportplus.com/wp-content/uploads/2025/09/kanallar_bikanal.png" group-title="Ulusal",Bi Kanal
