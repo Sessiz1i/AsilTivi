@@ -40,7 +40,7 @@ https://turkmedya-live.ercdn.net/tv24/tv24.m3u8
 #EXTINF:0 CUID="20" tvg-name="NTV" tvg-logo="https://gitlatte.github.io/m3ueditor/images/kanal-gorselleri/turkiye/ntv-tr.png" group-title="Haber",NTV
 https://dogus.daioncdn.net/ntv/ntv.m3u8?app=ntv_web
 #EXTINF:0 CUID="21" tvg-name="CNN Türk" tvg-logo="https://raw.githubusercontent.com/GitLatte/m3ueditor/refs/heads/site/images/kanal-gorselleri/turkiye/cnn-turk-tr.png" group-title="Haber",CNN Türk
-https://www.cnnturk.com/canli-yayin
+https://www.youtube.com/watch?v=6N8_r2uwLEc
 #EXTINF:0 CUID="22" tvg-name="A Para" tvg-logo="https://play-lh.googleusercontent.com/BCV0M24ufvt6FzjW_eLpETj6LTWGyHrPvcPZhWToH1wJF6dEgYEdshr-xNYbZUGdtA" group-title="Haber",A Para
 https://tv.sunarproje.com.tr/apara.m3u8
 #EXTINF:0 CUID="23" tvg-name="Habertürk" tvg-logo="https://itv224186.tmp.tivibu.com.tr:6430/images/poster/20250801838714.png" group-title="Haber",Habertürk
